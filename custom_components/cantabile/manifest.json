@@ -1,0 +1,15 @@
+{
+  "domain": "cantabile",
+  "name": "Cantabile",
+  "after_dependencies": ["lovelace", "sonos"],
+  "codeowners": ["@Gyuszko55"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http", "media_source", "websocket_api"],
+  "documentation": "https://github.com/Gyuszko55/ha-cantabile",
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/Gyuszko55/ha-cantabile/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "1.0.0"
+}

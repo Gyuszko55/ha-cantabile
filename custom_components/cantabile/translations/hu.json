@@ -1,0 +1,103 @@
+{
+  "config": {
+    "abort": {
+      "single_instance_allowed": "A Cantabile már be van állítva."
+    },
+    "step": {
+      "user": {
+        "title": "Cantabile",
+        "description": "Hozzáadja a Cantabile rádió- és magnókártyát (custom:cantabile-card) és a hozzá kellő szolgáltatásokat. A hangszórókat, az adókat és a zenemappát magán a kártyán állítod be (⚙).",
+        "data": {
+          "llm_api": "Assist-eszköz (LLM API)"
+        },
+        "data_description": {
+          "llm_api": "Az LLM-es beszélgetőügynökök (Gemini, OpenAI, Claude…) zenét és rádiót indíthatnak vele. Az ügynök beállításaiban is kapcsold be a „Cantabile”-t."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "llm_api": "Assist-eszköz (LLM API)"
+        },
+        "data_description": {
+          "llm_api": "Az LLM-es beszélgetőügynökök zenét és rádiót indíthatnak vele. Az ügynök beállításaiban is kapcsold be a „Cantabile”-t."
+        }
+      }
+    }
+  },
+  "entity": {
+    "number": {
+      "rounds": {
+        "name": "Ismétlésszám"
+      }
+    },
+    "sensor": {
+      "sleep_timer": {
+        "name": "Alvásidőzítő"
+      },
+      "net_station": {
+        "name": "Hanggal indított adó"
+      }
+    }
+  },
+  "selector": {
+    "kind": {
+      "options": {
+        "auto": "Automatikus",
+        "artist": "Előadó",
+        "album": "Album",
+        "track": "Szám",
+        "radio": "Rádióadó",
+        "playlist": "Lista"
+      }
+    },
+    "source": {
+      "options": {
+        "auto": "Automatikus (zenemappa, aztán Deezer)",
+        "local": "Zenemappa",
+        "deezer": "Deezer"
+      }
+    }
+  },
+  "services": {
+    "play": {
+      "name": "Lejátszás név alapján",
+      "description": "Előadót, albumot, számot, rádióadót vagy listát keres név szerint, és elindítja egy Cantabile hangszórón. Válaszként visszaadja, mi szól és hol.",
+      "fields": {
+        "query": { "name": "Mit", "description": "Az előadó, album, szám, adó vagy lista neve." },
+        "kind": { "name": "Fajta", "description": "Mire vonatkozik a név; ha nem biztos, automatikus." },
+        "artist": { "name": "Előadó", "description": "Az album vagy szám előadója, ha ismert." },
+        "speaker": { "name": "Hangszóró", "description": "A hangszóró neve a kártyáról, vagy „mindkettő” a Sonos hangszórók együtt. Üresen: ami most szól, különben az első." },
+        "shuffle": { "name": "Keverve", "description": "Véletlen sorrend. Előadónál alapból igen." },
+        "source": { "name": "Forrás", "description": "Hol keressen zenét." }
+      }
+    },
+    "play_tracks": {
+      "name": "Számok lejátszása egymás után",
+      "description": "Sor nélküli lejátszókhoz (pl. WiiM): sorban lejátssza a számokat, az ismétlésszám szerint; leáll, ha közben más kezd szólni.",
+      "fields": {
+        "entity_id": { "name": "Lejátszó", "description": "A lejátszó." },
+        "tracks": { "name": "Számok", "description": "Média-forrás azonosítók vagy URL-ek listája, sorrendben." },
+        "start": { "name": "Kezdés", "description": "Az első szám sorszáma (0 = az első)." }
+      }
+    },
+    "stop_tracks": {
+      "name": "Sorozatlejátszás leállítása",
+      "description": "Leállítja a „Számok lejátszása egymás után” sorozatot.",
+      "fields": {
+        "entity_id": { "name": "Lejátszó", "description": "A lejátszó; üresen mind." }
+      }
+    },
+    "sleep_timer": {
+      "name": "Alvásidőzítő",
+      "description": "A megadott perc múlva leállítja a lejátszót (az utolsó 30 mp-ben lehalkít). Sonoson a hangszóró saját időzítője fut. 0 törli az időzítőt.",
+      "fields": {
+        "entity_id": { "name": "Lejátszó", "description": "A lejátszó." },
+        "minutes": { "name": "Perc", "description": "Idő a leállásig; 0 törli." }
+      }
+    }
+  }
+}

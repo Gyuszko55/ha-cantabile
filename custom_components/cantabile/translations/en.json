@@ -1,0 +1,103 @@
+{
+  "config": {
+    "abort": {
+      "single_instance_allowed": "Cantabile is already set up."
+    },
+    "step": {
+      "user": {
+        "title": "Cantabile",
+        "description": "Adds the Cantabile radio & cassette deck card (custom:cantabile-card) and the services it needs. Speakers, stations and the music folder are set on the card itself (⚙).",
+        "data": {
+          "llm_api": "Assist tool (LLM API)"
+        },
+        "data_description": {
+          "llm_api": "Lets LLM-based conversation agents (Gemini, OpenAI, Claude…) start music and radio. Turn on “Cantabile” in the agent's options as well."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "llm_api": "Assist tool (LLM API)"
+        },
+        "data_description": {
+          "llm_api": "Lets LLM-based conversation agents start music and radio. Turn on “Cantabile” in the agent's options as well."
+        }
+      }
+    }
+  },
+  "entity": {
+    "number": {
+      "rounds": {
+        "name": "Repeat rounds"
+      }
+    },
+    "sensor": {
+      "sleep_timer": {
+        "name": "Sleep timer"
+      },
+      "net_station": {
+        "name": "Voice-started station"
+      }
+    }
+  },
+  "selector": {
+    "kind": {
+      "options": {
+        "auto": "Automatic",
+        "artist": "Artist",
+        "album": "Album",
+        "track": "Track",
+        "radio": "Radio station",
+        "playlist": "Playlist"
+      }
+    },
+    "source": {
+      "options": {
+        "auto": "Automatic (music folder, then Deezer)",
+        "local": "Music folder",
+        "deezer": "Deezer"
+      }
+    }
+  },
+  "services": {
+    "play": {
+      "name": "Play by name",
+      "description": "Finds an artist, album, track, radio station or playlist by name and starts it on a Cantabile speaker. Returns what is playing and where.",
+      "fields": {
+        "query": { "name": "What", "description": "Name of the artist, album, track, station or playlist." },
+        "kind": { "name": "Kind", "description": "What the name refers to; automatic when unsure." },
+        "artist": { "name": "Artist", "description": "Artist of the album or track, if known." },
+        "speaker": { "name": "Speaker", "description": "Speaker name from the card, or “all” for every Sonos speaker together. Empty: the one playing now, otherwise the first." },
+        "shuffle": { "name": "Shuffle", "description": "Random order. On by default for an artist." },
+        "source": { "name": "Source", "description": "Where to look for music." }
+      }
+    },
+    "play_tracks": {
+      "name": "Play tracks one after another",
+      "description": "For players without a queue (e.g. WiiM): plays the tracks in order, repeating by the repeat rounds; stops when something else starts playing.",
+      "fields": {
+        "entity_id": { "name": "Player", "description": "The media player." },
+        "tracks": { "name": "Tracks", "description": "List of media-source IDs or URLs, in order." },
+        "start": { "name": "Start at", "description": "Index of the first track (0 = first)." }
+      }
+    },
+    "stop_tracks": {
+      "name": "Stop track sequence",
+      "description": "Stops the track sequence started by “Play tracks one after another”.",
+      "fields": {
+        "entity_id": { "name": "Player", "description": "The media player; empty = all." }
+      }
+    },
+    "sleep_timer": {
+      "name": "Sleep timer",
+      "description": "Stops the player after the given minutes (fading out during the last 30 seconds). Sonos uses its own timer. 0 clears the timer.",
+      "fields": {
+        "entity_id": { "name": "Player", "description": "The media player." },
+        "minutes": { "name": "Minutes", "description": "Time until stopping; 0 clears it." }
+      }
+    }
+  }
+}

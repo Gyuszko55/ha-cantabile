@@ -1,0 +1,14 @@
+# Changelog
+
+## 1.0.0 – unreleased
+
+First public release, generalised from a home-made dashboard card.
+
+- `cantabile` integration (UI setup) that serves and registers the `custom:cantabile-card` card.
+- Server side: real VU signal (`cantabile/signal`), music-folder listing and search, Deezer proxy, Radio Browser.
+- Entities: repeat rounds, sleep timer, voice-started station.
+- Services: `cantabile.play`, `cantabile.play_tracks`, `cantabile.stop_tracks`, `cantabile.sleep_timer`.
+- Built-in track-by-track player for players without a queue (e.g. WiiM) and a repeat-round counter for Sonos.
+- “Cantabile” LLM API for Assist (any LLM conversation agent).
+- Card: Hungarian and English labels (follows the Home Assistant language), English configuration keys,
+  configurable 48 kHz and upload folders, works without preset stations.

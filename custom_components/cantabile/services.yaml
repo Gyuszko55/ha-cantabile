@@ -1,0 +1,75 @@
+play:
+  fields:
+    query:
+      required: true
+      example: A Kind of Magic
+      selector:
+        text:
+    kind:
+      default: auto
+      selector:
+        select:
+          translation_key: kind
+          options: [auto, artist, album, track, radio, playlist]
+    artist:
+      selector:
+        text:
+    speaker:
+      example: Living room
+      selector:
+        text:
+    shuffle:
+      selector:
+        boolean:
+    source:
+      default: auto
+      selector:
+        select:
+          translation_key: source
+          options: [auto, local, deezer]
+
+play_tracks:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          multiple: true
+    tracks:
+      required: true
+      example: '["media-source://media_source/local/Music/Artist/Album/01.flac"]'
+      selector:
+        object:
+    start:
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 999
+          mode: box
+
+stop_tracks:
+  fields:
+    entity_id:
+      selector:
+        entity:
+          domain: media_player
+          multiple: true
+
+sleep_timer:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          multiple: true
+    minutes:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 720
+          unit_of_measurement: min
+          mode: box
