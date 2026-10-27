@@ -13,6 +13,8 @@ jobs:
       - uses: home-assistant/actions/hassfest@master
 
   hacs:
+    # a HACS-ellenőrző csak nyilvános tárolót vizsgál
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     steps:
       - uses: hacs/action@main
