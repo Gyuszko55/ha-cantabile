@@ -365,7 +365,7 @@ class CantabileCard extends HTMLElement {
     const hl = [...config.hangszorok], sonosok = hl.filter((h) => h.mod === "sonos");
     if (sonosok.length >= 2 && config.multiroom !== false) {
       const utolso = hl.lastIndexOf(sonosok[sonosok.length - 1]);
-      hl.splice(utolso + 1, 0, { nev: sonosok.map((h) => h.nev).join(" + "), rovid: sonosok.length === 2 ? T("Mindkettő") : T("Mind"), entity: sonosok[0].entity, mod: "sonos", tagok: sonosok.map((h) => h.entity), kulcs: "multiroom" });
+      hl.splice(utolso + 1, 0, { nev: sonosok.map((h) => h.nev).join(" + "), rovid: "Multiroom", entity: sonosok[0].entity, mod: "sonos", tagok: sonosok.map((h) => h.entity), kulcs: "multiroom" });
     }
     this._kimenetek = [...hl, ...(config.bt === false ? [] : [{ nev: "BT", entity: HELYI, mod: "helyi" }])];
     this._hsz = null;
@@ -413,6 +413,7 @@ class CantabileCard extends HTMLElement {
         const sz = e[0]?.contentRect.width;
         if (sz) this.toggleAttribute("keskeny", sz < 600);
         const sr = this.shadowRoot; if (sr) { this._gorgo(sr.getElementById("kcim")); this._gorgo(sr.querySelector("#ksor .kea")); }
+        this._igazitKesobb();
       });
       this._meret.observe(this);
     }
@@ -501,16 +502,16 @@ class CantabileCard extends HTMLElement {
     const tolo = (nevek, osztaly, cim) => `<div class="tolo ${osztaly}"><div class="tnevek">${nevek}</div><div class="sin" title="${cim}"><i class="tfog"></i></div></div>`;
     const valaszto = `<div class="kimenet"><div class="tolok">
       <div class="toloo">${tolo(hszIdx.map((i) => `<button class="hszv" data-i="${i}" title="${ESC(kim[i].nev)}">${ESC(kim[i].rovid || kim[i].nev)}</button>`).join(""), "thsz", T("Hangszóró váltása"))}<small>SPEAKERS</small></div>
-      ${btIdx >= 0 ? `<div class="toloo">${tolo(`<button class="btv" data-b="1">${T("be")}</button><button class="btv" data-b="0">${T("ki")}</button>`, "tbt", T("BT be / ki"))}<small>BT</small></div>` : ""}
+      ${btIdx >= 0 ? `<div class="toloo">${tolo(`<button class="btv" data-b="1">ON</button><button class="btv" data-b="0">OFF</button>`, "tbt", T("BT be / ki"))}<small>BT</small></div>` : ""}
     </div></div>`;
     // forgó hangszóró-választó a magnón (Marantz SELECTOR mintára): körben a hangszórók, a kiválasztott lámpája világít
     const L0 = kim.map((h, i) => i).filter((i) => kim[i].entity !== HELYI), nL = L0.length;
-    this._forgoSzog = (i) => (nL > 1 ? -80 + (160 * L0.indexOf(i)) / (nL - 1) : 0);
-    const fPont = (i, r) => { const a = (this._forgoSzog(i) * Math.PI) / 180; return [90 + r * Math.sin(a), 60 - r * Math.cos(a)]; };
+    this._forgoSzog = (i) => (nL > 1 ? -82 + (164 * L0.indexOf(i)) / (nL - 1) : 0);
+    const fPont = (i, r) => { const a = (this._forgoSzog(i) * Math.PI) / 180; return [100 + r * Math.sin(a), 64 - r * Math.cos(a)]; };
     const forgo = `<div class="kimenet forgo"><div class="valaszto">
-      ${L0.map((i) => { const [x, y] = fPont(i, 50); return `<i class="vt" style="transform:rotate(${this._forgoSzog(i)}deg)"></i><button class="fhsz" data-i="${i}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><span class="lamp"></span>${ESC(kim[i].rovid || kim[i].nev)}</button>`; }).join("")}
+      ${L0.map((i) => { const [x, y] = fPont(i, 56); return `<i class="vt" style="transform:rotate(${this._forgoSzog(i)}deg)"></i><button class="fhsz" data-i="${i}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><span class="lamp"></span>${ESC(kim[i].rovid || kim[i].nev)}</button>`; }).join("")}
       <div class="vgomb" title="${T("Hangszóró váltása")}"><div class="vsapka"></div></div><small>SPEAKERS</small></div></div>`;
-    const valto = `<button class="valto" title="${T("Rádió / tape")}"><span class="vr">${T("RÁDIÓ")}</span><span class="kapcs"></span><span class="vm">${T("TAPE")}</span></button>`;
+    const valto = `<button class="valto" title="${T("Rádió / tape")}"><span class="vr">RADIO</span><span class="kapcs"></span><span class="vm">TAPE</span></button>`;
     let beosztas = "";
     for (let k = 0; k <= 10; k++) {
       const sz = -135 + k * 27;
@@ -652,7 +653,10 @@ class CantabileCard extends HTMLElement {
         :host { display: block; height: 100%; }
         /* széles (tablet) elrendezés ott is, ahol a környezet nem ad magasságot (pl. szekciós nézet laptopon): a fali tablet
            arányában; a lapozóban a kapott magasság érvényes, ott ez nem hat */
-        :host(:not([keskeny])) ha-card { aspect-ratio: 734 / 318; min-height: 300px; }
+        /* széles elrendezés: a két előlap egy rácscellában; ahol a környezet magasságot ad (fali tablet lapozója), kitöltik,
+           ahol nem (pl. szekciós nézet laptopon), a kártya pontosan a tartalom magasságát veszi fel */
+        :host(:not([keskeny])) ha-card { display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); padding: 6px 12px; }
+        :host(:not([keskeny])) .elo { position: relative; inset: auto; grid-area: 1 / 1; min-height: 0; }
         ha-card { height: 100%; box-sizing: border-box; overflow: hidden; border-radius: 14px; padding: 0 12px; position: relative;
           background: linear-gradient(90deg, #4a2a17, #6b3d20 40%, #4a2a17) ; border: 0; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
         .elo { position: absolute; inset: 6px 12px; border-radius: 6px; display: grid; grid-template-columns: minmax(0, 1fr) 236px; gap: 12px; padding: 12px 14px;
@@ -748,6 +752,9 @@ class CantabileCard extends HTMLElement {
         /* jobb oszlop: fent a hangerőgomb, alatta a forgó kimenetválasztó és a RÁDIÓ/MAGNÓ kapcsoló (+ POWER / állapot) */
         .jobb, .mjobb { display: grid; grid-template-columns: auto auto; grid-template-areas: "hang hang" "kim kap"; justify-content: center; align-content: space-between; align-items: center; gap: 0 10px; min-height: 0; }
         .jobb > .hangero, .mjobb > .hangero { grid-area: hang; justify-self: center; transform: scale(.84); margin: -14px; }
+        .magno .mjobb > .hangero { transform: translateY(var(--hgy, 0px)) scale(.78); }
+        :host(:not([keskeny])) .elo.magno { grid-template-columns: minmax(0, 1fr) 260px; }
+        :host(:not([keskeny])) .magno .mjobb > .forgo, :host(:not([keskeny])) .magno .mjobb > .kap { transform: translateY(var(--fgy, 0px)); }
         .kimenet { grid-area: kim; }
         .kap { grid-area: kap; display: flex; flex-direction: column; align-items: center; gap: 7px; }
         .kap .valto { flex-direction: column; gap: 4px; }
@@ -932,9 +939,9 @@ class CantabileCard extends HTMLElement {
         .ogomb:active { transform: translateY(1px); box-shadow: 0 1px 0 #80858c; }
         .mjobb > .otg { display: none; }
         /* forgó hangszóró-választó (magnó) */
-        .valaszto { position: relative; width: 180px; height: 100px; }
-        .valaszto .vt { position: absolute; left: 89px; top: 60px; width: 2px; height: 5px; margin-top: -33px; transform-origin: 1px 33px; background: #3d4148; }
-        .vgomb { position: absolute; left: 90px; top: 60px; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; cursor: pointer;
+        .valaszto { position: relative; width: 200px; height: 104px; }
+        .valaszto .vt { position: absolute; left: 99px; top: 64px; width: 2px; height: 5px; margin-top: -33px; transform-origin: 1px 33px; background: #3d4148; }
+        .vgomb { position: absolute; left: 100px; top: 64px; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; cursor: pointer;
           background: repeating-conic-gradient(#d8dbdf 0 5deg, #7d828a 5deg 10deg); box-shadow: 0 4px 8px rgba(0,0,0,.4), 0 0 0 1.5px #50545a; -webkit-tap-highlight-color: transparent; }
         .vsapka { position: absolute; inset: 5px; border-radius: 50%; transition: transform .35s cubic-bezier(.3,1.3,.5,1);
           background: conic-gradient(from 20deg, #f4f5f6, #a9aeb4 12%, #eceef0 25%, #9da2a8 38%, #f1f2f3 50%, #a2a7ad 62%, #e9ebed 75%, #9ca1a7 88%, #f4f5f6);
@@ -945,8 +952,8 @@ class CantabileCard extends HTMLElement {
         .valaszto .fhsz .lamp { width: 5px; height: 5px; border-radius: 50%; background: #9a9fa6; box-shadow: inset 0 1px 1px rgba(0,0,0,.4); }
         .valaszto .fhsz.akt { color: #23262b; }
         .valaszto .fhsz.akt .lamp { background: #ffb020; box-shadow: 0 0 5px #ffb020; }
-        .magno .mjobb > .forgo .valaszto { zoom: .84; }
-        :host([keskeny]) .magno .mjobb > .forgo .valaszto { zoom: 1; }
+        .magno .mjobb > .forgo .valaszto { zoom: .92; }
+        :host([keskeny]) .magno .mjobb > .forgo .valaszto { zoom: 1.1; }
         .magno .mjobb .mfelirat { max-width: 66px; font-size: 7.5px; letter-spacing: .04em; }
         :host([keskeny]) .magno .mjobb .mfelirat { font-size: 8px; letter-spacing: .08em; }
         .forgo.bton .fhsz.akt { color: #8a8e94; } .forgo.bton .fhsz.akt .lamp { background: #c9a14a; box-shadow: none; }
@@ -1264,7 +1271,7 @@ class CantabileCard extends HTMLElement {
     sr.querySelectorAll(".btv").forEach((b) => b.addEventListener("click", () => btAllit(b.dataset.b === "1")));
     sr.querySelectorAll(".tbt .sin").forEach((g) => g.addEventListener("click", () => btAllit(this._hsz !== this._btIdx)));
     sr.querySelectorAll(".valto").forEach((b) => b.addEventListener("click", () => {
-      this._mod = this._mod === "magno" ? "radio" : "magno"; TAR.ir("tablet-radio-mod", this._mod); this._polcZar(); this._netZar(); this._frissit();
+      this._mod = this._mod === "magno" ? "radio" : "magno"; TAR.ir("tablet-radio-mod", this._mod); this._polcZar(); this._netZar(); this._frissit(); this._igazitKesobb();
     }));
     sr.getElementById("power").addEventListener("click", () => this._bekapcs());
     sr.getElementById("netgomb").addEventListener("click", () => (this._net ? this._netZar() : this._netNyit()));
@@ -1286,6 +1293,7 @@ class CantabileCard extends HTMLElement {
     sr.querySelectorAll(".mg").forEach((b) => b.addEventListener("click", () => this._magnoGomb(b.dataset.k)));
     sr.querySelectorAll(".gomb").forEach((g) => this._gombKezel(g));
     this._frissit();
+    this._igazitKesobb(); setTimeout(() => this._igazit(), 600);   // a betűkészlet és a kazetta-kép betöltése után újra
   }
 
   // orsó (Echo-stílus): fehér gyűrű, piros agy hat küllővel, középen a tengely
@@ -1640,16 +1648,16 @@ class CantabileCard extends HTMLElement {
     let v = 0, fel = "";
     if (this._hangolo) {
       const { d } = this._legkozelebbi(this._hangolo.f);
-      v = Math.max(0, 1 - d / 0.35) * 0.92; fel = v > 0.5 ? T("VÉTEL") : T("KERESÉS");
+      v = Math.max(0, 1 - d / 0.35) * 0.92; fel = v > 0.5 ? "STATION" : "SEEK";
     } else if (ra.szol) {
       const kbps = Number(this._formatum?.kbps) || 0;
-      if (ra.keres) { v = 0.12; fel = T("HANGOLÁS…"); }
-      else if (ra.s?.state === "buffering") { v = 0.25; fel = T("PUFFEREL"); }
-      else if (this._jelAllapot === "nincs" && this._mod !== "magno") { v = 0.08; fel = T("NINCS JEL"); }
+      if (ra.keres) { v = 0.12; fel = "TUNING…"; }
+      else if (ra.s?.state === "buffering") { v = 0.25; fel = "BUFFERING"; }
+      else if (this._jelAllapot === "nincs" && this._mod !== "magno") { v = 0.08; fel = "NO SIGNAL"; }
       else {
         v = kbps ? Math.min(0.96, 0.35 + 0.61 * Math.log(kbps / 48) / Math.log(320 / 48)) : 0.72;
         v += ((this._szint ?? 0.5) - 0.5) * 0.06;   // a műsor hangosságával finoman rezdül
-        fel = kbps ? `${this._formatum?.kodek || ""} ${kbps} kbps`.trim() : T("VÉTEL");
+        fel = kbps ? `${this._formatum?.kodek || ""} ${kbps} kbps`.trim() : "STATION";
       }
     }
     const fok = -40 + 80 * Math.max(0, Math.min(1, v));
@@ -1707,7 +1715,7 @@ class CantabileCard extends HTMLElement {
   _hangoloRajz() {
     const sr = this.shadowRoot, f = this._hangolo.f, { i, d } = this._legkozelebbi(f), c = this._config;
     sr.getElementById("mutato").style.left = `${POZ(f)}%`;
-    sr.getElementById("ado").innerHTML = d <= 0.25 ? `<b>${ESC(c.adok[i].nev)}</b> · ${MHZ(c.adok[i].frekvencia)} MHz` : `${MHZ(Math.round(f * 10) / 10)} MHz · ${T("nincs adó")}`;
+    sr.getElementById("ado").innerHTML = d <= 0.25 ? `<b>${ESC(c.adok[i].nev)}</b> · ${MHZ(c.adok[i].frekvencia)} MHz` : `${MHZ(Math.round(f * 10) / 10)} MHz · NO STATION`;
     sr.getElementById("cim").textContent = "";
   }
 
@@ -2087,7 +2095,7 @@ class CantabileCard extends HTMLElement {
     const p = this.shadowRoot.getElementById("netpolc"), n = this._net;
     if (!p || !n) return;
     p.hidden = false;
-    const orszag = this._orszag(), fulek = [["hu", orszag === "HU" && MAGYAR() ? "MAGYAR" : orszag], ["vilag", T("VILÁG")], ["mufaj", T("MŰFAJ")]];
+    const orszag = this._orszag(), fulek = [["hu", orszag], ["vilag", "WORLD"], ["mufaj", "GENRE"]];
     const ut = n.ful === "mufaj" && n.tag && !n.keres ? `<button data-vissza>${T("‹ Vissza")}</button>${ESC(n.tag)}`
       : `<input class="pkeres" id="nkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Adó keresése név szerint…")}" value="${ESC(n.keres || "")}">`;
     p.innerHTML = `
@@ -2213,9 +2221,9 @@ class CantabileCard extends HTMLElement {
     const csoport = (cim, db, belso) => db ? `<h5 class="kcsop">${cim}<span>${db >= MAX ? `${MAX}+` : db}</span></h5>${belso}` : "";
     lista.innerHTML = (eloadok.length + albumok.length + szamok.length === 0)
       ? `<div class="puzenet">${T("Nincs találat erre: „{q}”.", { q: ESC(kerdes) })}</div>`
-      : csoport(T("ELŐADÓK"), eloadok.length, `<div class="eloadok">${eloadok.map((x, i) => `<button data-e="${i}">${ESC(x.nev)}</button>`).join("")}</div>`)
-        + csoport(T("ALBUMOK"), albumok.length, `<div class="ktalal">${albumok.map((x, i) => `<div class="ktsor"><button data-a="${i}"><b>${ESC(x.nev)}</b><small>${ESC(szulo(x.rel))}</small></button>${gombok("a", i)}</div>`).join("")}</div>`)
-        + csoport(T("SZÁMOK"), szamok.length, `<div class="ktalal">${szamok.map((x, i) => `<div class="ktsor"><button data-s="${i}"><b>${ESC(x.nev)}</b><small>${ESC(szulo(x.rel) || "NAS")}</small></button>${gombok("s", i)}</div>`).join("")}</div>`)
+      : csoport("ARTISTS", eloadok.length, `<div class="eloadok">${eloadok.map((x, i) => `<button data-e="${i}">${ESC(x.nev)}</button>`).join("")}</div>`)
+        + csoport("ALBUMS", albumok.length, `<div class="ktalal">${albumok.map((x, i) => `<div class="ktsor"><button data-a="${i}"><b>${ESC(x.nev)}</b><small>${ESC(szulo(x.rel))}</small></button>${gombok("a", i)}</div>`).join("")}</div>`)
+        + csoport("TRACKS", szamok.length, `<div class="ktalal">${szamok.map((x, i) => `<div class="ktsor"><button data-s="${i}"><b>${ESC(x.nev)}</b><small>${ESC(szulo(x.rel) || "NAS")}</small></button>${gombok("s", i)}</div>`).join("")}</div>`)
         + (hsz.mod === "sonos" && Number(hs.queue_size) > 0 && hs.shuffle ? `<div class="puzenet">${T("Keverés közben a „következőnek” és a „sor végére” nem érhető el (a Sonos véletlen helyre tenné).")}</div>` : "");
     lista.scrollTop = 0;
     lista.querySelectorAll("[data-e]").forEach((b) => b.addEventListener("click", () => {
@@ -2289,10 +2297,10 @@ class CantabileCard extends HTMLElement {
       const sor = (t, i, cim, al) => `<div class="ktsor"><button data-${t}="${i}"><b>${ESC(cim)}</b><small>${ESC(al)}</small></button>${gombok(t, i)}</div>`;
       lista.innerHTML = figy + ((eloadok.length + albumok.length + szamok.length + listak.length === 0)
         ? `<div class="puzenet">${T("Nincs találat a Deezeren erre: „{q}”.", { q: ESC(kerdes) })}</div>`
-        : csoport(T("ELŐADÓK"), eloadok.length, `<div class="eloadok">${eloadok.map((x, i) => `<button data-e="${i}">${ESC(x.name)}</button>`).join("")}</div>`)
-          + csoport(T("ALBUMOK"), albumok.length, `<div class="ktalal">${albumok.map((x, i) => sor("a", i, x.title, x.artist?.name || "")).join("")}</div>`)
-          + csoport(T("SZÁMOK"), szamok.length, `<div class="ktalal">${szamok.map((x, i) => sor("s", i, x.title, [x.artist?.name, x.album?.title].filter(Boolean).join(" · "))).join("")}</div>`)
-          + csoport(T("LISTÁK"), listak.length, `<div class="ktalal">${listak.map((x, i) => sor("l", i, x.title, `${T("{n} szám", { n: x.nb_tracks })} · ${x.user?.name || "Deezer"}`)).join("")}</div>`)
+        : csoport("ARTISTS", eloadok.length, `<div class="eloadok">${eloadok.map((x, i) => `<button data-e="${i}">${ESC(x.name)}</button>`).join("")}</div>`)
+          + csoport("ALBUMS", albumok.length, `<div class="ktalal">${albumok.map((x, i) => sor("a", i, x.title, x.artist?.name || "")).join("")}</div>`)
+          + csoport("TRACKS", szamok.length, `<div class="ktalal">${szamok.map((x, i) => sor("s", i, x.title, [x.artist?.name, x.album?.title].filter(Boolean).join(" · "))).join("")}</div>`)
+          + csoport("PLAYLISTS", listak.length, `<div class="ktalal">${listak.map((x, i) => sor("l", i, x.title, `${T("{n} szám", { n: x.nb_tracks })} · ${x.user?.name || "Deezer"}`)).join("")}</div>`)
           + (hsz.mod === "sonos" && Number(hs.queue_size) > 0 && hs.shuffle ? `<div class="puzenet">${T("Keverés közben a „következőnek” és a „sor végére” nem érhető el (a Sonos véletlen helyre tenné).")}</div>` : ""));
       lista.scrollTop = 0;
       const elem = { a: albumok, s: szamok, l: listak };
@@ -2454,8 +2462,8 @@ class CantabileCard extends HTMLElement {
         ${this._vanSonos() ? `<button class="pful ${pl.ful === "stream" ? "akt" : ""}" data-ful="stream">STREAMING</button>` : ""}
         ${this._config.deezer !== false && this._vanSonos() ? `<button class="pful ${pl.ful === "deezer" ? "akt" : ""}" data-ful="deezer">DEEZER</button>` : ""}
         <button class="pful ${pl.ful === "nas" ? "akt" : ""}" data-ful="nas">NAS</button>
-        <button class="pful ${pl.ful === "tel" ? "akt" : ""}" data-ful="tel">${T("TELEFON")}</button>
-        <button class="pful ${pl.ful === "sor" ? "akt" : ""}" data-ful="sor">${T("SOR")}</button>
+        <button class="pful ${pl.ful === "tel" ? "akt" : ""}" data-ful="tel">PHONE</button>
+        <button class="pful ${pl.ful === "sor" ? "akt" : ""}" data-ful="sor">QUEUE</button>
         <div class="put">${ut}</div>
         <button class="pzar" title="${T("Bezár")}">×</button>
       </div>
@@ -2716,12 +2724,12 @@ class CantabileCard extends HTMLElement {
     sr.querySelectorAll(".btv").forEach((b) => b.classList.toggle("akt", (b.dataset.b === "1") === bton));
     sr.querySelectorAll(".tbt .tfog").forEach((x) => x.style.setProperty("--p", bton ? 0 : 1));
     sr.querySelectorAll(".tolok").forEach((x) => x.classList.toggle("bton", bton));
-    sr.querySelectorAll(".hszfej").forEach((x) => { x.textContent = elerheto ? hsz.nev : `${hsz.nev} · ${T("nem elérhető")}`; });
+    sr.querySelectorAll(".hszfej").forEach((x) => { x.textContent = elerheto ? hsz.nev : `${hsz.nev} · UNAVAILABLE`; });
     const adoNev = kulso ? kulso.nev : c.adok[i]?.nev;
     const dal = [a.media_artist, a.media_title].filter((x) => x && x !== adoNev && !URLSZERU(x)).join(" – ");
     sr.getElementById("ado").innerHTML = radioSzol && kulso ? `<b>${ESC(kulso.nev)}</b> · NET${kulso.orszag ? ` · ${ESC(kulso.orszag)}` : ""}`
       : radioSzol ? `<b>${ESC(c.adok[i].nev)}</b> · ${MHZ(c.adok[i].frekvencia)} MHz`
-      : SZOL(s) ? `<b>${T("a tape deck szól")}</b>` : T("kikapcsolva");
+      : SZOL(s) ? `<b>TAPE DECK PLAYING</b>` : "OFF";
     sr.getElementById("cim").textContent = radioSzol ? dal : "";
     if (!this._forgat && a.volume_level != null) { this._hangero = a.volume_level; this._rajzHangero(a.volume_level); }
     this._radioAll = { szol: radioSzol, keres: !!this._kezi, s, i };
@@ -2739,12 +2747,34 @@ class CantabileCard extends HTMLElement {
     if (this._polc?.ful === "sor") this._sorKiemel();
     sr.querySelectorAll(".mg").forEach((b) => b.classList.toggle("akt", (b.dataset.k === "play" && szalagSzol) || (b.dataset.k === "pause" && szunet)));
     this._infoRajz(a, kaz, szalagSzol || szunet);
-    sr.getElementById("mallapot").textContent = szalagSzol ? "PLAY" : szunet ? "PAUSE" : radioSzol ? T("RÁDIÓ SZÓL") : "STOP";
-    sr.getElementById("vufajta").textContent = !szalagSzol ? "TAPE · NORMAL" : this._jelAllapot === "elemzes" ? (this._config.magno?.vu_kijelzo === "fluor" ? T("PEAK · dBFS") : T("VU · NORMALIZÁLT")) : T("VU · UTÁNZAT");
+    sr.getElementById("mallapot").textContent = szalagSzol ? "PLAY" : szunet ? "PAUSE" : radioSzol ? "RADIO ON" : "STOP";
+    sr.getElementById("vufajta").textContent = !szalagSzol ? "TAPE · NORMAL" : this._jelAllapot === "elemzes" ? (this._config.magno?.vu_kijelzo === "fluor" ? "PEAK · dBFS" : "VU · NORMALIZED") : "VU · SIMULATED";
     this._szalagRajz();
     this._jelFeliratkozas();
     this._animIndit();
   }
+
+  // széles elrendezésben a magnó hangerőgombja a kijelző + öt gomb blokk tengelyébe (függőlegesen középre) kerül
+  // – a forgó választó és a RADIO/TAPE kapcsoló pedig a billentyűsor (eject … pause) tengelyébe
+  _igazit() {
+    const sr = this.shadowRoot, m = sr?.getElementById("magno"), j = m?.querySelector(".mjobb");
+    const parok = [[".mjobb > .hangero", ".mkij", "--hgy"], [".mjobb > .forgo", ".msor", "--fgy"]];
+    if (!j) return;
+    if (this.hasAttribute("keskeny") || m.classList.contains("rejt")) { j.style.removeProperty("--hgy"); j.style.removeProperty("--fgy"); return; }
+    for (const [mit, mihez, v] of parok) {
+      const a = m.querySelector(mit)?.getBoundingClientRect(), b = m.querySelector(mihez)?.getBoundingClientRect();
+      if (!a?.height || !b?.height) continue;
+      const regi = parseFloat(j.style.getPropertyValue(v)) || 0;
+      let uj = Math.max(-60, Math.min(140, regi + (b.top + b.height / 2) - (a.top + a.height / 2)));
+      if (v === "--fgy") {
+        // a választó nem mehet följebb a helyénél (ott a hangerőgomb), és nem lóghat ki a kártya aljából
+        const jr = j.getBoundingClientRect();
+        uj = Math.max(0, Math.min(uj, regi + (jr.bottom - a.bottom)));
+      }
+      if (Math.abs(uj - regi) > 0.5) j.style.setProperty(v, `${uj.toFixed(1)}px`);
+    }
+  }
+  _igazitKesobb() { cancelAnimationFrame(this._igazitIdo); this._igazitIdo = requestAnimationFrame(() => this._igazit()); }
 
   // görgetés (mint a régi kijelzőkön), ha a szöveg nem fér ki: megáll az elején, végigúszik, megáll a végén, vissza
   _gorgo(doboz) {
@@ -2768,7 +2798,7 @@ class CantabileCard extends HTMLElement {
       : kazTarolt.forras === "nas" ? (nasMost && (!kazTarolt.szamok?.length || this._szamIndex(kazTarolt, a) >= 0) ? kazTarolt : null)
       : kazTarolt.forras === "stream" ? (nasMost ? null : kazTarolt) : kazTarolt;
     const nas = kaz?.forras === "nas" || /\/media\/local\//.test(id) || /\/media\/local\//.test(a.media_title || "");
-    const forras = megy ? (nas ? "NAS" : SZOLGALTATO[sid] ? "STREAM" : kaz?.forras === "stream" ? "STREAM" : kaz?.forras === "tel" ? T("TELEFON") : "") : (kaz ? (kaz.forras === "nas" ? "NAS" : kaz.forras === "tel" ? T("TELEFON") : "STREAM") : "");
+    const forras = megy ? (nas ? "NAS" : SZOLGALTATO[sid] ? "STREAM" : kaz?.forras === "stream" ? "STREAM" : kaz?.forras === "tel" ? "PHONE" : "") : (kaz ? (kaz.forras === "nas" ? "NAS" : kaz.forras === "tel" ? "PHONE" : "STREAM") : "");
     // állapotsor: hangerő · hangszóró · sorszám · lista · keverés · ismétlés · forrás
     let sorsz = "–/–";
     if (megy && a.queue_size) sorsz = `${String(a.queue_position || 1).padStart(3, "0")}/${String(a.queue_size).padStart(3, "0")}`;
@@ -2798,10 +2828,10 @@ class CantabileCard extends HTMLElement {
     const f = this._formatum;
     const minoseg = f?.kodek || SZOLGALTATO[sid] || (forras === "NAS" ? "NAS" : "");
     sr.getElementById("ablak").classList.toggle("ures", !cim);
-    const kcimHtml = `<span class="gord">${ESC(cim || T("— üres —"))}</span>`;
+    const kcimHtml = `<span class="gord">${ESC(cim || "— EMPTY —")}</span>`;
     const ksorHtml = cim
       ? `<span class="gdoboz kea"><span class="gord">${KI.ember}<em>${ESC(eloado || "–")}</em>${album ? `<i class="ksep"></i>${KI.lemez}<em>${ESC(album)}</em>` : ""}</span></span><span class="kmin">${KI.szint}<em>${ESC(minoseg || "–")}</em></span>`
-      : `<span class="kures"><em>${T("EJECT: kazetta választás")}</em></span>`;
+      : `<span class="kures"><em>EJECT: CHOOSE A TAPE</em></span>`;
     // csak változáskor írjuk át (különben a görgetés minden frissítésnél elölről indulna)
     if (kcimHtml !== this._kcimHtml) { this._kcimHtml = kcimHtml; sr.getElementById("kcim").innerHTML = kcimHtml; this._gorgo(sr.getElementById("kcim")); }
     if (ksorHtml !== this._ksorHtml) { this._ksorHtml = ksorHtml; sr.getElementById("ksor").innerHTML = ksorHtml; this._gorgo(sr.querySelector("#ksor .kea")); }
@@ -2840,7 +2870,7 @@ class CantabileCard extends HTMLElement {
       this._jelAllapot = m.allapot;
       if (this._mod !== "magno") this._jelRajz();
       const f = this.shadowRoot.getElementById("vufajta");
-      if (f && this._magnoAllapot?.szol) f.textContent = m.allapot === "elemzes" ? (this._config.magno?.vu_kijelzo === "fluor" ? T("PEAK · dBFS") : T("VU · NORMALIZÁLT")) : T("VU · UTÁNZAT");
+      if (f && this._magnoAllapot?.szol) f.textContent = m.allapot === "elemzes" ? (this._config.magno?.vu_kijelzo === "fluor" ? "PEAK · dBFS" : "VU · NORMALIZED") : "VU · SIMULATED";
     }
     if ("formatum" in m) { this._formatum = m.formatum || null; this._frissit(); }
     if (m.l == null) return;

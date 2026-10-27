@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.6 – unreleased
+
+- Wide layout: both panels share one grid cell – they fill the height given by the dashboard (wall-tablet pager) or take exactly their content height (sections view), no empty band under the header.
+- Tape deck: the volume knob sits on the axis of the display and the five buttons; the speaker selector and the RADIO / TAPE switch on the axis of the transport keys.
+- Rotary speaker selector: larger, wider label arc; the two-Sonos position is labelled MULTIROOM.
+- Front-panel labels are English in every UI language (RADIO / TAPE, ON / OFF, signal and status texts, shelf tabs and group titles), like a real hi-fi.
+
 ## 1.0.5 – unreleased
 
 - The wide (tablet) layout keeps the panel's aspect ratio where the dashboard gives no height (e.g. a sections view spanning two columns on a laptop).
