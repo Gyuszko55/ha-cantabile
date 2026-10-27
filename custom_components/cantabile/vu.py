@@ -2,8 +2,9 @@
 
 A hangszórók (Sonos, WiiM…) a lejátszott jel szintjét nem adják ki, ezért ugyanazt a forrást, amit a lejátszó szól
 (rádió-stream vagy a helyi zenefájl), a szerveren az ffmpeg is megnyitja valós idejű tempóban, és 50 ms-onként
-csatornánként RMS-szintet számol. A kártya websocket-feliratkozással kapja: {"l": dB, "r": dB}, ahol a dB VU-skálán
-értendő (0 VU = −12 dBFS). Ha a forrás nem elemezhető (pl. titkosított streaming), egy {"allapot": "nincs"} üzenet jön,
+csatornánként RMS-szintet és mintacsúcsot számol. A kártya websocket-feliratkozással kapja: {"l": dB, "r": dB, "pl": dBFS,
+"pr": dBFS}, ahol az l/r a VU-skálán (a mutatós műszerhez), a pl/pr a csúcs dBFS-ben (a fluoreszcens
+kijelzőhöz); 0 VU = −12 dBFS (K-12). Ha a forrás nem elemezhető (pl. titkosított streaming), egy {"allapot": "nincs"} üzenet jön,
 és a kártya utánzatra vált. Forrásváltáskor egy {"formatum": {...}} üzenet is megy (ffprobe: kodek, kHz, bit, kbps).
 
 Lejátszónként egy ffmpeg fut, akárhány feliratkozó osztozik rajta; az utolsó leiratkozáskor leáll. A lejátszó
@@ -83,18 +84,21 @@ def pozicio(state: State) -> float:
     return max(0.0, poz)
 
 
-def szint(adat: bytes) -> tuple[float, float]:
-    """16 bites sztereó PCM → csatornánkénti RMS a VU-skálán (dB, 0 = −12 dBFS)."""
+def szint(adat: bytes) -> tuple[float, float, float, float]:
+    """16 bites sztereó PCM → csatornánként (1) RMS a VU-skálán (dB, 0 VU = −12 dBFS, K-12) a mutatós műszerhez,
+    (2) mintacsúcs dBFS-ben (0 = digitális végkitérés) a fluoreszcens kijelző csúcsmérőjéhez (IEC 60268-18 mintára)."""
     m = array("h")
     m.frombytes(adat)
     bal, jobb = m[0::2], m[1::2]
-    ki = []
+    ki, cs = [], []
     for csat in (bal, jobb):
         n = len(csat) or 1
         rms = math.sqrt(sum(x * x for x in csat) / n) / 32768.0
         dbfs = 20 * math.log10(rms) if rms > 1e-6 else -120.0
         ki.append(round(max(-40.0, dbfs - VU_NULLA), 1))
-    return ki[0], ki[1]
+        csucs = max((abs(x) for x in csat), default=0) / 32767.0
+        cs.append(round(max(-60.0, 20 * math.log10(csucs)) if csucs > 1e-6 else -60.0, 1))
+    return ki[0], ki[1], cs[0], cs[1]
 
 
 class Figyelo:
@@ -225,8 +229,8 @@ class Figyelo:
             self._jelez("elemzes")
             while True:
                 adat = await folyamat.stdout.readexactly(BAJT)
-                l, r = szint(adat)
-                self._kuld({"l": l, "r": r, "t": round(time.time(), 2)})
+                l, r, pl, pr = szint(adat)
+                self._kuld({"l": l, "r": r, "pl": pl, "pr": pr, "t": round(time.time(), 2)})
         except asyncio.IncompleteReadError:
             pass                                  # a fájl véget ért, vagy az ffmpeg kilépett
         except asyncio.CancelledError:

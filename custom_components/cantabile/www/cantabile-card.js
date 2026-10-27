@@ -210,6 +210,8 @@ const EN = {
   "kikapcsolva": "off",
   "RÁDIÓ SZÓL": "RADIO ON",
   "VU · VALÓDI JEL": "VU · REAL SIGNAL",
+  "VU · NORMALIZÁLT": "VU · NORMALISED",
+  "PEAK · dBFS": "PEAK · dBFS",
   "VU · UTÁNZAT": "VU · SIMULATED",
   "Lejátszási sor": "Queue",
   "— üres —": "— empty —",
@@ -315,6 +317,18 @@ const FORDULAT = (p) => {
   return Math.round(((r - r0) / d) * 0.8);
 };
 
+// a fluoreszcens kijelző digitális csúcsmérő (dBFS, a CD-játszók és stúdiók mintájára, IEC 60268-18): skálahelyek 0…1;
+// −3 dBFS fölött piros (0,79-től, mint eddig), 0 dBFS = végkitérés (OVER = valódi vágás)
+const PK_JELEK = [[-40, 0], [-30, 0.14], [-20, 0.3], [-10, 0.52], [-6, 0.66], [-3, 0.79], [0, 0.94]];
+const PKPOZ = (db) => {
+  if (db <= PK_JELEK[0][0]) return 0;
+  for (let k = 1; k < PK_JELEK.length; k++) { const [d1, x1] = PK_JELEK[k - 1], [d2, x2] = PK_JELEK[k]; if (db <= d2) return x1 + ((db - d1) / (d2 - d1)) * (x2 - x1); }
+  return 1;
+};
+const PK_ESES = 20 / 1.7;
+// a mutatós VU hangosság-normalizált (mint a streaming-szolgáltatók, ReplayGain-szerűen): a szám átlagos hangossága
+// (energiaátlag, a csend nélkül) −1 VU-ra kerül, így a mai hangos és a régi halk felvételek is 0 VU körül lengenek
+const HN_CEL = -1, HN_CSEND = -35, HN_MAX = 14;   // dB / mp – a csúcsmérő visszaesése (IEC 60268-18: 20 dB 1,7 mp alatt)
 // dB (VU-skála) → mutatóhely 0…1 (a VU_JELEK között egyenesen; −20 alatt a bal ütköző, +3 fölött kicsit túllendül)
 const DBPOZ = (db) => {
   if (db <= VU_JELEK[0][0]) return 0;
@@ -613,8 +627,7 @@ class CantabileCard extends HTMLElement {
     // köztük dB-skála, 0 dB fölött piros, csúcstartással
     const VFD_N = 34;
     const szegmensek = () => Array.from({ length: VFD_N }, (_, i) => `<i class="${(i + 0.5) / VFD_N > 0.79 ? "p" : ""}"></i>`).join("");
-    const vfdSkala = VU_JELEK.filter(([db]) => [-20, -10, -7, -5, -3, -1, 0, 1, 3].includes(db))
-      .map(([db, x]) => `<span style="left:${(x * 100).toFixed(1)}%" class="${db > 0 ? "p" : ""}">${db > 0 ? "+" + db : db}</span>`).join("");
+    const vfdSkala = PK_JELEK.map(([db, x]) => `<span style="left:${(x * 100).toFixed(1)}%" class="${db >= -3 ? "p" : ""}">${db}</span>`).join("");
     // jelzősor a COUNTER és a TIME felirat között: BT · mobilnet · SHUFFLE · REPEAT n · FADE (bekapcsolva világít, különben halvány)
     const vjelzo = `<div class="vjelzo">
         <i data-j="bt"><svg viewBox="0 0 24 24"><path d="M6.5 7l11 10-5.5 5V2l5.5 5-11 10"/></svg><small>BT</small></i>
@@ -1331,13 +1344,15 @@ class CantabileCard extends HTMLElement {
   // bal/jobb szint VU-dB-ben (0 VU = −12 dBFS, mint az integráció jelelemzőjénél)
   _elemzoSzint() {
     const e = this._elemzo; if (!e) return null;
+    const pk = [];
     const db = e.an.map((a) => {
       a.getFloatTimeDomainData(e.buf);
-      let o = 0; for (let k = 0; k < e.buf.length; k++) o += e.buf[k] * e.buf[k];
+      let o = 0, m = 0; for (let k = 0; k < e.buf.length; k++) { o += e.buf[k] * e.buf[k]; m = Math.max(m, Math.abs(e.buf[k])); }
+      pk.push(m > 1e-6 ? 20 * Math.log10(m) : -60);
       return 20 * Math.log10(Math.sqrt(o / e.buf.length) || 1e-9) + 12;
     });
-    if (db[1] < -60 && db[0] > -60) db[1] = db[0];   // monó fájl
-    return db;
+    if (db[1] < -60 && db[0] > -60) { db[1] = db[0]; pk[1] = pk[0]; }   // monó fájl
+    return [db[0], db[1], pk[0], pk[1]];
   }
 
   async _helyiForras(id) {
@@ -2722,7 +2737,7 @@ class CantabileCard extends HTMLElement {
     sr.querySelectorAll(".mg").forEach((b) => b.classList.toggle("akt", (b.dataset.k === "play" && szalagSzol) || (b.dataset.k === "pause" && szunet)));
     this._infoRajz(a, kaz, szalagSzol || szunet);
     sr.getElementById("mallapot").textContent = szalagSzol ? "PLAY" : szunet ? "PAUSE" : radioSzol ? T("RÁDIÓ SZÓL") : "STOP";
-    sr.getElementById("vufajta").textContent = !szalagSzol ? "TAPE · NORMAL" : this._jelAllapot === "elemzes" ? T("VU · VALÓDI JEL") : T("VU · UTÁNZAT");
+    sr.getElementById("vufajta").textContent = !szalagSzol ? "TAPE · NORMAL" : this._jelAllapot === "elemzes" ? (this._config.magno?.vu_kijelzo === "fluor" ? T("PEAK · dBFS") : T("VU · NORMALIZÁLT")) : T("VU · UTÁNZAT");
     this._szalagRajz();
     this._jelFeliratkozas();
     this._animIndit();
@@ -2822,13 +2837,14 @@ class CantabileCard extends HTMLElement {
       this._jelAllapot = m.allapot;
       if (this._mod !== "magno") this._jelRajz();
       const f = this.shadowRoot.getElementById("vufajta");
-      if (f && this._magnoAllapot?.szol) f.textContent = m.allapot === "elemzes" ? T("VU · VALÓDI JEL") : T("VU · UTÁNZAT");
+      if (f && this._magnoAllapot?.szol) f.textContent = m.allapot === "elemzes" ? (this._config.magno?.vu_kijelzo === "fluor" ? T("PEAK · dBFS") : T("VU · NORMALIZÁLT")) : T("VU · UTÁNZAT");
     }
     if ("formatum" in m) { this._formatum = m.formatum || null; this._frissit(); }
     if (m.l == null) return;
     if (this._mod !== "magno") { this._szint = Math.max(m.l, m.r); if (performance.now() - (this._jelRajzIdo || 0) > 700) { this._jelRajzIdo = performance.now(); this._jelRajz(); } return; }
     const kesl = Number(this._config.magno?.vu_kesleltetes_mp) || 0;
-    this._jelSor.push({ ido: performance.now() + kesl * 1000, l: m.l, r: m.r });
+    this._jelSor.push({ ido: performance.now() + kesl * 1000, l: m.l, r: m.r, pl: m.pl, pr: m.pr });
+    this._hnMer(m.l, m.r);
     if (this._jelSor.length > 400) this._jelSor.splice(0, this._jelSor.length - 400);
     this._animIndit();
   }
@@ -2899,14 +2915,15 @@ class CantabileCard extends HTMLElement {
       if (this._lathato === false || this._mod !== "magno" || !this.isConnected) return;
       if (this._hangszoro()?.entity === HELYI && this._aktAudio && this._aktAudio === this._audioE && !this._aktAudio.paused && this._elemzo) {
         const sz = this._elemzoSzint();
-        this._jelSor = [{ ido: t, l: sz[0], r: sz[1] }];
+        this._jelSor = [{ ido: t, l: sz[0], r: sz[1], pl: sz[2], pr: sz[3] }];
+        if (t - (this._hnBtIdo || 0) > 50) { this._hnBtIdo = t; this._hnMer(sz[0], sz[1]); }
         if (this._jelAllapot !== "elemzes") { this._jelAllapot = "elemzes"; this._frissit(); }
       }
       const sor = this._jelSor || [];
       while (sor.length > 1 && sor[1].ido <= t) sor.shift();
       const s0 = sor[0];
       const valodi = m2?.szol && this._jelAllapot === "elemzes" && s0 && s0.ido <= t && t - s0.ido < 1000;
-      if (valodi) this._vuCel = [DBPOZ(s0.l), DBPOZ(s0.r)];
+      if (valodi) { const off = this._config.magno?.vu_kijelzo === "fluor" ? 0 : this._hnOff(); this._vuCel = [DBPOZ(s0.l + off), DBPOZ(s0.r + off)]; }
       if (t - utolso > 85) {
         utolso = t;
         if (valodi) { /* a cél a valódi jelből jön */ } else if (m2?.szol) {
@@ -2927,27 +2944,52 @@ class CantabileCard extends HTMLElement {
       const sr = this.shadowRoot;
       sr.getElementById("tuL").style.transform = `rotate(${-42 + 84 * this._vu[0]}deg)`;
       sr.getElementById("tuR").style.transform = `rotate(${-42 + 84 * this._vu[1]}deg)`;
-      if (this._config.magno?.vu_kijelzo === "fluor") this._vfdRajz(t, !m2?.szol);
+      if (this._config.magno?.vu_kijelzo === "fluor") {
+        // csúcsmérő: azonnal felugrik, 20 dB / 1,7 mp-cel esik vissza; utánzatnál a VU-mutatóból becsült hely
+        this._pk = this._pk || [-60, -60];
+        const poz = [0, 1].map((k) => {
+          if (!valodi) { this._pk[k] = -60; return this._vu[k] * 0.86; }
+          const cel = s0[k ? "pr" : "pl"] ?? Math.min(-1, s0[k ? "r" : "l"] - 12 + 6);   // régi szervernél: becslés az átlagszintből (OVER-t nem gyújt)
+          this._pk[k] = Math.max(cel, this._pk[k] - (PK_ESES * dt) / 1000);
+          if (cel >= -0.1) this._tulvez = t;
+          return PKPOZ(this._pk[k]);
+        });
+        this._vfdRajz(t, !m2?.szol, poz);
+      }
       if (m2?.szol || this._vu[0] > 0.005 || this._vu[1] > 0.005) this._anim = requestAnimationFrame(lep);
     };
     this._anim = requestAnimationFrame(lep);
   }
 
   // fluoreszcens kijelző: kigyújtott szegmensek + csúcstartás (1,2 mp-ig marad, aztán lépésenként esik)
-  _vfdRajz(t, all) {
+  // hangosság-mérés számonként: energiaátlag a nem csendes ablakokból; számváltáskor újraindul (az előző eltolásból)
+  _hnMer(l, r) {
+    const a = this._magnoAllapot?.s?.attributes || {}, kulcs = `${a.media_content_id || ""}|${a.media_title || ""}`;
+    let h = this._hn;
+    if (!h || h.kulcs !== kulcs) h = this._hn = { kulcs, e: 0, n: 0, off: h ? h.off : 0 };
+    if (Math.max(l, r) < HN_CSEND) return;
+    h.e += (10 ** (l / 10) + 10 ** (r / 10)) / 2; h.n++;
+    if (h.n >= 20) h.off = Math.max(-HN_MAX, Math.min(HN_MAX, HN_CEL - 10 * Math.log10(h.e / h.n)));
+  }
+  _hnOff() { return this._hn?.off || 0; }
+
+  // PEAK: −3 dBFS fölötti csúcs (a tartott csúcs alapján), OVER: valódi digitális vágás (≥ −0,1 dBFS) az utolsó 1,2 mp-ben
+  _vfdRajz(t, all, poz) {
     const sr = this.shadowRoot;
     this._csucs = this._csucs || [{ n: 0, t: 0 }, { n: 0, t: 0 }];
     ["vfdL", "vfdR"].forEach((id, k) => {
       const szeg = sr.getElementById(id)?.children;
       if (!szeg) return;
-      const N = szeg.length, n = Math.round(Math.min(1, Math.max(0, this._vu[k])) * N), cs = this._csucs[k];
+      const N = szeg.length, n = Math.round(Math.min(1, Math.max(0, poz[k])) * N), cs = this._csucs[k];
       if (n >= cs.n) { cs.n = n; cs.t = t; } else if (t - cs.t > 1200) { cs.n = Math.max(n, cs.n - 1); cs.t = t - 1140; }
       if (all && n === 0) cs.n = 0;
-      const kulcs = n * 100 + cs.n;
+      const over = t - (this._tulvez || -1e9) < 1200;
+      const kulcs = n * 1000 + cs.n * 2 + (over ? 1 : 0);
       if (this["_vfdAll" + k] === kulcs) return;
       this["_vfdAll" + k] = kulcs;
       for (let i = 0; i < N; i++) szeg[i].classList.toggle("be", i < n || (cs.n > 0 && i === cs.n - 1));
-      szeg[0].parentElement.nextElementSibling?.classList.toggle("be", cs.n / N > 0.79);
+      // a bal sor végén PEAK (−3 dBFS fölött), a jobb sor végén OVER (vágás)
+      szeg[0].parentElement.nextElementSibling?.classList.toggle("be", k === 0 ? Math.max(...this._csucs.map((c) => c.n)) / N > 0.79 : over);
     });
   }
 

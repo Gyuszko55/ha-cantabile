@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4 – unreleased
+
+- VFD display: a standard digital peak meter (dBFS, after IEC 60268-18) – sample peaks on a −40…0 dBFS scale, peak hold, 20 dB / 1.7 s fall-back; PEAK above −3 dBFS, OVER only on real clipping. The server now also sends per-channel sample peaks (`pl`, `pr`).
+- Needle VU meters: loudness-normalised (like streaming services / ReplayGain) – each track's average loudness sits at −1 VU, so loud modern masters and quiet old recordings both swing around 0 VU.
+
 ## 1.0.3 – unreleased
 
 - Cassette display: long titles and the artist · album line scroll back and forth when they don't fit; the quality stays fixed on the right.
