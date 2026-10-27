@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.2 – unreleased
+
+- Transferring to a single Sonos now splits a leftover Multiroom group first (awaited), so only the selected speaker plays – previously, after Multiroom, switching from WiiM / BT to Nappali also woke Háló.
+- Verified live: BT plays an http-only station through the integration with real VU (≈ −12 dB) and gives the sound back to WiiM / Nappali; group sequence Multiroom → WiiM → Nappali → Multiroom → Nest Hub → Háló → Multiroom → BT → Nappali → WiiM.
+
 ## 1.3.1 – unreleased
 
 - Radio routing: the speaker selector only redirects what is playing – the old output goes quiet and the same station starts on the new one, between any outputs (Sonos, WiiM, Cast, BT; Sonos ↔ Sonos still by grouping). Switches run one after another and remember the station being transferred, so fast switching no longer loses the station or leaves two outputs playing; a buffering output counts as playing.

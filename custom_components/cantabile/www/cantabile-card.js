@@ -1691,7 +1691,7 @@ class CantabileCard extends HTMLElement {
     }
     const g = this._hass.states[uj.entity]?.attributes?.group_members || [];
     const tobbi = g.filter((e) => e !== uj.entity);
-    if (tobbi.length) this._hiv("media_player", "unjoin", { entity_id: tobbi }).catch(() => {});
+    if (tobbi.length) return this._hiv("media_player", "unjoin", { entity_id: tobbi }).catch(() => {});
   }
 
   // kimenetváltás: ami szól, átkerül az új kimenetre (mint egy igazi hangszóróválasztón); atvisz=false: csak választ
@@ -1725,7 +1725,9 @@ class CantabileCard extends HTMLElement {
     const poz = a.media_position != null ? a.media_position + (a.media_position_updated_at ? (Date.now() - Date.parse(a.media_position_updated_at)) / 1000 : 0) : 0;
     if (regi.mod === "url") this._szkriptLeallit(regi);
     await this._hiv("media_player", regi.mod === "sonos" ? "media_pause" : "media_stop", { entity_id: regi.entity });
-    if (uj.tagok) await this._csoportAllit(uj);
+    // Sonos célnál a csoport mindig a választás szerinti (egyedül, vagy mindkettő) – különben egy korábbi Multiroom-csoport
+    // tagja is megszólalna
+    await this._csoportAllit(uj);
     if (ado >= 0 || ado === KULSO) this._atvitel = { ado, hova: uj.entity, ido: Date.now() };
     if (ado >= 0) return this._hangol(ado);
     if (ado === KULSO) { const k = this._kulso(); if (k) return this._netIndit({ name: k.nev, url_resolved: k.url, favicon: k.ikon, countrycode: k.orszag, codec: k.kodek, bitrate: k.kbps }, false); }
