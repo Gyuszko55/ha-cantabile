@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.9.0 – unreleased
+## 1.9.0 – 2026-10-27
 
 - **Spotify and Tidal (experimental)** – new SPOTIFY β and TIDAL β tabs on the tape shelf: search artists / albums / tracks / playlists, artist pages, and for Spotify your own library through the Home Assistant Spotify integration.
   - Catalogue access goes through the integration (`cantabile/spotify`, `cantabile/tidal`, whitelisted read-only paths; keys and tokens stay on the server): Spotify with a developer key in the Cantabile options or the Home Assistant Spotify integration's login; Tidal with a developer key (openapi.tidal.com v2).
