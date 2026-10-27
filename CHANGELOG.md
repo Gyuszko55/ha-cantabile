@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.2 – unreleased
+
+- Choosing music from the phone / computer (PHONE tab) switches to BT and now stops what was playing on the previous output first (Sonos paused, others stopped) – like inserting a new tape. Verified live on Háló.
+
 ## 1.4.1 – unreleased
 
 - Tape transfer from the WiiM uses the track actually playing (from the title field); the WiiM sequence also reports it (`current` was the track already handed over in advance).

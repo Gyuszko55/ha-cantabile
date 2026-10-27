@@ -2216,7 +2216,15 @@ class CantabileCard extends HTMLElement {
       if (kaz.forras === "tel") {
         // a telefonról választott számok: csak a BT kimeneten (ezen a készüléken) szólnak
         if (!kaz.szamok?.length) { this._polc = { ful: "tel", ut: [] }; this._polcRajz(); return; }
-        if (hsz.entity !== HELYI) { this._kimenetValt(this._kimenetek.findIndex((x) => x.entity === HELYI), false); this._uzen(T("A telefonról választott zene a BT kimeneten szól – átváltottam.")); }
+        if (hsz.entity !== HELYI) {
+          // új forrás a BT-n: ami eddig a másik kimeneten szólt, az leáll (mint új kazetta betételekor)
+          if (SZOL(this._allapot(hsz)) || SZUNETEL(this._allapot(hsz))) {
+            if (hsz.mod === "url") this._szkriptLeallit(hsz);
+            await this._hiv("media_player", hsz.mod === "sonos" ? "media_pause" : "media_stop", { entity_id: hsz.entity }).catch(() => {});
+          }
+          this._kimenetValt(this._kimenetek.findIndex((x) => x.entity === HELYI), false);
+          this._uzen(T("A telefonról választott zene a BT kimeneten szól – átváltottam."));
+        }
         this._telKaz = kaz;
         this._helyiLista = { szamok: kaz.szamok, i: 0, tel: true };
         await this._helyiSzam(0);
