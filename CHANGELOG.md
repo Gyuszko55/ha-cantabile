@@ -38,24 +38,24 @@ Portability – tested in a clean Home Assistant without Sonos, WiiM, Deezer, st
 - Own music playing on BT can now be moved to other speakers like any tape (the selector used to snap back).
 - The track-by-track sequence (Cast etc.) now runs on the same live order as the WiiM one: reorderable and extendable while playing.
 - File-like titles (WiiM reports the raw file name) are cleaned on the display.
-- Verified live: own music on Háló with TEMP, Háló → WiiM → BT, and BT → Háló.
+- Verified live: own music on the bedroom Sonos with TEMP, the bedroom Sonos → WiiM → BT, and BT → the bedroom Sonos.
 
 ## 1.5.0 – unreleased
 
 - Fast winding within a track (like a deck's CUE / REVIEW): a short tap on REW / FF still skips tracks; held, the display moves 10 s every half second (30 s after 3 s), the player jumps there every 1.5 s so you hear where you are, and playback continues from the release point. The reels spin fast meanwhile.
 - The cassette's time bar is a scrubber: tap or drag to jump within the track.
 - Works on Sonos (music folder and Deezer), WiiM, Cast and BT; not shown for live streams.
-- Verified live on Nappali (music folder and Deezer) and BT.
+- Verified live on the living-room Sonos (music folder and Deezer) and BT.
 
 ## 1.4.2 – unreleased
 
-- Choosing music from the phone / computer (PHONE tab) switches to BT and now stops what was playing on the previous output first (Sonos paused, others stopped) – like inserting a new tape. Verified live on Háló.
+- Choosing music from the phone / computer (PHONE tab) switches to BT and now stops what was playing on the previous output first (Sonos paused, others stopped) – like inserting a new tape. Verified live on the bedroom Sonos.
 
 ## 1.4.1 – unreleased
 
 - Tape transfer from the WiiM uses the track actually playing (from the title field); the WiiM sequence also reports it (`current` was the track already handed over in advance).
 - The seek after a transfer waits until the new output plays the transferred track, plus 2.5 s on WiiM / Cast (they show the title before they can seek).
-- Verified live: NAS tape Nappali → Háló → WiiM → Nest Hub → BT → Nappali → Multiroom → WiiM, same track throughout, position continuous (43 → 54 → 61 → 69 → 79 → 87 → 98 → 105 s); Deezer tape between the Sonos speakers with snap-back on WiiM / BT; paused transfer Háló → WiiM.
+- Verified live: NAS tape the living-room Sonos → the bedroom Sonos → WiiM → Nest Hub → BT → the living-room Sonos → Multiroom → WiiM, same track throughout, position continuous (43 → 54 → 61 → 69 → 79 → 87 → 98 → 105 s); Deezer tape between the Sonos speakers with snap-back on WiiM / BT; paused transfer the bedroom Sonos → WiiM.
 
 ## 1.4.0 – unreleased
 
@@ -67,8 +67,8 @@ Portability – tested in a clean Home Assistant without Sonos, WiiM, Deezer, st
 
 ## 1.3.2 – unreleased
 
-- Transferring to a single Sonos now splits a leftover Multiroom group first (awaited), so only the selected speaker plays – previously, after Multiroom, switching from WiiM / BT to Nappali also woke Háló.
-- Verified live: BT plays an http-only station through the integration with real VU (≈ −12 dB) and gives the sound back to WiiM / Nappali; group sequence Multiroom → WiiM → Nappali → Multiroom → Nest Hub → Háló → Multiroom → BT → Nappali → WiiM.
+- Transferring to a single Sonos now splits a leftover Multiroom group first (awaited), so only the selected speaker plays – previously, after Multiroom, switching from WiiM / BT to the living-room Sonos also woke the bedroom Sonos.
+- Verified live: BT plays an http-only station through the integration with real VU (≈ −12 dB) and gives the sound back to WiiM / the living-room Sonos; group sequence Multiroom → WiiM → the living-room Sonos → Multiroom → Nest Hub → the bedroom Sonos → Multiroom → BT → the living-room Sonos → WiiM.
 
 ## 1.3.1 – unreleased
 
@@ -76,7 +76,7 @@ Portability – tested in a clean Home Assistant without Sonos, WiiM, Deezer, st
 - Stations are also recognised from the URL in the title field (WiiM, Cast report it there), so the dial no longer says “TAPE DECK PLAYING” for a station on the WiiM.
 - BT returns the sound to the output it took it from.
 - BT plays web radio through the integration (`/api/cantabile/stream`, signed link only): http-only stations also play when Home Assistant is opened over https, and the VU meter shows the real signal on BT radio too. Falls back to the direct link if the integration does not answer.
-- Verified live: WiiM → Nappali → Háló → WiiM → Nest Hub → Nappali → Nest Hub → WiiM, fast switching (0.7 s), and Multiroom in and out.
+- Verified live: WiiM → the living-room Sonos → the bedroom Sonos → WiiM → Nest Hub → the living-room Sonos → Nest Hub → WiiM, fast switching (0.7 s), and Multiroom in and out.
 
 ## 1.3.0 – unreleased
 
