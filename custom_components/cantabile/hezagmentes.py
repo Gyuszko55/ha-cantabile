@@ -71,6 +71,8 @@ async def lejatszik(hass: HomeAssistant, dmr: DmrDevice, entity_id: str, sorrend
     await dmr.async_set_transport_uri(url, unquote(most.rsplit("/", 1)[-1]), meta)
     await dmr.async_play()
     most_ut = _ut(url)
+    if hasattr(sorrend, "most"):
+        sorrend.most = most
     kov = next(sorrend, None)
     kov_ut: str | None = None
     indult = False
@@ -95,6 +97,8 @@ async def lejatszik(hass: HomeAssistant, dmr: DmrDevice, entity_id: str, sorrend
             kov_ut = _ut(k_url)
         if kov_ut and szol == kov_ut:
             # átváltott a következőre: az azutánit adjuk meg
+            if hasattr(sorrend, "most"):
+                sorrend.most = kov
             most_ut, kov, kov_ut = szol, next(sorrend, None), None
             continue
         if szol and szol not in (most_ut, kov_ut):

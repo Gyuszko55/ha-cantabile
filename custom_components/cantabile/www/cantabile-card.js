@@ -1751,9 +1751,19 @@ class CantabileCard extends HTMLElement {
   async _kazettaFolytat(f, uj) {
     await this._betolt(f.kaz, f.kezdo);
     if (!(f.poz > 3)) return;
-    // a tekerés csak akkor hat, ha az új kimenet már ténylegesen játssza a számot (a Cast / WiiM lassabban tölt be)
-    for (let t = 0; t < 24 && this._allapot(uj)?.state !== "playing"; t++) await new Promise((r) => setTimeout(r, 500));
-    await new Promise((r) => setTimeout(r, 800));
+    // a tekerés csak akkor hat, ha az új kimenet már ténylegesen az átvitt számot játssza (a Cast / WiiM lassabban tölt be,
+    // és előtte még mást is szólhatott)
+    const ezSzol = () => {
+      const s = this._allapot(uj), a = s?.attributes || {};
+      if (s?.state !== "playing") return false;
+      if (uj.entity === HELYI) return this._helyiLista?.i === f.kezdo;
+      if (uj.mod === "sonos") return (Number(a.queue_position) || 0) - 1 === f.kezdo;
+      const i = this._szamIndex(f.kaz, a);
+      return i === f.kezdo || i < 0 && !URLSZERU(a.media_title);
+    };
+    for (let t = 0; t < 24 && !ezSzol(); t++) await new Promise((r) => setTimeout(r, 500));
+    // a WiiM / Cast a címet már a betöltéskor kiírja, de tekerni csak kicsivel később tud
+    await new Promise((r) => setTimeout(r, uj.mod === "sonos" || uj.entity === HELYI ? 800 : 2500));
     this._hiv("media_player", "media_seek", { entity_id: uj.entity, seek_position: Math.round(f.poz) }).catch(() => {});
   }
 
@@ -1781,7 +1791,8 @@ class CantabileCard extends HTMLElement {
     } else {
       try {
         const t = await this._hass.callWS({ type: "cantabile/tracks", entity_id: hsz.entity });
-        if (t?.tracks?.length) { szamok = t.tracks; kezdo = Math.max(0, t.current); }
+        // a ténylegesen szóló szám a címmezőből (a sorozat a következőt már előre megadta a WiiM-nek)
+        if (t?.tracks?.length) { szamok = t.tracks; const i2 = this._szamIndex({ szamok }, a); kezdo = i2 >= 0 ? i2 : Math.max(0, t.current); }
       } catch (e) { /* régebbi integráció: a kártya emlékezete */ }
       const k = TAR.json("tablet-magno-kazetta");
       if (!szamok && k?.forras === "nas" && k.szamok?.length && k.entity === hsz.entity) { szamok = k.szamok; kezdo = Math.max(0, this._szamIndex(k, a)); }

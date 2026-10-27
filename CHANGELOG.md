@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.1 – unreleased
+
+- Tape transfer from the WiiM uses the track actually playing (from the title field); the WiiM sequence also reports it (`current` was the track already handed over in advance).
+- The seek after a transfer waits until the new output plays the transferred track, plus 2.5 s on WiiM / Cast (they show the title before they can seek).
+- Verified live: NAS tape Nappali → Háló → WiiM → Nest Hub → BT → Nappali → Multiroom → WiiM, same track throughout, position continuous (43 → 54 → 61 → 69 → 79 → 87 → 98 → 105 s); Deezer tape between the Sonos speakers with snap-back on WiiM / BT; paused transfer Háló → WiiM.
+
 ## 1.4.0 – unreleased
 
 - Tape deck routing: the speaker selector only redirects. A playing music-folder tape moves to any output (Sonos ↔ Sonos by grouping, otherwise the old output stops and the new one continues from the same track and position), from any device: the track list comes from the player itself (Sonos queue, the integration's WiiM sequence via `cantabile/tracks`, the card's BT list), so order changes and shuffling are kept.

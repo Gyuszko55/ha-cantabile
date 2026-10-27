@@ -67,6 +67,7 @@ class Sorrend:
     def __init__(self, rt: Cantabile, entity_id: str, szamok: list[str], kezdo: int) -> None:
         self.rt, self.e, self.szamok = rt, entity_id, list(szamok)
         self.kor, self.lista, self.i, self.utolso = 1, self.szamok[kezdo:], 0, None
+        self.most: str | None = None       # a ténylegesen szóló szám (az utolso a már előre megadott következő)
 
     def __iter__(self) -> Sorrend:
         return self
@@ -160,7 +161,8 @@ class Cantabile:
         s = self._sorrend.get(entity_id)
         if s is None or not self.tracks_running(entity_id):
             return None
-        return {"tracks": list(s.szamok), "current": s.szamok.index(s.utolso) if s.utolso in s.szamok else -1}
+        most = s.most or s.utolso
+        return {"tracks": list(s.szamok), "current": s.szamok.index(most) if most in s.szamok else -1}
 
     def tracks_running(self, entity_id: str) -> bool:
         t = self._sorozat.get(entity_id)
