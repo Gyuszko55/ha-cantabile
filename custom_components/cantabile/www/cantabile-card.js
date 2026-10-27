@@ -43,9 +43,9 @@ const EN = {
   "be": "on",
   "ki": "off",
   "BT be / ki": "BT on / off",
-  "Rádió / magnó": "Radio / tape",
+  "Rádió / tape": "Radio / tape",
   "RÁDIÓ": "RADIO",
-  "MAGNÓ": "TAPE",
+  "TAPE": "TAPE",
   "Beállítások": "Settings",
   "Hangolás: húzd oldalra vagy görgess": "Tuning: drag sideways or scroll",
   "Még nincs adó a gombokon – a NET gombbal keress, és a „+ gombra” teszi ide.": "No preset stations yet – find one with NET and “+ preset” puts it here.",
@@ -92,7 +92,7 @@ const EN = {
   "LEJÁTSZÓ": "PLAYER",
   "FAJTA": "TYPE",
   "Egyéb (sor nélkül, pl. WiiM)": "Other (no queue, e.g. WiiM)",
-  "Magnó": "Tape deck",
+  "Tape deck": "Tape deck",
   "Zenemappa": "Music folder",
   "48 kHz-es másolatok mappája": "Folder of 48 kHz copies",
   "(nincs)": "(none)",
@@ -181,7 +181,7 @@ const EN = {
   "SOR": "QUEUE",
   "A streaming kazetták csak Sonos hangszórón szólnak – válts Sonos hangszóróra.": "Streaming tapes only play on Sonos speakers – switch to a Sonos speaker.",
   "Nincs Sonos-kedvenc lista vagy album.": "No Sonos favourite playlists or albums.",
-  "Nincs megadva zenemappa (⚙ → Magnó → Zenemappa).": "No music folder set (⚙ → Tape deck → Music folder).",
+  "Nincs megadva zenemappa (⚙ → Tape deck → Zenemappa).": "No music folder set (⚙ → Tape deck → Music folder).",
   "Üres mappa.": "Empty folder.",
   "Hiba: {h}": "Error: {h}",
   "EZEN A KÉSZÜLÉKEN · BT": "ON THIS DEVICE · BT",
@@ -205,7 +205,7 @@ const EN = {
   "20 MB fölött, kihagyva: {h}.": "Over 20 MB, skipped: {h}.",
   "lejátszási lista": "playlist",
   "nem elérhető": "unavailable",
-  "a magnó szól": "the tape deck is playing",
+  "a tape deck szól": "the tape deck is playing",
   "kikapcsolva": "off",
   "RÁDIÓ SZÓL": "RADIO ON",
   "VU · VALÓDI JEL": "VU · REAL SIGNAL",
@@ -473,7 +473,7 @@ class CantabileCard extends HTMLElement {
       <div class="toloo">${tolo(hszIdx.map((i) => `<button class="hszv" data-i="${i}" title="${ESC(kim[i].nev)}">${ESC(kim[i].rovid || kim[i].nev)}</button>`).join(""), "thsz", T("Hangszóró váltása"))}<small>SPEAKERS</small></div>
       ${btIdx >= 0 ? `<div class="toloo">${tolo(`<button class="btv" data-b="1">${T("be")}</button><button class="btv" data-b="0">${T("ki")}</button>`, "tbt", T("BT be / ki"))}<small>BT</small></div>` : ""}
     </div></div>`;
-    const valto = `<button class="valto" title="${T("Rádió / magnó")}"><span class="vr">${T("RÁDIÓ")}</span><span class="kapcs"></span><span class="vm">${T("MAGNÓ")}</span></button>`;
+    const valto = `<button class="valto" title="${T("Rádió / tape")}"><span class="vr">${T("RÁDIÓ")}</span><span class="kapcs"></span><span class="vm">${T("TAPE")}</span></button>`;
     let beosztas = "";
     for (let k = 0; k <= 10; k++) {
       const sz = -135 + k * 27;
@@ -1654,7 +1654,7 @@ class CantabileCard extends HTMLElement {
           <div class="bfejlec hsz2"><span>${T("NÉV")}</span><span>${T("LEJÁTSZÓ")}</span><span>${T("FAJTA")}</span><span></span></div>
           ${sz.hangszorok.map((h, i) => `<div class="bsor hsz2">${be("hangszorok", i, "nev", h.nev, `placeholder="${T("Név")}"`)}<select data-l="hangszorok" data-i="${i}" data-m="entity">${opc(h.entity)}</select><select data-l="hangszorok" data-i="${i}" data-m="mod"><option value="sonos" ${h.mod === "sonos" ? "selected" : ""}>Sonos</option><option value="url" ${h.mod !== "sonos" ? "selected" : ""}>${T("Egyéb (sor nélkül, pl. WiiM)")}</option></select><button class="bx" data-a="torol" data-l="hangszorok" data-i="${i}" title="${T("Törlés")}">×</button></div>`).join("")}
         </section>
-        <section class="bresz"><h3>${T("Magnó")}</h3>
+        <section class="bresz"><h3>${T("Tape deck")}</h3>
           <div class="bsor ket"><label>${T("Zenemappa")}</label>${be("magno", 0, "nas", sz.magno.nas, 'placeholder="media-source://media_source/local/Zene"')}</div>
           <div class="bsor ket"><label>${T("48 kHz-es másolatok mappája")}</label>${be("magno", 0, "hires", sz.magno.hires, `placeholder="${T("(nincs)")}"`)}</div>
           <div class="bsor ket"><label>${T("Feltöltések mappája")}</label>${be("magno", 0, "feltoltes", sz.magno.feltoltes, `placeholder="${TEL_ALAP}"`)}</div>
@@ -2377,7 +2377,7 @@ class CantabileCard extends HTMLElement {
         lista.querySelectorAll(".kt").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._betolt(kaz[Number(b.dataset.i)]); }));
         return;
       }
-      if (!nasGyoker) { lista.innerHTML = `<div class="puzenet">${T("Nincs megadva zenemappa (⚙ → Magnó → Zenemappa).")}</div>`; return; }
+      if (!nasGyoker) { lista.innerHTML = `<div class="puzenet">${T("Nincs megadva zenemappa (⚙ → Tape deck → Zenemappa).")}</div>`; return; }
       const hol = pl.ut.length ? pl.ut[pl.ut.length - 1] : { id: nasGyoker, cim: "NAS" };
       const r = await this._bongesz(hol.id);
       if (allapot !== kulcs(this._polc)) return;
@@ -2604,7 +2604,7 @@ class CantabileCard extends HTMLElement {
     const dal = [a.media_artist, a.media_title].filter((x) => x && x !== adoNev && !URLSZERU(x)).join(" – ");
     sr.getElementById("ado").innerHTML = radioSzol && kulso ? `<b>${ESC(kulso.nev)}</b> · NET${kulso.orszag ? ` · ${ESC(kulso.orszag)}` : ""}`
       : radioSzol ? `<b>${ESC(c.adok[i].nev)}</b> · ${MHZ(c.adok[i].frekvencia)} MHz`
-      : SZOL(s) ? `<b>${T("a magnó szól")}</b>` : T("kikapcsolva");
+      : SZOL(s) ? `<b>${T("a tape deck szól")}</b>` : T("kikapcsolva");
     sr.getElementById("cim").textContent = radioSzol ? dal : "";
     if (!this._forgat && a.volume_level != null) { this._hangero = a.volume_level; this._rajzHangero(a.volume_level); }
     this._radioAll = { szol: radioSzol, keres: !!this._kezi, s, i };
@@ -2849,5 +2849,5 @@ if (!customElements.get("cantabile-card")) {
   if (!customElements.get("tablet-radio")) customElements.define("tablet-radio", class extends CantabileCard {});
   window.customCards = window.customCards || [];
   window.customCards.push({ type: "cantabile-card", name: "Cantabile", preview: true,
-    description: T("70-es évekbeli ezüst rádió és kazettás magnó: adógombok, NET-rádió, forgó kazetta, valódi VU-mérők, NAS és Deezer.") });
+    description: T("70-es évekbeli ezüst rádió és tape deck: adógombok, NET-rádió, forgó kazetta, valódi VU-mérők, NAS és Deezer.") });
 }

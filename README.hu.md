@@ -1,7 +1,7 @@
 # Cantabile
 
-**70-es évekbeli ezüst rádió és kazettás magnó a Home Assistant vezérlőpultjára.** Adógombok egy FM-skálán, internetes
-rádió, kazettás magnó forgó orsókkal és valódi VU-mérőkkel, a saját zenemappád, Deezer és hangvezérlés.
+**70-es évekbeli ezüst rádió és tape deck a Home Assistant vezérlőpultjára.** Adógombok egy FM-skálán, internetes
+rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemappád, Deezer és hangvezérlés.
 
 *English: [README.md](README.md)*
 
@@ -13,7 +13,7 @@ rádió, kazettás magnó forgó orsókkal és valódi VU-mérőkkel, a saját z
   műfaj, név szerint). Bármelyik adó gombra tehető.
 - SIGNAL-műszer, ami a valódi stream bitrátáját követi.
 
-**Magnó**
+**Tape deck**
 - Kazetta-ablak forgó orsókkal, két mutatós VU-műszer *vagy* fluoreszcens (VFD) kijelző.
 - A VU-mérő a **valódi hangszintet** mutatja: az integráció a szerveren ugyanazt a streamet vagy fájlt elemzi.
 - REW / PLAY / FF / STOP / PAUSE / EJECT, SHUFFLE, REPEAT (1–5 kör vagy végtelen), FADE (Sonos-áttűnés), SLEEP.
@@ -71,31 +71,31 @@ Az integráció beállítása után nyisd meg a beszélgetőügynök beállítá
 
 ```yaml
 type: custom:cantabile-card
-marka: Cantabile                 # elhagyható
+brand: Cantabile                 # elhagyható
 bt: true                         # BT-kimenet ezen a készüléken; false = nincs
-hangszorok:
-  - nev: Nappali
+speakers:
+  - name: Nappali
     entity: media_player.nappali
-    mod: sonos                   # sonos | url (sor nélküli lejátszó, pl. WiiM)
-  - nev: WiiM
+    mode: sonos                  # sonos | url (sor nélküli lejátszó, pl. WiiM)
+  - name: WiiM
     entity: media_player.wiim_mini
-    mod: url
-adok:                            # elhagyható – a NET-tel többet is találsz
-  - nev: Petőfi Rádió
-    rovid: Petőfi                # a gomb felirata
-    frekvencia: 94.8             # helye a skálán (87,5–108)
+    mode: url
+stations:                        # elhagyható – a NET-tel többet is találsz
+  - name: Petőfi Rádió
+    short: Petőfi                # a gomb felirata
+    frequency: 94.8              # helye a skálán (87,5–108)
     url: https://icast.connectmedia.hu/4738/mr2.mp3
-magno:
-  nas: media-source://media_source/local/Zene    # előadó/album/szám
-  hires: Hi-Res 48kHz            # elhagyható: 48 kHz-es másolatok a Sonosnak (<mappa>/<előadó>/<album [48kHz]>)
-  feltoltes: Cantabile           # a TELEFON fül feltöltései ide kerülnek (a zenemappán belül)
-  vu_kijelzo: deprez             # deprez (mutatós műszer) | fluor (fluoreszcens kijelző)
-  vu_kesleltetes_mp: 0           # mp; a valódi VU-jelet a hangszóró pufferéhez igazítja
+tape:
+  media_folder: media-source://media_source/local/Zene   # előadó/album/szám
+  hires_folder: Hi-Res 48kHz     # elhagyható: 48 kHz-es másolatok a Sonosnak (<mappa>/<előadó>/<album [48kHz]>)
+  upload_folder: Cantabile       # a TELEFON fül feltöltései ide kerülnek (a zenemappán belül)
+  display: vu                    # vu (mutatós műszer) | vfd (fluoreszcens kijelző)
+  vu_delay: 0                    # mp; a valódi VU-jelet a hangszóró pufferéhez igazítja
 deezer: true                     # false = nincs DEEZER fül
 multiroom: true                  # két vagy több Sonosnál „Mindkettő” állás
 ```
 
-Az angol kulcsok (`speakers`, `stations`, `tape`, `media_folder` …) is működnek.
+A korábbi magyar kulcsok (`hangszorok`, `adok`, `magno`, `nas` …) is működnek; a ⚙ Mentés abban a formában ír vissza, amiben a beállítás volt.
 
 ## Entitások és szolgáltatások
 

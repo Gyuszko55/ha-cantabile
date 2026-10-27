@@ -6,7 +6,7 @@
     "step": {
       "user": {
         "title": "Cantabile",
-        "description": "Hozzáadja a Cantabile rádió- és magnókártyát (custom:cantabile-card) és a hozzá kellő szolgáltatásokat. A hangszórókat, az adókat és a zenemappát magán a kártyán állítod be (⚙).",
+        "description": "Hozzáadja a Cantabile rádió- és tape deck-kártyát (custom:cantabile-card) és a hozzá kellő szolgáltatásokat. A hangszórókat, az adókat és a zenemappát magán a kártyán állítod be (⚙).",
         "data": {
           "llm_api": "Assist-eszköz (LLM API)"
         },

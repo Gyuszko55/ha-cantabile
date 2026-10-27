@@ -94,7 +94,7 @@ deezer: true                     # false hides the DEEZER tab
 multiroom: true                  # with two or more Sonos speakers: a “Both” position
 ```
 
-Hungarian keys (`hangszorok`, `adok`, `magno`, `nas` …) are accepted as well.
+The earlier Hungarian keys (`hangszorok`, `adok`, `magno`, `nas` …) are accepted as well; ⚙ Save writes back in the same form.
 
 ## Entities and services
 
