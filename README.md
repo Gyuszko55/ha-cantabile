@@ -35,7 +35,7 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
   *“Play Queen in the living room”*, *“Put on the Kind of Magic album”*, *“Turn on Jazz FM in the bedroom”*,
   *“Play Adele from Deezer”*. Anything not in your music folder is looked up on Deezer.
 
-The card's labels follow your Home Assistant language: **Hungarian** or **English**.
+Front-panel labels are always English, like on a real 1970s hi-fi; settings, messages and tooltips follow your Home Assistant language: **Hungarian** or **English**.
 
 ## Requirements
 

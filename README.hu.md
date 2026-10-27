@@ -35,7 +35,7 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
   *„Játssz Queent a nappaliban”*, *„Tedd be a Kind of Magic albumot”*, *„Kapcsold be a Jazz FM-et a hálóban”*,
   *„Játszd a Deezerről Adele-t”*. Ami a zenemappában nincs meg, azt a Deezeren keresi.
 
-A kártya feliratai a Home Assistant nyelvét követik: **magyar** vagy **angol**.
+Az előlapok feliratai mindig angolok, mint egy igazi 70-es évekbeli hifin; a beállítások, az üzenetek és a súgók a Home Assistant nyelvét követik: **magyar** vagy **angol**.
 
 ## Feltételek
 
