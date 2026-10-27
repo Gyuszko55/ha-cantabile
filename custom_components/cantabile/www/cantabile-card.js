@@ -495,7 +495,7 @@ class CantabileCard extends HTMLElement {
       + `<button class="fgomb" data-f="fade" title="${T("Áttűnés a számok között (csak Sonos)")}"><span class="led"></span>FADE</button>`;
     const alvasGomb = `<button class="sleep" title="${T("Időzített kikapcsolás: 15 · 30 · 45 · 60 · 90 perc · ki")}"><span class="led"></span>SLEEP<b class="amar"></b></button>`;
     // a magnó öt funkciógombja: egyforma, ikonos gombok, a felirat alattuk (REPEAT · SHUFFLE · FADE · SLEEP · BT)
-    const og = (f, cim, felirat) => `<div class="og"><button class="ogomb" data-f="${f}" title="${cim}"><span class="led"></span><i>${OI[f]}</i></button><small>${felirat}<b class="amar"></b></small></div>`;
+    const og = (f, cim, felirat) => `<div class="og"><button class="ogomb" data-f="${f}" title="${cim}"><span class="led"></span><i>${OI[f]}${f === "korok" ? '<b class="oszam"></b>' : ""}</i></button><small>${felirat}<b class="amar"></b></small></div>`;
     const otGomb = `<div class="otg">${og("korok", T("Ismétlés: 1 · 2 · 3 · 4 · 5 kör · végtelen"), "REPEAT")}${og("kever", T("Véletlenszerű lejátszás"), "SHUFFLE")}`
       + `${og("fade", T("Áttűnés a számok között (csak Sonos)"), "FADE")}${og("sleep", T("Időzített kikapcsolás: 15 · 30 · 45 · 60 · 90 perc · ki"), "SLEEP")}`
       + `${this._kimenetek.some((h) => h.entity === HELYI) ? og("bt", T("BT: ezen a készüléken szól (újra koppintva vissza a hangszóróra)"), "BT") : ""}</div>`;
@@ -935,7 +935,11 @@ class CantabileCard extends HTMLElement {
           color: #2b2e33; background: linear-gradient(180deg, #f6f7f8, #d0d4d9); box-shadow: 0 2px 0 #80858c; -webkit-tap-highlight-color: transparent; }
         .ogomb .led { position: absolute; top: 4px; left: 50%; width: 10px; height: 3px; margin-left: -5px; border-radius: 2px; background: #6b5a35; }
         .ogomb.be .led { background: #ffb020; box-shadow: 0 0 6px #ffb020; }
-        .ogomb i { display: flex; } .ogomb svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .ogomb i { display: flex; position: relative; }
+        .ogomb .oszam { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 800 9.5px/1 Arial, sans-serif; color: #2b2e33; padding-top: 1px;
+          text-shadow: 0 0 1px #e8eaed, 0 0 2px #e8eaed, 0 0 2px #e8eaed, 1px 0 1px #e8eaed, -1px 0 1px #e8eaed; }
+        .ogomb .oszam.vegt { font-size: 12px; }
+        .ogomb.be .oszam { color: #8a5a00; } .ogomb svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
         .ogomb:active { transform: translateY(1px); box-shadow: 0 1px 0 #80858c; }
         .mjobb > .otg { display: none; }
         /* forgó hangszóró-választó (magnó) */
@@ -1493,7 +1497,8 @@ class CantabileCard extends HTMLElement {
       b.classList.toggle("tiltva", helyi || (f === "fade" && !fade.length));
       b.parentElement.classList.toggle("tiltva", helyi || (f === "fade" && !fade.length));
       b.classList.toggle("be", !helyi && (f === "kever" ? !!a.shuffle : f === "korok" ? kor !== 1 : fade.some((x) => this._hass.states[x].state === "on")));
-      if (f === "korok") am.textContent = !helyi && kor !== 1 ? ` ${kor >= 6 ? "∞" : kor}` : "";
+      // a körszám a REPEAT jel közepén (mint a Sonos appban az „ismétlés egy szám” jel)
+      if (f === "korok") { const sz = b.querySelector(".oszam"); sz.textContent = !helyi && kor !== 1 ? (kor >= 6 ? "∞" : String(kor)) : ""; sz.classList.toggle("vegt", kor >= 6); }
     });
     sr.querySelectorAll(".fgomb").forEach((b) => {
       const f = b.dataset.f;

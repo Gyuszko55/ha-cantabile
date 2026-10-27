@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.7 – unreleased
+
+- Tape deck REPEAT button: the repeat count (2–5, ∞) is shown inside the loop symbol instead of after the label; one pass shows the bare symbol.
+
 ## 1.0.6 – unreleased
 
 - Wide layout: both panels share one grid cell – they fill the height given by the dashboard (wall-tablet pager) or take exactly their content height (sections view), no empty band under the header.
