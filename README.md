@@ -100,6 +100,12 @@ After setting up the integration, open your conversation agent's options (e.g. *
   artist / album / tracks. A Jellyfin or DLNA-server library works too: use its media-source path.
 - **Streaming**: on Sonos, your Sonos favourites (playlists, albums) and the whole Deezer catalogue (with the Deezer
   account linked in the Sonos app). Hide the DEEZER tab in ⚙ if you don't use it.
+- **Spotify (experimental)**: set up the Home Assistant **Spotify** integration (your own playlists and library, plus
+  playback on Spotify Connect speakers – Premium), and/or enter a Spotify developer key (client ID / secret from
+  developer.spotify.com) in the Cantabile integration options for catalogue search. On Sonos it plays with Spotify linked
+  in the Sonos app. If a speaker isn't found among the Spotify Connect devices, set `spotify_device: <name>` on it.
+- **Tidal (experimental)**: enter a Tidal developer key (developer.tidal.com) in the Cantabile options; playback on Sonos
+  with Tidal linked in the Sonos app.
 - **Music on your phone / computer**: PHONE tab → *Choose music*. On BT it plays directly; on any other speaker it is
   uploaded temporarily (TEMP on the tape, deleted after 24 hours).
 - **Voice**: an LLM conversation agent with the *Cantabile* tool turned on (see Voice control).

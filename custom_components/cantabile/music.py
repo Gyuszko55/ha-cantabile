@@ -48,7 +48,7 @@ FAJTAK = ("auto", "eloado", "album", "szam", "radio", "lista")
 
 # a szolgáltatás (angol) mezőnevei és értékei → a belső (magyar) nevek
 KIND = {"auto": "auto", "artist": "eloado", "album": "album", "track": "szam", "radio": "radio", "playlist": "lista"}
-SOURCE = {"auto": "auto", "local": "nas", "deezer": "deezer"}
+SOURCE = {"auto": "auto", "local": "nas", "deezer": "deezer", "spotify": "spotify", "tidal": "tidal"}
 TIPUS_KI = {"eloado": "artist", "album": "album", "szam": "track", "radio": "radio", "lista": "playlist"}
 
 SCHEMA = vol.Schema(
@@ -625,6 +625,77 @@ class Zene:
 
         self._alias_le = [async_track_state_change_event(self.hass, entity, valtozott), async_call_later(self.hass, 15, vege)]
 
+    async def szolg_talalat(self, szolg: str, mit: str, fajta: str, eloado: str) -> dict[str, Any] | None:
+        """Spotify / Tidal (kísérleti): {tipus, ids, poz, nev} – a Sonos a szolgáltatás linkjével játssza."""
+        from urllib.parse import quote
+
+        from . import streaming
+
+        orszag = str(self.hass.config.country or "US").upper()
+        q = f"{eloado} {mit}".strip()
+        cel = {"eloado": ["eloado"], "album": ["album"], "szam": ["szam"], "lista": ["lista"]}.get(fajta, ["eloado", "album", "szam", "lista"])
+        jeloltek: list[tuple[float, str, dict[str, Any]]] = []
+        if szolg == "spotify":
+            r = await streaming.spotify(self.hass, f"/search?q={quote(q)}&type=artist,album,track,playlist&limit=10&market={orszag}")
+            for tip, kulcs, mezo in (("eloado", "artists", "name"), ("album", "albums", "name"), ("szam", "tracks", "name"), ("lista", "playlists", "name")):
+                if tip not in cel:
+                    continue
+                for n, x in enumerate([x for x in ((r.get(kulcs) or {}).get("items") or []) if x][:10]):
+                    p = pont(mit, x.get(mezo, "")) - n * 0.5 + (3 if tip == "eloado" and not eloado else 0)
+                    if p >= (45 if fajta != "auto" else 65):
+                        jeloltek.append((p, tip, x))
+            if not jeloltek:
+                return None
+            _, tip, x = max(jeloltek, key=lambda j: j[0])
+            if tip == "eloado":
+                top = (await streaming.spotify(self.hass, f"/artists/{x['id']}/top-tracks?market={orszag}")).get("tracks") or []
+                return {"tipus": "eloado", "ids": [f"https://open.spotify.com/track/{t['id']}" for t in top], "poz": None, "nev": x["name"]} if top else None
+            if tip == "album":
+                return {"tipus": "album", "ids": [f"https://open.spotify.com/album/{x['id']}"], "poz": 0, "nev": x["name"]}
+            if tip == "lista":
+                return {"tipus": "lista", "ids": [f"https://open.spotify.com/playlist/{x['id']}"], "poz": 0, "nev": x["name"]}
+            alb = x.get("album") or {}
+            if alb.get("id") and x.get("disc_number", 1) == 1 and x.get("track_number"):
+                return {"tipus": "szam", "ids": [f"https://open.spotify.com/album/{alb['id']}"], "poz": x["track_number"] - 1, "nev": x["name"]}
+            return {"tipus": "szam", "ids": [f"https://open.spotify.com/track/{x['id']}"], "poz": 0, "nev": x["name"]}
+        # Tidal (JSON:API): a találatok a relationships alatt, az adataik az included-ben
+        r = await streaming.tidal(self.hass, f"/searchResults/{quote(q, safe='')}?countryCode={orszag}&include=artists,albums,tracks,playlists")
+        inc = {(x.get("type"), x.get("id")): x.get("attributes") or {} for x in r.get("included") or []}
+        rel = ((r.get("data") or {}).get("relationships") or {})
+        for tip, kulcs in (("eloado", "artists"), ("album", "albums"), ("szam", "tracks"), ("lista", "playlists")):
+            if tip not in cel:
+                continue
+            for n, x in enumerate(((rel.get(kulcs) or {}).get("data") or [])[:10]):
+                a = inc.get((x.get("type"), x.get("id")), {})
+                nev = a.get("title") or a.get("name") or ""
+                p = pont(mit, nev) - n * 0.5
+                if p >= (45 if fajta != "auto" else 65):
+                    jeloltek.append((p, tip, {"id": x.get("id"), "nev": nev}))
+        if not jeloltek:
+            return None
+        _, tip, x = max(jeloltek, key=lambda j: j[0])
+        utvonal = {"album": "album", "szam": "track", "lista": "playlist"}
+        if tip == "eloado":
+            alb = await streaming.tidal(self.hass, f"/artists/{x['id']}/relationships/albums?countryCode={orszag}")
+            elso = ((alb.get("data") or [{}])[0] or {}).get("id")
+            return {"tipus": "album", "ids": [f"https://tidal.com/browse/album/{elso}"], "poz": 0, "nev": x["nev"]} if elso else None
+        return {"tipus": tip, "ids": [f"https://tidal.com/browse/{utvonal[tip]}/{x['id']}"], "poz": 0, "nev": x["nev"]}
+
+    async def szolg_valasz(self, szolg: str, hsz: tuple[str, list[str], str], mit: str, fajta: str, eloado: str, keverve: bool | None) -> dict[str, Any]:
+        from . import streaming
+
+        if hsz[2] != "sonos":
+            raise HibaUzenet("stream_sonos", szolg=szolg.capitalize())
+        try:
+            t = await self.szolg_talalat(szolg, mit, fajta, eloado)
+        except streaming.StreamHiba as e:
+            raise HibaUzenet("stream_error", szolg=szolg.capitalize(), hiba=str(e)) from e
+        if not t:
+            raise HibaUzenet("not_found_service", szolg=szolg.capitalize(), mit=mit)
+        kev = keverve if keverve is not None else t["tipus"] == "eloado"
+        await self.deezer_indit(hsz, t, kev)
+        return {"success": True, "kind": TIPUS_KI[t["tipus"]], "playing": t["nev"], "speaker": hsz[0], "source": szolg.capitalize(), "shuffle": kev}
+
     async def deezer_valasz(self, hsz: tuple[str, list[str], str], mit: str, fajta: str, eloado: str, keverve: bool | None) -> dict[str, Any]:
         t = await self.deezer_talalat(mit, fajta, eloado)
         if not t:
@@ -663,6 +734,8 @@ class Zene:
 
             if forras == "deezer" and deezer_be:
                 return await self.deezer_valasz(hsz, mit, fajta, eloado, d.get("keverve"))
+            if forras in ("spotify", "tidal"):
+                return await self.szolg_valasz(forras, hsz, mit, fajta, eloado, d.get("keverve"))
 
             if fajta == "lista":
                 if mod != "sonos" or not sonos:

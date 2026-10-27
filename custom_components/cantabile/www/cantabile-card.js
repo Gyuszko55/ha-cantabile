@@ -220,6 +220,19 @@ const EN = {
   "— üres —": "— empty —",
   "EJECT: kazetta választás": "EJECT: choose a tape",
   "Dalszöveg": "Lyrics",
+  "lista · {o}": "playlist · {o}",
+  "lista": "playlist",
+  "kísérleti": "experimental",
+  "Keresés: {s}…": "Search {s}…",
+  "{s}: kísérleti funkció – élő fiókkal még nincs visszaigazolva.": "{s}: experimental – not yet confirmed with a live account.",
+  "Írd be, mit keresel: előadó, album, szám vagy lista.": "Type what you're looking for: artist, album, track or playlist.",
+  "A(z) {s} most nem érhető el: {h}": "{s} is not available right now: {h}",
+  "Nincs találat ({s}): „{q}”.": "No results on {s} for “{q}”.",
+  "A(z) {s} Sonoson szól – válts Sonos hangszóróra.": "{s} plays on Sonos – switch to a Sonos speaker.",
+  "A Spotify Sonoson vagy Spotify Connect-hangszórón szól – válts hangszórót.": "Spotify plays on Sonos or on a Spotify Connect speaker – switch speakers.",
+  "Saját Spotify-könyvtár": "Your Spotify library",
+  "A(z) {h} nem szerepel a Spotify Connect-eszközök között (nyisd meg rajta egyszer a Spotify appot, vagy add meg a nevét: spotify_device).": "{h} is not among the Spotify Connect devices (open the Spotify app on it once, or set its name: spotify_device).",
+  "A Spotify Connect-lejátszás csak Spotify Connect-hangszóróra vihető át – a(z) {r} szól tovább.": "Spotify Connect playback can only move to a Spotify Connect speaker – it keeps playing on {r}.",
   "Ebben a zenetárban nincs keresés – böngéssz a mappák között (töröld a keresőt).": "This library can't be searched – browse the folders instead (clear the search box).",
   "Ezt, ami most szól, nem tudom átvinni a(z) {h} hangszóróra – a(z) {r} szól tovább.": "I can't move what's playing now to {h} – it keeps playing on {r}.",
   "Üres hely – koppints, és a NET-katalógusból tegyél ide adót": "Empty slot – tap to put a station here from the NET catalogue",
@@ -436,7 +449,7 @@ class CantabileCard extends HTMLElement {
 
   // az integráció entitásai (ismétlésszám, alvásidőzítő, NET-adó) a cantabile/info parancsból
   async _infoKer() {
-    try { const v = await this._hass.callWS({ type: "cantabile/info" }); this._ent = v.entities || {}; this._haIndult = v.started ? v.started * 1000 : null; }
+    try { const v = await this._hass.callWS({ type: "cantabile/info" }); this._ent = v.entities || {}; this._haIndult = v.started ? v.started * 1000 : null; this._stream = v.streaming || {}; }
     catch (e) { this._ent = {}; this._nincsIntegracio = true; }
     this._frissit();
   }
@@ -1751,6 +1764,12 @@ class CantabileCard extends HTMLElement {
 
   // kimenetváltás: ami szól, átkerül az új kimenetre (mint egy igazi hangszóróválasztón); atvisz=false: csak választ
   async _atviszHaKell(regi, uj) {
+    if (this._spotifyConnectSzol(regi)) {
+      // Spotify Connect: a Spotify maga adja át a lejátszást a másik eszköznek
+      const eszk = this._spotifyEszkoz(uj);
+      if (!eszk) { this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); this._uzen(T("A Spotify Connect-lejátszás csak Spotify Connect-hangszóróra vihető át – a(z) {r} szól tovább.", { r: regi.nev })); return this._frissit(); }
+      return this._hiv("media_player", "select_source", { entity_id: this._stream.spotify_entity, source: eszk });
+    }
     const s = this._allapot(regi);
     const fb = this._atvitel && this._atvitel.hova === regi.entity && Date.now() - this._atvitel.ido < 15000 ? this._atvitel : null;
     if (SZOL(s) || fb) return this._atvisz(regi, uj, s, fb);
@@ -1921,7 +1940,7 @@ class CantabileCard extends HTMLElement {
       this._frissit();
       return;
     }
-    if ((kiz === "sonos" && cel?.mod !== "sonos") || (kiz === "bt" && cel?.entity !== HELYI)) {
+    if (((kiz === "sonos" && !this._spotifyConnectSzol(regi)) && cel?.mod !== "sonos") || (kiz === "bt" && cel?.entity !== HELYI)) {
       // a Deezer / Sonos-kedvenc csak Sonoson, a telefonos zene csak BT-n szól: a választó marad, a zene szól tovább
       this._uzen(kiz === "sonos" ? T("A Deezer és a Sonos-kedvencek csak Sonoson szólnak – a(z) {h} szól tovább.", { h: regi.nev })
         : T("A telefonról választott zene csak BT-n szól – ott marad."));
@@ -2428,8 +2447,12 @@ class CantabileCard extends HTMLElement {
         return this._frissit();
       }
       if (kaz.forras === "stream") {
+        if (hsz.mod !== "sonos" && kaz.tipus === "spotify" && this._stream?.spotify_entity && hsz.entity !== HELYI) return this._spotifyConnect(kaz, hsz);
         if (hsz.mod !== "sonos") throw new Error(T("A streaming kazetta csak Sonos hangszórón szól."));
-        if (kaz.tipus === "deezer") {
+        if (kaz.tipus === "spotify" && /^spotify:\/\//.test(kaz.id)) {
+          // a HA Spotify-integrációjának könyvtárából (a Sonos-integráció alakítja Spotify-címmé)
+          await this._hiv("media_player", "play_media", { ...e, media_content_id: kaz.id, media_content_type: kaz.mtype || "playlist" });
+        } else if (["deezer", "spotify", "tidal"].includes(kaz.tipus)) {
           // Deezer-link (album, lista, szám) vagy linkek listája (előadó népszerű számai): a Sonos a Deezer-fiókjával játssza;
           // az első után már szól, a többi utána kerül a sorba
           const ids = kaz.szamok?.length ? kaz.szamok : [kaz.id];
@@ -2503,7 +2526,7 @@ class CantabileCard extends HTMLElement {
   _polcNyit() {
     if (this._mod !== "magno") { this._mod = "magno"; this._frissit(); }
     const ful = TAR.olvas("tablet-magno-ful");
-    const lehet = ["nas", "tel", ...(this._vanSonos() ? ["stream", ...(this._config.deezer !== false ? ["deezer"] : [])] : [])];
+    const lehet = ["nas", "tel", ...(this._vanSonos() ? ["stream", ...(this._config.deezer !== false ? ["deezer"] : [])] : []), ...["spotify", "tidal"].filter((x) => this._szolgLatszik(x))];
     this._polc = { ful: lehet.includes(ful) ? ful : this._vanSonos() ? "stream" : "nas", ut: [] };
     this._polcRajz();
   }
@@ -2813,6 +2836,133 @@ class CantabileCard extends HTMLElement {
   // játssza a linkeket (album, lista, szám), sorba is tehetők. Üres keresőnél a Deezer toplistája, előadóra koppintva az oldala.
   _dz(ut) { return this._hass.callWS({ type: "cantabile/deezer", ut }); }
 
+  // a SPOTIFY / TIDAL fül akkor látszik, ha a szolgáltatás használható (kulcs vagy HA Spotify-integráció) és van hol szólnia
+  _szolgLatszik(szolg) {
+    const s = this._stream || {};
+    if (szolg === "spotify") return !!s.spotify && (this._vanSonos() || !!s.spotify_entity);
+    return !!s.tidal && this._vanSonos();
+  }
+
+  // a Spotify Connect-eszköz neve egy hangszóróhoz: a beállított spotify_device, különben név szerint a Spotify forráslistájából
+  _spotifyEszkoz(hsz) {
+    const sp = this._stream?.spotify_entity, lista = this._hass?.states[sp]?.attributes?.source_list || [];
+    if (!hsz || hsz.entity === HELYI || !lista.length) return null;
+    const norm = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+    const nevek = [hsz.spotify_device, hsz.nev, this._hass.states[hsz.entity]?.attributes?.friendly_name].filter(Boolean).map(norm);
+    return lista.find((x) => nevek.includes(norm(x))) || lista.find((x) => nevek.some((n) => n && (norm(x).includes(n) || n.includes(norm(x))))) || null;
+  }
+
+  // Spotify Connect: a HA Spotify-integrációja a hangszórót választja lejátszó eszköznek, és ott indít (Premium kell)
+  async _spotifyConnect(kaz, hsz) {
+    const sp = this._stream?.spotify_entity, eszk = this._spotifyEszkoz(hsz);
+    if (!eszk) throw new Error(T("A(z) {h} nem szerepel a Spotify Connect-eszközök között (nyisd meg rajta egyszer a Spotify appot, vagy add meg a nevét: spotify_device).", { h: hsz.nev }));
+    const uri = kaz.uri || kaz.id;
+    await this._hiv("media_player", "select_source", { entity_id: sp, source: eszk });
+    await this._hiv("media_player", "play_media", { entity_id: sp, media_content_id: uri, media_content_type: kaz.mtype || (String(uri).split(":")[1] || "playlist") });
+    TAR.ir("tablet-magno-kazetta", JSON.stringify({ ...kaz, entity: hsz.entity }));
+    this._frissit();
+  }
+
+  // szól-e Spotify Connecten ez a hangszóró (akkor a választó a Spotifyval viszi át)
+  _spotifyConnectSzol(hsz) {
+    const sp = this._stream?.spotify_entity, s = sp && this._hass?.states[sp];
+    return !!s && s.state === "playing" && !!s.attributes?.source && s.attributes.source === this._spotifyEszkoz(hsz);
+  }
+
+  // SPOTIFY / TIDAL fül (kísérleti): keresés a szerveren át (cantabile/spotify, cantabile/tidal), előadó-oldal,
+  // a Spotify saját könyvtára a HA Spotify-integrációján át; kazettaként Sonoson linkkel, Spotify Connecten a Spotifyval
+  async _szolgRajz(lista, szolg) {
+    const pl = this._polc; if (!pl) return;
+    const nev = szolg === "spotify" ? "Spotify" : "Tidal", kerdes = pl.keres || "", hely = pl.ut[pl.ut.length - 1];
+    const allapot = JSON.stringify([szolg, kerdes, pl.ut.map((x) => x.id)]), friss = () => this._polc === pl && pl.ful === szolg && allapot === JSON.stringify([szolg, pl.keres || "", pl.ut.map((x) => x.id)]);
+    const hsz = this._hangszoro(), connect = szolg === "spotify" && !!this._stream?.spotify_entity;
+    const jo = hsz.mod === "sonos" || (connect && hsz.entity !== HELYI);
+    const figy = (jo ? "" : `<div class="puzenet">${szolg === "spotify" && connect ? T("A Spotify Sonoson vagy Spotify Connect-hangszórón szól – válts hangszórót.") : T("A(z) {s} Sonoson szól – válts Sonos hangszóróra.", { s: nev })}</div>`)
+      + `<div class="puzenet">${T("{s}: kísérleti funkció – élő fiókkal még nincs visszaigazolva.", { s: nev })}</div>`;
+    const api = (ut) => this._hass.callWS({ type: `cantabile/${szolg}`, ut });
+    const orszag = this._orszag();
+    const link = (tip, id) => (szolg === "spotify" ? `https://open.spotify.com/${tip}/${id}` : `https://tidal.com/browse/${tip}/${id}`);
+    const kazLista = (kaz) => {
+      lista.innerHTML = figy + (kaz.length ? `<div class="kazettak">${kaz.map((k, i) => this._kazettaCsempe(k, i)).join("")}</div>` : `<div class="puzenet">${T("Nincs találat.")}</div>`);
+      lista.querySelectorAll(".kt").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._betolt(kaz[Number(b.dataset.i)]); }));
+    };
+    const kaz = (cim, alcim, tip, id, kep, extra = {}) => ({ cim, alcim, forras: "stream", tipus: szolg, id: link(tip, id), uri: szolg === "spotify" ? `spotify:${tip}:${id}` : undefined, mtype: tip, kep: kep || null, ...extra });
+    lista.innerHTML = `<div class="puzenet">${T("Betöltés…")}</div>`;
+    try {
+      // a Spotify saját könyvtára (HA Spotify-integráció): mappák a HA médiaböngészőjéből
+      if (hely?.konyvtar || (!hely && KERES_NORM(kerdes).length < 2 && connect)) {
+        const r = await this._hass.callWS({ type: "media_player/browse_media", entity_id: this._stream.spotify_entity, ...(hely?.konyvtar ? { media_content_id: hely.id, media_content_type: hely.mtype } : {}) });
+        if (!friss()) return;
+        const elemek = r.children || [], mappak = elemek.filter((x) => x.can_expand && !x.can_play), jatszhato = elemek.filter((x) => x.can_play);
+        lista.innerHTML = figy + (mappak.length ? `<div class="eloadok">${mappak.map((x, i) => `<button data-k="${i}">${ESC(x.title)}</button>`).join("")}</div>` : "")
+          + (jatszhato.length ? `<div class="kazettak">${jatszhato.map((x, i) => this._kazettaCsempe({ cim: x.title, alcim: x.media_class || "", kep: x.thumbnail }, i)).join("")}</div>` : "")
+          + (!mappak.length && !jatszhato.length ? `<div class="puzenet">${T("Nincs találat.")}</div>` : "");
+        lista.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => { const x = mappak[Number(b.dataset.k)]; pl.ut.push({ id: x.media_content_id, mtype: x.media_content_type, cim: x.title, konyvtar: true }); this._polcRajz(); }));
+        lista.querySelectorAll(".kt").forEach((b) => b.addEventListener("click", () => {
+          const x = jatszhato[Number(b.dataset.i)]; this._polcZar();
+          const uri = /^spotify:/.test(x.media_content_id) ? x.media_content_id : undefined;
+          this._betolt({ cim: x.title, alcim: x.media_class || "Spotify", forras: "stream", tipus: "spotify", id: x.media_content_id, uri, mtype: x.media_content_type, kep: x.thumbnail || null });
+        }));
+        return;
+      }
+      if (hely) {
+        // előadó-oldal: népszerű számai egy kazettán (Spotify), alatta az albumai
+        const lap = [];
+        if (szolg === "spotify") {
+          const [top, alb] = await Promise.all([api(`/artists/${hely.id}/top-tracks?market=${orszag}`), api(`/artists/${hely.id}/albums?include_groups=album,single,compilation&limit=50&market=${orszag}`)]);
+          if (!friss()) return;
+          if (top.tracks?.length) lap.push({ cim: T("{e} – népszerű számok", { e: hely.cim }), alcim: T("{n} szám", { n: top.tracks.length }), forras: "stream", tipus: "spotify", id: link("track", top.tracks[0].id), szamok: top.tracks.map((t) => link("track", t.id)), uri: `spotify:artist:${hely.id}`, mtype: "artist", kep: top.tracks[0].album?.images?.[1]?.url || null });
+          for (const x of alb.items || []) lap.push(kaz(x.name, `${x.album_type || "album"} · ${String(x.release_date || "").slice(0, 4)}`, "album", x.id, x.images?.[1]?.url || x.images?.[0]?.url));
+        } else {
+          const alb = await api(`/artists/${hely.id}/relationships/albums?countryCode=${orszag}&include=albums`);
+          if (!friss()) return;
+          const inc = new Map((alb.included || []).map((x) => [x.id, x.attributes || {}]));
+          for (const x of alb.data || []) lap.push(kaz(inc.get(x.id)?.title || x.id, hely.cim, "album", x.id));
+        }
+        return kazLista(lap);
+      }
+      if (KERES_NORM(kerdes).length < 2) { lista.innerHTML = figy + `<div class="puzenet">${T("Írd be, mit keresel: előadó, album, szám vagy lista.")}</div>`; return; }
+      let eloadok = [], albumok = [], szamok = [], listak = [];
+      if (szolg === "spotify") {
+        const r = await api(`/search?q=${encodeURIComponent(kerdes.trim())}&type=artist,album,track,playlist&limit=15&market=${orszag}`);
+        if (!friss()) return;
+        eloadok = (r.artists?.items || []).filter(Boolean).sort((x, y) => (y.popularity || 0) - (x.popularity || 0)).map((x) => ({ id: x.id, nev: x.name }));
+        albumok = (r.albums?.items || []).filter(Boolean).map((x) => kaz(x.name, (x.artists || []).map((a) => a.name).join(", "), "album", x.id, x.images?.[1]?.url || x.images?.[0]?.url));
+        szamok = (r.tracks?.items || []).filter(Boolean).map((x) => {
+          const al = [(x.artists || []).map((a) => a.name).join(", "), x.album?.name].filter(Boolean).join(" · ");
+          // a szám az albumával töltődik be, attól a számtól (csak az első lemezen biztos a sorszám)
+          return x.album?.id && (x.disc_number || 1) === 1 ? { ...kaz(x.album.name, al, "album", x.album.id, x.album.images?.[1]?.url), cimSor: x.name, kezdo: Math.max(0, (x.track_number || 1) - 1) }
+            : { ...kaz(x.name, al, "track", x.id), cimSor: x.name, kezdo: 0 };
+        });
+        listak = (r.playlists?.items || []).filter(Boolean).map((x) => kaz(x.name, T("lista · {o}", { o: x.owner?.display_name || "Spotify" }), "playlist", x.id, x.images?.[0]?.url));
+      } else {
+        const r = await api(`/searchResults/${encodeURIComponent(kerdes.trim())}?countryCode=${orszag}&include=artists,albums,tracks,playlists`);
+        if (!friss()) return;
+        const inc = new Map((r.included || []).map((x) => [`${x.type}:${x.id}`, x.attributes || {}])), rel = r.data?.relationships || {};
+        const elem = (k) => (rel[k]?.data || []).map((x) => ({ id: x.id, a: inc.get(`${x.type}:${x.id}`) || {} }));
+        eloadok = elem("artists").map((x) => ({ id: x.id, nev: x.a.name || x.id }));
+        albumok = elem("albums").map((x) => kaz(x.a.title || x.id, "album", "album", x.id));
+        szamok = elem("tracks").map((x) => ({ ...kaz(x.a.title || x.id, "", "track", x.id), cimSor: x.a.title || x.id, kezdo: 0 }));
+        listak = elem("playlists").map((x) => kaz(x.a.name || x.a.title || x.id, T("lista"), "playlist", x.id));
+      }
+      const csoport = (cim, db, belso) => (db ? `<h5 class="kcsop">${cim}<span>${db}</span></h5>${belso}` : "");
+      const sor = (t, i, cim, al) => `<div class="ktsor"><button data-${t}="${i}"><b>${ESC(cim)}</b><small>${ESC(al || "")}</small></button></div>`;
+      lista.innerHTML = figy + (eloadok.length + albumok.length + szamok.length + listak.length === 0
+        ? `<div class="puzenet">${T("Nincs találat ({s}): „{q}”.", { s: nev, q: ESC(kerdes) })}</div>`
+        : csoport("ARTISTS", eloadok.length, `<div class="eloadok">${eloadok.map((x, i) => `<button data-e="${i}">${ESC(x.nev)}</button>`).join("")}</div>`)
+          + csoport("ALBUMS", albumok.length, `<div class="ktalal">${albumok.map((x, i) => sor("a", i, x.cim, x.alcim)).join("")}</div>`)
+          + csoport("TRACKS", szamok.length, `<div class="ktalal">${szamok.map((x, i) => sor("s", i, x.cimSor, x.alcim)).join("")}</div>`)
+          + csoport("PLAYLISTS", listak.length, `<div class="ktalal">${listak.map((x, i) => sor("l", i, x.cim, x.alcim)).join("")}</div>`));
+      lista.scrollTop = 0;
+      lista.querySelectorAll("[data-e]").forEach((b) => b.addEventListener("click", () => { const x = eloadok[Number(b.dataset.e)]; pl.ut = [{ id: x.id, cim: x.nev }]; pl.dzKeres = kerdes; pl.keres = ""; this._polcRajz(); }));
+      lista.querySelectorAll("[data-a]").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._betolt(albumok[Number(b.dataset.a)]); }));
+      lista.querySelectorAll("[data-l]").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._betolt(listak[Number(b.dataset.l)]); }));
+      lista.querySelectorAll("[data-s]").forEach((b) => b.addEventListener("click", () => { const x = szamok[Number(b.dataset.s)]; this._polcZar(); this._betolt(x, x.kezdo || 0); }));
+    } catch (err) {
+      if (friss()) lista.innerHTML = figy + `<div class="puzenet">${T("A(z) {s} most nem érhető el: {h}", { s: nev, h: ESC(err?.message || err) })}</div>`;
+    }
+  }
+
   async _deezerRajz(lista) {
     const pl = this._polc; if (!pl) return;
     const kerdes = pl.keres || "", eloado = pl.ut[pl.ut.length - 1];
@@ -3073,16 +3223,20 @@ class CantabileCard extends HTMLElement {
     if (!pl) return;
     p.hidden = false;
     const nasGyoker = this._config.magno?.nas;
-    const ut = (pl.ful === "nas" || pl.ful === "deezer") && pl.ut.length
+    const szolg = ["spotify", "tidal"].includes(pl.ful), szolgNev = pl.ful === "spotify" ? "Spotify" : "Tidal";
+    const ut = (pl.ful === "nas" || pl.ful === "deezer" || szolg) && pl.ut.length
       ? `<button data-vissza>${T("‹ Vissza")}</button>${ESC(pl.ut.map((x) => x.cim).join(" › "))}`
       : pl.ful === "sor" ? ""
       : pl.ful === "deezer" ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés a Deezeren…")}" value="${ESC(pl.keres || "")}">`
+      : szolg ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés: {s}…", { s: szolgNev })}" value="${ESC(pl.keres || "")}">`
       : nasGyoker ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés a zenemappában…")}" value="${ESC(pl.keres || "")}">`
       : (pl.ful === "tel" ? T("Saját zene") : pl.ful === "nas" ? T("Zenemappa") : T("Sonos kedvencek"));
     p.innerHTML = `
       <div class="pfej">
         ${this._vanSonos() ? `<button class="pful ${pl.ful === "stream" ? "akt" : ""}" data-ful="stream">STREAMING</button>` : ""}
         ${this._config.deezer !== false && this._vanSonos() ? `<button class="pful ${pl.ful === "deezer" ? "akt" : ""}" data-ful="deezer">DEEZER</button>` : ""}
+        ${this._szolgLatszik("spotify") ? `<button class="pful ${pl.ful === "spotify" ? "akt" : ""}" data-ful="spotify" title="${T("kísérleti")}">SPOTIFY<sup>β</sup></button>` : ""}
+        ${this._szolgLatszik("tidal") ? `<button class="pful ${pl.ful === "tidal" ? "akt" : ""}" data-ful="tidal" title="${T("kísérleti")}">TIDAL<sup>β</sup></button>` : ""}
         <button class="pful ${pl.ful === "nas" ? "akt" : ""}" data-ful="nas">NAS</button>
         <button class="pful ${pl.ful === "tel" ? "akt" : ""}" data-ful="tel">PHONE</button>
         <button class="pful ${pl.ful === "sor" ? "akt" : ""}" data-ful="sor">QUEUE</button>
@@ -3094,18 +3248,19 @@ class CantabileCard extends HTMLElement {
       pl.ful = b.dataset.ful; pl.ut = []; pl.keres = ""; if (pl.ful !== "sor") TAR.ir("tablet-magno-ful", pl.ful); this._polcRajz();
     }));
     p.querySelector(".pzar").addEventListener("click", () => this._polcZar());
-    p.querySelector("[data-vissza]")?.addEventListener("click", () => { pl.ut.pop(); if (pl.ful === "deezer" && !pl.ut.length) pl.keres = pl.dzKeres || ""; this._polcRajz(); });
+    p.querySelector("[data-vissza]")?.addEventListener("click", () => { pl.ut.pop(); if ((pl.ful === "deezer" || szolg) && !pl.ut.length) pl.keres = pl.dzKeres || ""; this._polcRajz(); });
     const lista = p.querySelector(".plista");
     const kereso = p.querySelector("#pkeres");
     if (kereso) {
       // gépelés közben csak a találati lista frissül (a mező és a billentyűzet marad)
       kereso.addEventListener("input", () => {
         pl.keres = kereso.value; clearTimeout(this._keresIdo);
-        this._keresIdo = setTimeout(() => (KERES_NORM(pl.keres).length >= 2 ? (pl.ful === "deezer" ? this._deezerRajz(lista) : this._keresRajz(lista)) : this._polcRajz()), pl.ful === "deezer" ? 400 : 180);
+        this._keresIdo = setTimeout(() => (KERES_NORM(pl.keres).length >= 2 ? (pl.ful === "deezer" ? this._deezerRajz(lista) : szolg ? this._szolgRajz(lista, pl.ful) : this._keresRajz(lista)) : this._polcRajz()), pl.ful === "deezer" || szolg ? 450 : 180);
       });
       kereso.addEventListener("keydown", (e) => { if (e.key === "Enter") kereso.blur(); });
     }
     if (pl.ful === "deezer") return this._deezerRajz(lista);
+    if (szolg) return this._szolgRajz(lista, pl.ful);
     if (KERES_NORM(pl.keres || "").length >= 2 && !(pl.ful === "nas" && pl.ut.length)) return this._keresRajz(lista);
     const kulcs = (x) => JSON.stringify([x?.ful, x?.ut.map((y) => y.id), KERES_NORM(x?.keres || "").length >= 2 && !x?.ut.length]);
     const allapot = kulcs(pl);

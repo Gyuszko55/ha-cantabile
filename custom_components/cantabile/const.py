@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.core import HomeAssistant
 
 DOMAIN = "cantabile"
-VERSION = "1.8.0"
+VERSION = "1.9.0"
 
 # a kártya és a betűkészlet a saját statikus útvonalon
 STATIC_URL = "/cantabile_static"
@@ -15,6 +15,10 @@ CONF_LLM_API = "llm_api"          # Assist-eszköz (LLM API) bekapcsolva
 CONF_DUCK_SOURCES = "duck_sources"  # bemondó eszközök (halkítás bemondáskor)
 CONF_DUCK_LEVEL = "duck_level"      # a zene hangereje bemondás alatt, az eredeti %-ában
 DUCK_LEVEL_DEFAULT = 25
+CONF_SPOTIFY_ID = "spotify_client_id"      # Spotify-fejlesztői kulcs (kísérleti SPOTIFY fül)
+CONF_SPOTIFY_SECRET = "spotify_client_secret"
+CONF_TIDAL_ID = "tidal_client_id"          # Tidal-fejlesztői kulcs (kísérleti TIDAL fül)
+CONF_TIDAL_SECRET = "tidal_client_secret"
 LLM_API_ID = "cantabile"
 
 # entitások egyedi azonosítói (a kártya a cantabile/info parancsból tudja meg az entity_id-kat)
@@ -55,6 +59,9 @@ _TEXT: dict[str, dict[str, str]] = {
     },
     "start_failed": {"hu": "Nem sikerült elindítani: {hiba}", "en": "Could not start playback: {hiba}"},
     "rb_down": {"hu": "A Radio Browser most nem érhető el ({hiba}).", "en": "Radio Browser is not reachable right now ({hiba})."},
+    "stream_sonos": {"hu": "A {szolg} csak Sonos hangszórón szól.", "en": "{szolg} only plays on Sonos speakers."},
+    "stream_error": {"hu": "{szolg}: {hiba}", "en": "{szolg}: {hiba}"},
+    "not_found_service": {"hu": "A {szolg} kínálatában nem találom: „{mit}”.", "en": "I can't find “{mit}” on {szolg}."},
     "deezer_down": {"hu": "A Deezer most nem érhető el ({hiba}).", "en": "Deezer is not reachable right now ({hiba})."},
     "deezer_denied": {"hu": "Ilyen Deezer-kérés nem engedélyezett.", "en": "This Deezer request is not allowed."},
     "deezer_error": {"hu": "Deezer-hiba: {hiba}", "en": "Deezer error: {hiba}"},

@@ -37,7 +37,7 @@ class Lejatszas(llm.Tool):
             vol.Optional("artist", description="The artist, when an album or track was requested and the artist was named."): str,
             vol.Optional("speaker", description="Speaker name, or 'all' for every Sonos speaker together. Leave empty if not said."): str,
             vol.Optional("shuffle", description="True if the user asked for shuffled / random order."): bool,
-            vol.Optional("source", description="deezer if the user asked for Deezer, local for their own music, otherwise auto."): vol.In(list(SOURCE)),
+            vol.Optional("source", description="deezer, spotify or tidal if the user asked for that service, local for their own music, otherwise auto."): vol.In(list(SOURCE)),
         }
     )
 

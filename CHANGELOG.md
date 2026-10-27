@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.0 – unreleased
+
+- **Spotify and Tidal (experimental)** – new SPOTIFY β and TIDAL β tabs on the tape shelf: search artists / albums / tracks / playlists, artist pages, and for Spotify your own library through the Home Assistant Spotify integration.
+  - Catalogue access goes through the integration (`cantabile/spotify`, `cantabile/tidal`, whitelisted read-only paths; keys and tokens stay on the server): Spotify with a developer key in the Cantabile options or the Home Assistant Spotify integration's login; Tidal with a developer key (openapi.tidal.com v2).
+  - Playback on Sonos with the service's share link (account linked in the Sonos app) – queue, gapless, movable between Sonos speakers; Spotify also on Spotify Connect speakers through the Spotify integration (Premium), where the speaker selector hands playback over with Spotify Connect. Not on BT.
+  - Voice: `source: spotify | tidal` (“play … from Spotify”).
+  - Not yet confirmed with a live account: tested with invalid keys (clear errors), a forbidden path, and mocked catalogue answers (tabs, results, artist page, Sonos share-link and Spotify Connect branches).
+
 ## 1.8.0 – unreleased
 
 Portability, part 2.

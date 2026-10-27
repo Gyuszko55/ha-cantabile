@@ -22,12 +22,18 @@
         "data": {
           "llm_api": "Assist tool (LLM API)",
           "duck_sources": "Announcers (duck music while they speak)",
-          "duck_level": "Music volume during announcements"
+          "duck_level": "Music volume during announcements",
+          "spotify_client_id": "Spotify client ID (experimental)",
+          "spotify_client_secret": "Spotify client secret",
+          "tidal_client_id": "Tidal client ID (experimental)",
+          "tidal_client_secret": "Tidal client secret"
         },
         "data_description": {
           "llm_api": "Lets LLM-based conversation agents start music and radio. Turn on “Cantabile” in the agent's options as well.",
           "duck_sources": "Assist satellites (e.g. Voice PE: while listening, thinking or answering) and media players (while they say a TTS message). The playing Sonos / WiiM speakers are turned down meanwhile.",
-          "duck_level": "Percentage of the original volume; 0 = muted."
+          "duck_level": "Percentage of the original volume; 0 = muted.",
+          "spotify_client_id": "From developer.spotify.com → Dashboard → Create app. Enables catalogue search on the SPOTIFY tab. Not needed if the Home Assistant Spotify integration is set up (that also shows your own playlists). Playback: on Sonos with Spotify linked in the Sonos app, or on Spotify Connect speakers via the Spotify integration (Premium).",
+          "tidal_client_id": "From developer.tidal.com → Dashboard → Create app. Enables catalogue search on the TIDAL tab; playback on Sonos with Tidal linked in the Sonos app."
         }
       }
     }
@@ -62,7 +68,9 @@
       "options": {
         "auto": "Automatic (music folder, then Deezer)",
         "local": "Music folder",
-        "deezer": "Deezer"
+        "deezer": "Deezer",
+        "spotify": "Spotify (experimental)",
+        "tidal": "Tidal (experimental)"
       }
     }
   },
