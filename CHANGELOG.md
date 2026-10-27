@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.1 – 2026-10-27
+
+- Own icon and logo (cassette with two reels and an amber “on” lamp; light and dark logo), shipped in the integration's `brand/` folder – Home Assistant 2026.3+ shows them automatically in Settings → Devices & services.
+
 ## 1.9.0 – 2026-10-27
 
 - **Spotify and Tidal (experimental)** – new SPOTIFY β and TIDAL β tabs on the tape shelf: search artists / albums / tracks / playlists, artist pages, and for Spotify your own library through the Home Assistant Spotify integration.
