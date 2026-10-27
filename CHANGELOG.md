@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1 – unreleased
+
+- Tape deck: five equal icon buttons with labels below – REPEAT, SHUFFLE, FADE, SLEEP, BT (BT toggles playback on this device).
+  Tablet: under the display; phone: next to the volume knob.
+- Tape deck: rotary speaker selector (the radio keeps the slide switches).
+- The card is registered as a Lovelace resource (sections views rendered before the injected module).
+
 ## 1.0.0 – unreleased
 
 First public release, generalised from a home-made dashboard card.
