@@ -5,6 +5,8 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
 
 *English: [README.md](README.md)*
 
+![Cantabile demó: kazetta a polcról, tekerés, ismétlés és keverés, átvitel másik hangszóróra, hangvezérlés és rádió](docs/images/demo.gif)
+
 ![Cantabile rádió: FM-skála adógombokkal, térerő-mérő, hangerő és hangszóróválasztó](docs/images/radio.png)
 
 ![Cantabile tape deck: forgó orsók, VU-mérők, zongorabillentyűs vezérlés](docs/images/tape.png)

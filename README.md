@@ -5,6 +5,8 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
 
 *Magyar leírás: [README.hu.md](README.hu.md)*
 
+![Cantabile demo: loading a tape from the shelf, scanning, repeat and shuffle, moving the tape to another speaker, voice control and the radio](docs/images/demo.gif)
+
 ![Cantabile radio: FM dial with preset buttons, signal meter, volume and speaker selector](docs/images/radio.png)
 
 ![Cantabile cassette deck: turning reels, VU meters, piano-key transport](docs/images/tape.png)
