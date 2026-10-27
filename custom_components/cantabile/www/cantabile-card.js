@@ -217,6 +217,7 @@ const EN = {
   "— üres —": "— empty —",
   "EJECT: kazetta választás": "EJECT: choose a tape",
   "Dalszöveg": "Lyrics",
+  "Húzd az átrendezéshez": "Drag to reorder",
   "Újraindult a Home Assistant – a kazettát friss linkekkel töltöm újra.": "Home Assistant restarted – reloading the tape with fresh links.",
   "Nincs dalszöveg ehhez a dalhoz.": "No lyrics found for this song.",
   "Instrumentális szám – nincs szövege.": "Instrumental – no lyrics.",
@@ -1146,6 +1147,14 @@ class CantabileCard extends HTMLElement {
         .sorgomb { cursor: pointer; }
         .sorsor, .ktsor { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px; align-items: stretch; }
         .sorsor > button { width: 100%; }
+        .huzhato .sorsor { grid-template-columns: 24px minmax(0, 1fr) auto; position: relative; }
+        .sorsor .foga { display: grid; align-content: center; justify-items: center; gap: 3px; cursor: grab; touch-action: none; border-radius: 3px;
+          background: rgba(255,255,255,.04); }
+        .sorsor .foga i { display: block; width: 12px; height: 2px; border-radius: 1px; background: #a88f6b; }
+        .sorsor .foga:active { cursor: grabbing; background: rgba(255,216,146,.2); }
+        .sorsor.huz { z-index: 3; box-shadow: 0 0 0 4px #4a2c17, 0 8px 20px rgba(0,0,0,.6); background: #4a2c17; border-radius: 3px; transition: none; }
+        .sorsor.ide::before, .sorsor.ideala::after { content: ""; position: absolute; left: 0; right: 0; height: 3px; border-radius: 2px; background: #ffd892; box-shadow: 0 0 6px rgba(255,216,146,.7); }
+        .sorsor.ide::before { top: -3px; } .sorsor.ideala::after { bottom: -3px; }
         .sorsor.akt .sorm { display: none; }
         .sorm { display: flex; gap: 3px; }
         .sorm .sm { border: 0; border-radius: 3px; min-width: 34px; padding: 0 8px; cursor: pointer; background: rgba(255,255,255,.07); color: #cdb995;
@@ -1366,6 +1375,19 @@ class CantabileCard extends HTMLElement {
     const k = () => HELYI_KOZOS.kartya || this;
     const frissit = () => k()._frissit();
     ["playing", "pause", "waiting", "canplay", "loadedmetadata", "volumechange", "error"].forEach((e) => au.addEventListener(e, frissit));
+    // a szám vége előtt 20 mp-cel a következő link előre feloldva és letöltve: a váltás így szinte azonnali
+    au.addEventListener("timeupdate", () => {
+      const l = this._helyiLista;
+      if (!l || this._aktAudio !== au || !(l.i + 1 < l.szamok.length) || !(au.duration - au.currentTime < 20)) return;
+      const kov = l.szamok[l.i + 1];
+      if (this._helyiElore?.id === kov) return;
+      this._helyiElore = { id: kov, url: null };
+      this._helyiForras(kov).then((url) => {
+        if (this._helyiElore?.id !== kov) return;
+        this._helyiElore.url = url;
+        const m = new Audio(); m.preload = "auto"; m.muted = true; m.src = url; this._helyiElore.meleg = m;
+      }).catch(() => { this._helyiElore = null; });
+    });
     au.addEventListener("ended", () => {
       const l = this._helyiLista;
       if (l && l.i + 1 < l.szamok.length) k()._helyiSzam(l.i + 1); else { this._helyiId = null; k()._frissit(); }
@@ -1406,7 +1428,9 @@ class CantabileCard extends HTMLElement {
   }
 
   async _helyiIndit(id) {
-    const url = await this._helyiForras(id);
+    const elore = this._helyiElore?.id === id && this._helyiElore.url ? this._helyiElore.url : null;
+    this._helyiElore = null;
+    const url = elore || await this._helyiForras(id);
     const elemzett = /^(blob:|\/)/.test(url) || url.startsWith(location.origin);
     const au = this._helyiAudio(elemzett), masik = elemzett ? this._audio : this._audioE;
     if (masik && masik !== au) { masik.pause(); masik.removeAttribute("src"); }
@@ -2513,10 +2537,13 @@ class CantabileCard extends HTMLElement {
     if (this._polc !== pl || pl.ful !== "sor") return;
     pl.sor = { kulcs: f.kulcs, db: elemek.length, elemek };
     const kevert = !!this._hass?.states[f.vez || ""]?.attributes?.shuffle, szerk = f.mod === "sonos";
+    // húzással átrendezhető: Sonoson (keverés nélkül – ott a sor sorrendje nem a lejátszásé), WiiM-en és BT-n
+    const huz = elemek.length > 1 && !(szerk && kevert);
     lista.innerHTML = `<div class="sorfej">${ESC(f.hsz.nev)} · ${T("{n} szám", { n: elemek.length })}${kevert ? ` · ${T("keverve")}` : ""}${szerk && kevert ? `<span> – ${T("keverés közben a „következőnek” nem érhető el")}</span>` : ""}</div>
-      <div class="sorlista">${elemek.map((e, i) => `<div class="sorsor"><button data-q="${i}"><span class="sn">${i + 1}</span><span class="st"><b>${ESC(e.cim)}</b>${e.al ? `<small>${ESC(e.al)}</small>` : ""}</span></button>${szerk
+      <div class="sorlista${huz ? " huzhato" : ""}">${elemek.map((e, i) => `<div class="sorsor">${huz ? `<span class="foga" title="${T("Húzd az átrendezéshez")}"><i></i><i></i><i></i></span>` : ""}<button data-q="${i}"><span class="sn">${i + 1}</span><span class="st"><b>${ESC(e.cim)}</b>${e.al ? `<small>${ESC(e.al)}</small>` : ""}</span></button>${szerk
         ? `<span class="sorm">${e.nas && !kevert ? `<button class="sm" data-kov="${i}" title="${T("Következőnek")}">${SI.kov}</button>` : ""}<button class="sm" data-tor="${i}" title="${T("Törlés a sorból")}">${SI.torol}</button></span>` : ""}</div>`).join("")}</div>`;
     lista.querySelectorAll("[data-q]").forEach((b) => b.addEventListener("click", () => this._sorUgrik(Number(b.dataset.q))));
+    if (huz) this._sorHuzas(lista, f);
     lista.querySelectorAll("[data-kov]").forEach((b) => b.addEventListener("click", () => this._sorKovetkezo(f, Number(b.dataset.kov))));
     lista.querySelectorAll("[data-tor]").forEach((b) => b.addEventListener("click", () => {
       // kétlépcsős: első koppintás „Biztos?”, a 3 mp-en belüli második töröl
@@ -2539,6 +2566,69 @@ class CantabileCard extends HTMLElement {
     });
     const el = lista.querySelector(".sorlista .akt");
     if (el && (gorget || ujra)) lista.scrollTop = Math.max(0, el.offsetTop - lista.offsetTop - lista.clientHeight / 3);
+  }
+
+  // húzás a fogantyúnál (egér és érintés): a sor az ujjal mozog, a beszúrás helyét vonal jelzi; a lista széléhez érve
+  // görget; elengedéskor áthelyez
+  _sorHuzas(lista, f) {
+    lista.querySelectorAll(".sorlista .foga").forEach((h) => h.addEventListener("pointerdown", (ev) => {
+      if (ev.button > 0) return;
+      ev.preventDefault();
+      const sor = h.closest(".sorsor"), sorok = [...lista.querySelectorAll(".sorlista .sorsor")], honnan = sorok.indexOf(sor);
+      const kezdY = ev.clientY, kezdG = lista.scrollTop;
+      let hova = honnan, y = ev.clientY, gorgeto = null;
+      try { h.setPointerCapture(ev.pointerId); } catch (e) { /* régi böngésző */ }
+      sor.classList.add("huz");
+      const jelol = () => {
+        sor.style.transform = `translateY(${y - kezdY + lista.scrollTop - kezdG}px)`;
+        let k = sorok.length;
+        for (let j = 0; j < sorok.length; j++) {
+          if (sorok[j] === sor) continue;
+          const t = sorok[j].getBoundingClientRect();
+          if (y < t.top + t.height / 2) { k = j; break; }
+        }
+        hova = k > honnan ? k - 1 : k;
+        sorok.forEach((x, j) => { x.classList.toggle("ide", j === k && k !== honnan && k !== honnan + 1); x.classList.toggle("ideala", k === sorok.length && j === sorok.length - 1 && honnan !== sorok.length - 1); });
+      };
+      const mozog = (e) => {
+        y = e.clientY; jelol();
+        const t = lista.getBoundingClientRect(), szel = 36;
+        const seb = y < t.top + szel ? -8 : y > t.bottom - szel ? 8 : 0;
+        if (seb && !gorgeto) gorgeto = setInterval(() => { lista.scrollTop += seb; jelol(); }, 16);
+        if (!seb && gorgeto) { clearInterval(gorgeto); gorgeto = null; }
+        if (seb && gorgeto) { clearInterval(gorgeto); gorgeto = setInterval(() => { lista.scrollTop += seb; jelol(); }, 16); }
+      };
+      const vege = () => {
+        h.removeEventListener("pointermove", mozog); h.removeEventListener("pointerup", vege); h.removeEventListener("pointercancel", vege);
+        if (gorgeto) clearInterval(gorgeto);
+        sor.classList.remove("huz"); sor.style.transform = "";
+        sorok.forEach((x) => x.classList.remove("ide", "ideala"));
+        if (hova !== honnan) {
+          // azonnal a helyére (a valódi sorrendet a frissítés hozza)
+          const sl = sor.parentElement;
+          sl.insertBefore(sor, hova > honnan ? sorok[hova].nextSibling : sorok[hova]);
+          this._sorAthelyez(f, honnan, hova);
+        }
+      };
+      h.addEventListener("pointermove", mozog); h.addEventListener("pointerup", vege); h.addEventListener("pointercancel", vege);
+    }));
+  }
+
+  async _sorAthelyez(f, honnan, hova) {
+    const mozgat = (t) => { const x = [...t]; x.splice(hova, 0, x.splice(honnan, 1)[0]); return x; };
+    try {
+      if (f.mod === "sonos") await this._hiv("cantabile", "move_queue_item", { entity_id: f.vez, from: honnan, to: hova });
+      else if (f.mod === "wiim") {
+        const kaz = { ...f.kaz, szamok: mozgat(f.kaz.szamok) };
+        TAR.ir("tablet-magno-kazetta", JSON.stringify({ ...kaz, entity: f.hsz.entity }));
+        if (!this._config.magno?.szkript && !this._nincsIntegracio) await this._hiv("cantabile", "set_order", { entity_id: f.hsz.entity, tracks: kaz.szamok });
+      } else if (f.mod === "helyi") {
+        const l = this._helyiLista, most = l.szamok[l.i];
+        l.szamok = mozgat(l.szamok); l.i = l.szamok.indexOf(most);
+        this._helyiElore = null;
+      }
+    } catch (err) { this._uzen(T("Az áthelyezés nem sikerült: {h}", { h: err?.message || err })); }
+    this._sorFrissitKesobb();
   }
 
   async _sorTorol(f, i) {

@@ -1,15 +1,28 @@
 {
   "domain": "cantabile",
   "name": "Cantabile",
-  "after_dependencies": ["lovelace", "sonos"],
-  "codeowners": ["@Gyuszko55"],
+  "after_dependencies": [
+    "lovelace",
+    "sonos",
+    "wiim"
+  ],
+  "codeowners": [
+    "@Gyuszko55"
+  ],
   "config_flow": true,
-  "dependencies": ["frontend", "http", "media_source", "websocket_api"],
+  "dependencies": [
+    "frontend",
+    "http",
+    "media_source",
+    "websocket_api"
+  ],
   "documentation": "https://github.com/Gyuszko55/ha-cantabile",
   "integration_type": "service",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/Gyuszko55/ha-cantabile/issues",
-  "requirements": [],
+  "requirements": [
+    "async-upnp-client"
+  ],
   "single_config_entry": true,
-  "version": "1.1.1"
+  "version": "1.2.0"
 }

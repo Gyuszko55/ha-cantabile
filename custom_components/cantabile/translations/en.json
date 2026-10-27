@@ -20,10 +20,14 @@
     "step": {
       "init": {
         "data": {
-          "llm_api": "Assist tool (LLM API)"
+          "llm_api": "Assist tool (LLM API)",
+          "duck_sources": "Announcers (duck music while they speak)",
+          "duck_level": "Music volume during announcements"
         },
         "data_description": {
-          "llm_api": "Lets LLM-based conversation agents start music and radio. Turn on “Cantabile” in the agent's options as well."
+          "llm_api": "Lets LLM-based conversation agents start music and radio. Turn on “Cantabile” in the agent's options as well.",
+          "duck_sources": "Assist satellites (e.g. Voice PE: while listening, thinking or answering) and media players (while they say a TTS message). The playing Sonos / WiiM speakers are turned down meanwhile.",
+          "duck_level": "Percentage of the original volume; 0 = muted."
         }
       }
     }
@@ -67,36 +71,104 @@
       "name": "Play by name",
       "description": "Finds an artist, album, track, radio station or playlist by name and starts it on a Cantabile speaker. Returns what is playing and where.",
       "fields": {
-        "query": { "name": "What", "description": "Name of the artist, album, track, station or playlist." },
-        "kind": { "name": "Kind", "description": "What the name refers to; automatic when unsure." },
-        "artist": { "name": "Artist", "description": "Artist of the album or track, if known." },
-        "speaker": { "name": "Speaker", "description": "Speaker name from the card, or “all” for every Sonos speaker together. Empty: the one playing now, otherwise the first." },
-        "shuffle": { "name": "Shuffle", "description": "Random order. On by default for an artist." },
-        "source": { "name": "Source", "description": "Where to look for music." }
+        "query": {
+          "name": "What",
+          "description": "Name of the artist, album, track, station or playlist."
+        },
+        "kind": {
+          "name": "Kind",
+          "description": "What the name refers to; automatic when unsure."
+        },
+        "artist": {
+          "name": "Artist",
+          "description": "Artist of the album or track, if known."
+        },
+        "speaker": {
+          "name": "Speaker",
+          "description": "Speaker name from the card, or “all” for every Sonos speaker together. Empty: the one playing now, otherwise the first."
+        },
+        "shuffle": {
+          "name": "Shuffle",
+          "description": "Random order. On by default for an artist."
+        },
+        "source": {
+          "name": "Source",
+          "description": "Where to look for music."
+        }
       }
     },
     "play_tracks": {
       "name": "Play tracks one after another",
       "description": "For players without a queue (e.g. WiiM): plays the tracks in order, repeating by the repeat rounds; stops when something else starts playing.",
       "fields": {
-        "entity_id": { "name": "Player", "description": "The media player." },
-        "tracks": { "name": "Tracks", "description": "List of media-source IDs or URLs, in order." },
-        "start": { "name": "Start at", "description": "Index of the first track (0 = first)." }
+        "entity_id": {
+          "name": "Player",
+          "description": "The media player."
+        },
+        "tracks": {
+          "name": "Tracks",
+          "description": "List of media-source IDs or URLs, in order."
+        },
+        "start": {
+          "name": "Start at",
+          "description": "Index of the first track (0 = first)."
+        }
       }
     },
     "stop_tracks": {
       "name": "Stop track sequence",
       "description": "Stops the track sequence started by “Play tracks one after another”.",
       "fields": {
-        "entity_id": { "name": "Player", "description": "The media player; empty = all." }
+        "entity_id": {
+          "name": "Player",
+          "description": "The media player; empty = all."
+        }
       }
     },
     "sleep_timer": {
       "name": "Sleep timer",
       "description": "Stops the player after the given minutes (fading out during the last 30 seconds). Sonos uses its own timer. 0 clears the timer.",
       "fields": {
-        "entity_id": { "name": "Player", "description": "The media player." },
-        "minutes": { "name": "Minutes", "description": "Time until stopping; 0 clears it." }
+        "entity_id": {
+          "name": "Player",
+          "description": "The media player."
+        },
+        "minutes": {
+          "name": "Minutes",
+          "description": "Time until stopping; 0 clears it."
+        }
+      }
+    },
+    "move_queue_item": {
+      "name": "Move track in queue",
+      "description": "Moves a track within the Sonos queue (positions start at 0).",
+      "fields": {
+        "entity_id": {
+          "name": "Player",
+          "description": "Sonos media player (group coordinator)."
+        },
+        "from": {
+          "name": "From",
+          "description": "Current position."
+        },
+        "to": {
+          "name": "To",
+          "description": "New position."
+        }
+      }
+    },
+    "set_order": {
+      "name": "Reorder track sequence",
+      "description": "New order for the running “Play tracks one after another” sequence; it continues after the current track.",
+      "fields": {
+        "entity_id": {
+          "name": "Player",
+          "description": "The media player."
+        },
+        "tracks": {
+          "name": "Tracks",
+          "description": "The same tracks in the new order."
+        }
       }
     }
   }

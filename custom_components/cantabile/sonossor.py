@@ -1,0 +1,199 @@
+"""Sonos-sor: automatikus folytatás HA-újraindítás után, és áthelyezés a sorban.
+
+- Folytatás: a zenemappa számait a Sonos aláírt linkkel (authSig) kapja, és a HA induláskor új aláíró kulcsot
+  használ, így újraindítás után a sorban lévő linkek érvénytelenek (401): a szóló szám még végigszól, a következőt a
+  Sonos már nem tudja letölteni. Induláskor ezért megnézzük minden szóló Sonos sorát; ha csupa zenemappás, régi
+  linkből áll, a szám végén (a szóló számot nem szakítjuk meg) friss linkekkel újraépítjük, és a következő számmal
+  folytatjuk. A sor végén (REPEAT 1) csak újraépítjük, nem indítjuk el. Szünetelő vagy álló Sonosnál nem nyúlunk
+  hozzá – ott a kártya a következő gombnyomásnál tölt újra.
+- Áthelyezés: a HA Sonos-integrációjának nincs sor-átrendező szolgáltatása; a hangszóró SoCo-objektumán át az
+  AVTransport ReorderTracksInQueue műveletét hívjuk.
+"""
+
+from __future__ import annotations
+
+import base64
+import json
+import logging
+import re
+from typing import Any
+from urllib.parse import unquote
+
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
+from homeassistant.core import CoreState, Event, HomeAssistant, State, callback
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.event import async_call_later, async_track_state_change_event
+
+_LOGGER = logging.getLogger(__name__)
+
+_MEDIA = re.compile(r"/media/([^/?#]+)/([^?#]+)")
+_ALAIRAS = re.compile(r"[?&]authSig=([^&\s]+)")
+VARAKOZAS = 25          # mp induláskor, amíg a Sonosok csatlakoznak
+SZUNET_TURES = 8        # mp: ennyivel a szám vége előtti szünet felhasználói szünet, nem a szám vége
+
+
+def kiallitva(url: str) -> float | None:
+    """Az aláírt link kiállítási ideje (iat, Unix mp), ha van."""
+    m = _ALAIRAS.search(url or "")
+    if not m:
+        return None
+    try:
+        resz = m.group(1).split(".")[1]
+        return float(json.loads(base64.urlsafe_b64decode(resz + "=" * (-len(resz) % 4)))["iat"])
+    except (IndexError, ValueError, KeyError, TypeError):
+        return None
+
+
+def media_source_id(url: str) -> str | None:
+    m = _MEDIA.search(url or "")
+    return f"media-source://media_source/{m.group(1)}/{unquote(m.group(2))}" if m else None
+
+
+async def sor(hass: HomeAssistant, entity_id: str) -> list[dict[str, Any]]:
+    v = await hass.services.async_call("sonos", "get_queue", {"entity_id": entity_id}, blocking=True, return_response=True)
+    return list((v or {}).get(entity_id) or [])
+
+
+def elavult(elemek: list[dict[str, Any]], indult: float) -> list[str] | None:
+    """A sor media-source azonosítói, ha a sor csupa zenemappás szám, és a linkek az indulás előttiek; különben None."""
+    ids, regi = [], False
+    for x in elemek:
+        cid = str(x.get("media_content_id") or "")
+        iat, mid = kiallitva(cid), media_source_id(cid)
+        if iat is None or mid is None:
+            return None
+        regi = regi or iat < indult - 2
+        ids.append(mid)
+    return ids if ids and regi else None
+
+
+async def ujraepit(hass: HomeAssistant, entity_id: str, ids: list[str], hely: int | None) -> None:
+    """A sor újraépítése friss linkekkel (a HA a media-source azonosítót lejátszáskor írja alá); hely: innen indul."""
+    hiv = hass.services.async_call
+    s = hass.states.get(entity_id)
+    ismetles = s.attributes.get("repeat") if s else None
+    await hiv("media_player", "clear_playlist", {"entity_id": entity_id}, blocking=True)
+    for id_ in ids:
+        await hiv("media_player", "play_media", {"entity_id": entity_id, "media_content_id": id_, "media_content_type": "music", "enqueue": "add"}, blocking=True)
+    if hely is not None:
+        await hiv("sonos", "play_queue", {"entity_id": entity_id, "queue_position": hely}, blocking=True)
+    if ismetles:
+        await hiv("media_player", "repeat_set", {"entity_id": entity_id, "repeat": ismetles}, blocking=True)
+
+
+class Folytato:
+    """HA-újraindítás után a szóló Sonosok elavult sorának cseréje a szám végén."""
+
+    def __init__(self, hass: HomeAssistant, indult: float) -> None:
+        self.hass = hass
+        self.indult = indult
+        self._figyelt: dict[str, dict[str, Any]] = {}
+        self._le: list[Any] = []
+        self._figyelo: Any = None
+
+    @callback
+    def start(self) -> None:
+        @callback
+        def atnez(_most: Any) -> None:
+            self.hass.async_create_task(self._atnez())
+
+        @callback
+        def indul(_: Any = None) -> None:
+            self._le.append(async_call_later(self.hass, VARAKOZAS, atnez))
+
+        if self.hass.state is CoreState.running:
+            indul()
+        else:
+            self._le.append(self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, indul))
+
+    @callback
+    def stop(self) -> None:
+        for le in self._le:
+            le()
+        self._le.clear()
+        if self._figyelo:
+            self._figyelo()
+            self._figyelo = None
+
+    def _sonosok(self) -> list[str]:
+        reg = er.async_get(self.hass)
+        return [e.entity_id for e in reg.entities.values() if e.platform == "sonos" and e.domain == "media_player" and not e.disabled]
+
+    async def _atnez(self) -> None:
+        for e in self._sonosok():
+            s = self.hass.states.get(e)
+            if not s or s.state != "playing" or (s.attributes.get("group_members") or [e])[0] != e:
+                continue
+            try:
+                ids = elavult(await sor(self.hass, e), self.indult)
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Cantabile: %s sora nem olvasható", e, exc_info=True)
+                continue
+            if not ids:
+                continue
+            hely = int(s.attributes.get("queue_position") or 1) - 1
+            self._figyelt[e] = {"ids": ids, "hely": hely}
+            _LOGGER.info("Cantabile: %s sorában újraindítás előtti linkek – a(z) %d. szám végén friss linkekkel folytatom", e, hely + 1)
+        if self._figyelt and not self._figyelo:
+            self._figyelo = async_track_state_change_event(self.hass, list(self._figyelt), self._valtozott)
+
+    @callback
+    def _valtozott(self, ev: Event) -> None:
+        e = ev.data["entity_id"]
+        f = self._figyelt.get(e)
+        uj: State | None = ev.data.get("new_state")
+        regi: State | None = ev.data.get("old_state")
+        if not f or uj is None:
+            return
+        a = uj.attributes
+        hely = int(a.get("queue_position") or 0) - 1
+        if uj.state == "playing" and hely == f["hely"]:
+            return
+        if uj.state == "paused" and hely == f["hely"] and regi and regi.state == "playing":
+            poz, hossz = float(a.get("media_position") or 0), float(a.get("media_duration") or 0)
+            if hossz and poz < hossz - SZUNET_TURES:
+                return          # felhasználói szünet a szám közben: a kártya tölt újra a következő gombnyomásnál
+        self._figyelt.pop(e, None)
+        if not self._figyelt and self._figyelo:
+            self._figyelo()
+            self._figyelo = None
+        self.hass.async_create_task(self._folytat(e, f, a.get("repeat")))
+
+    async def _folytat(self, e: str, f: dict[str, Any], ismetles: str | None) -> None:
+        try:
+            ids = elavult(await sor(self.hass, e), self.indult)
+            if not ids:
+                return          # közben máshonnan (pl. a kártyáról) már friss linkekkel újratöltötték
+            kov = f["hely"] + 1
+            if kov >= len(ids):
+                kov = 0 if ismetles == "all" else None
+            _LOGGER.info("Cantabile: %s sora friss linkekkel újraépítve%s", e, f", folytatás a(z) {kov + 1}. számmal" if kov is not None else " (a kazetta végén, megállítva)")
+            await ujraepit(self.hass, e, ids, kov)
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Cantabile: %s sorának újraépítése nem sikerült", e)
+
+
+def _soco(hass: HomeAssistant, entity_id: str) -> Any:
+    ent = er.async_get(hass).async_get(entity_id)
+    if not ent or ent.platform != "sonos":
+        raise HomeAssistantError(f"{entity_id} nem Sonos-lejátszó")
+    for bej in hass.config_entries.async_loaded_entries("sonos"):
+        hangszoro = getattr(getattr(bej, "runtime_data", None), "discovered", {}).get(ent.unique_id)
+        if hangszoro is not None:
+            return hangszoro.soco
+    raise HomeAssistantError(f"{entity_id}: a Sonos-hangszóró nem érhető el")
+
+
+async def athelyez(hass: HomeAssistant, entity_id: str, honnan: int, hova: int) -> None:
+    """A sor `honnan`. elemét (0-tól) a `hova`. helyre teszi (a többi elcsúszik)."""
+    if honnan == hova:
+        return
+    soco = _soco(hass, entity_id)
+    # ReorderTracksInQueue: 1-től számozott, InsertBefore az eredeti számozásban értendő
+    ele = hova + 1 if hova < honnan else hova + 2
+    await hass.async_add_executor_job(
+        lambda: soco.avTransport.ReorderTracksInQueue(
+            [("InstanceID", 0), ("StartingIndex", honnan + 1), ("NumberOfTracks", 1), ("InsertBefore", ele), ("UpdateID", 0)]
+        )
+    )

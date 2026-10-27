@@ -5,13 +5,16 @@ from __future__ import annotations
 from homeassistant.core import HomeAssistant
 
 DOMAIN = "cantabile"
-VERSION = "1.1.1"
+VERSION = "1.2.0"
 
 # a kártya és a betűkészlet a saját statikus útvonalon
 STATIC_URL = "/cantabile_static"
 CARD_URL = f"{STATIC_URL}/cantabile-card.js"
 
 CONF_LLM_API = "llm_api"          # Assist-eszköz (LLM API) bekapcsolva
+CONF_DUCK_SOURCES = "duck_sources"  # bemondó eszközök (halkítás bemondáskor)
+CONF_DUCK_LEVEL = "duck_level"      # a zene hangereje bemondás alatt, az eredeti %-ában
+DUCK_LEVEL_DEFAULT = 25
 LLM_API_ID = "cantabile"
 
 # entitások egyedi azonosítói (a kártya a cantabile/info parancsból tudja meg az entity_id-kat)

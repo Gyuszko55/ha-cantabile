@@ -73,3 +73,38 @@ sleep_timer:
           max: 720
           unit_of_measurement: min
           mode: box
+
+move_queue_item:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          integration: sonos
+    from:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 999
+          mode: box
+    to:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 999
+          mode: box
+
+set_order:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          domain: media_player
+    tracks:
+      required: true
+      selector:
+        object:

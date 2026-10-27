@@ -2,7 +2,8 @@
 
 - Sorozatlejátszó: a sor nélküli lejátszókon (pl. WiiM: minden play_media lecseréli az előzőt) a kazetta számait
   egymás után indítja, körönként (az ismétlésszám szerint), bekapcsolt keverésnél körönként új sorrendben. Leáll, ha
-  a lejátszón közben más kezd szólni, vagy ha egy szám 30 mp alatt sem indul el.
+  a lejátszón közben más kezd szólni, vagy ha egy szám 30 mp alatt sem indul el. WiiM-en UPnP-n át, hézag nélkül
+  (hezagmentes.py); a sorrend menet közben átrendezhető (set_order).
 - Körszámláló: Sonos-féle sorral rendelkező lejátszón 2–5 körnél a lejátszó „repeat: all”-ban játszik, ez pedig
   számolja az elindult számokat, és a lista hossza × körök száma után szünetet ad (nem stopot: a Sonos stopra a sor
   elejére ugrik). Számot számol, nem sorszámot, mert keverésnél a sorszám ugrál.
@@ -29,6 +30,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.util import dt as dt_util
 
+from . import hezagmentes
 from .const import ROUNDS_INFINITE, SIGNAL_NET, SIGNAL_SLEEP
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,6 +60,40 @@ async def var(hass: HomeAssistant, entity_id: str, feltetel: Callable[[State | N
         le()
 
 
+class Sorrend:
+    """A kazetta számai körönként (első kör a kezdő számtól), keverésnél körönként új sorrendben; menet közben
+    átrendezhető – a szóló szám után az új sorrend szerint folytatja."""
+
+    def __init__(self, rt: Cantabile, entity_id: str, szamok: list[str], kezdo: int) -> None:
+        self.rt, self.e, self.szamok = rt, entity_id, list(szamok)
+        self.kor, self.lista, self.i, self.utolso = 1, self.szamok[kezdo:], 0, None
+
+    def __iter__(self) -> Sorrend:
+        return self
+
+    def __next__(self) -> str:
+        if self.i >= len(self.lista):
+            if self.rt.rounds < ROUNDS_INFINITE and self.kor >= self.rt.rounds:
+                raise StopIteration
+            self.kor += 1
+            self.lista, self.i = list(self.szamok), 0
+            s = self.rt.hass.states.get(self.e)
+            if s and s.attributes.get("shuffle"):
+                random.shuffle(self.lista)
+        if not self.lista:
+            raise StopIteration
+        self.utolso = self.lista[self.i]
+        self.i += 1
+        return self.utolso
+
+    def atrendez(self, uj: list[str]) -> None:
+        if sorted(uj) != sorted(self.szamok):
+            return
+        self.szamok = list(uj)
+        hol = uj.index(self.utolso) if self.utolso in uj else -1
+        self.lista, self.i = uj[hol + 1:] if self.kor == 1 else uj, 0 if self.kor == 1 else hol + 1
+
+
 def sonos_e(hass: HomeAssistant, entity_id: str) -> bool:
     ent = er.async_get(hass).async_get(entity_id)
     return bool(ent and ent.platform == "sonos")
@@ -72,6 +108,7 @@ class Cantabile:
         self.sleep: dict[str, str] = {}             # lejátszó → leállás ideje (ISO)
         self.net: dict[str, Any] | None = None      # hanggal indított NET-adó
         self._sorozat: dict[str, asyncio.Task] = {}
+        self._sorrend: dict[str, Sorrend] = {}
         self._alvas: dict[str, Callable[[], None]] = {}
         self._szamlalo: dict[str, dict[str, int]] = {}
         self._le: list[Callable[[], None]] = []
@@ -112,6 +149,12 @@ class Cantabile:
             if (t := self._sorozat.pop(e, None)) and not t.done():
                 t.cancel()
 
+    @callback
+    def set_order(self, entity_id: str, tracks: list[str]) -> None:
+        """A szóló sorozat új sorrendje (a SOR fülön húzással): a szóló szám után ebben a sorrendben folytatja."""
+        if (s := self._sorrend.get(entity_id)) is not None:
+            s.atrendez(tracks)
+
     def tracks_running(self, entity_id: str) -> bool:
         t = self._sorozat.get(entity_id)
         return bool(t and not t.done())
@@ -119,6 +162,15 @@ class Cantabile:
     async def _sorozat_fut(self, entity_id: str, szamok: list[str], kezdo: int) -> None:
         kor = 0
         try:
+            dmr = None
+            try:
+                dmr = await hezagmentes.wiim_renderelo(self.hass, entity_id)
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Cantabile: %s UPnP-n nem érhető el, számonként indítom", entity_id, exc_info=True)
+            if dmr is not None:
+                self._sorrend[entity_id] = sorrend = Sorrend(self, entity_id, szamok, kezdo)
+                await hezagmentes.lejatszik(self.hass, dmr, entity_id, sorrend)
+                return
             while True:
                 kor += 1
                 lista = szamok[kezdo:] if kor == 1 else szamok[:]
@@ -155,6 +207,7 @@ class Cantabile:
         finally:
             if self._sorozat.get(entity_id) is asyncio.current_task():
                 self._sorozat.pop(entity_id, None)
+                self._sorrend.pop(entity_id, None)
 
     # ---- körszámláló (sorral rendelkező lejátszók, pl. Sonos) ----
     @callback

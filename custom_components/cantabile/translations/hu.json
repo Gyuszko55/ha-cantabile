@@ -20,10 +20,14 @@
     "step": {
       "init": {
         "data": {
-          "llm_api": "Assist-eszköz (LLM API)"
+          "llm_api": "Assist-eszköz (LLM API)",
+          "duck_sources": "Bemondó eszközök (halkítás, amíg beszélnek)",
+          "duck_level": "A zene hangereje bemondás alatt"
         },
         "data_description": {
-          "llm_api": "Az LLM-es beszélgetőügynökök zenét és rádiót indíthatnak vele. Az ügynök beállításaiban is kapcsold be a „Cantabile”-t."
+          "llm_api": "Az LLM-es beszélgetőügynökök zenét és rádiót indíthatnak vele. Az ügynök beállításaiban is kapcsold be a „Cantabile”-t.",
+          "duck_sources": "Assist-segédállomások (pl. Voice PE: amíg hallgat, gondolkodik vagy válaszol) és médialejátszók (amíg szöveget mondanak). Közben a szóló Sonos / WiiM hangszórók halkabban szólnak.",
+          "duck_level": "Az eredeti hangerő százalékában; 0 = elnémul."
         }
       }
     }
@@ -67,36 +71,104 @@
       "name": "Lejátszás név alapján",
       "description": "Előadót, albumot, számot, rádióadót vagy listát keres név szerint, és elindítja egy Cantabile hangszórón. Válaszként visszaadja, mi szól és hol.",
       "fields": {
-        "query": { "name": "Mit", "description": "Az előadó, album, szám, adó vagy lista neve." },
-        "kind": { "name": "Fajta", "description": "Mire vonatkozik a név; ha nem biztos, automatikus." },
-        "artist": { "name": "Előadó", "description": "Az album vagy szám előadója, ha ismert." },
-        "speaker": { "name": "Hangszóró", "description": "A hangszóró neve a kártyáról, vagy „mindkettő” a Sonos hangszórók együtt. Üresen: ami most szól, különben az első." },
-        "shuffle": { "name": "Keverve", "description": "Véletlen sorrend. Előadónál alapból igen." },
-        "source": { "name": "Forrás", "description": "Hol keressen zenét." }
+        "query": {
+          "name": "Mit",
+          "description": "Az előadó, album, szám, adó vagy lista neve."
+        },
+        "kind": {
+          "name": "Fajta",
+          "description": "Mire vonatkozik a név; ha nem biztos, automatikus."
+        },
+        "artist": {
+          "name": "Előadó",
+          "description": "Az album vagy szám előadója, ha ismert."
+        },
+        "speaker": {
+          "name": "Hangszóró",
+          "description": "A hangszóró neve a kártyáról, vagy „mindkettő” a Sonos hangszórók együtt. Üresen: ami most szól, különben az első."
+        },
+        "shuffle": {
+          "name": "Keverve",
+          "description": "Véletlen sorrend. Előadónál alapból igen."
+        },
+        "source": {
+          "name": "Forrás",
+          "description": "Hol keressen zenét."
+        }
       }
     },
     "play_tracks": {
       "name": "Számok lejátszása egymás után",
       "description": "Sor nélküli lejátszókhoz (pl. WiiM): sorban lejátssza a számokat, az ismétlésszám szerint; leáll, ha közben más kezd szólni.",
       "fields": {
-        "entity_id": { "name": "Lejátszó", "description": "A lejátszó." },
-        "tracks": { "name": "Számok", "description": "Média-forrás azonosítók vagy URL-ek listája, sorrendben." },
-        "start": { "name": "Kezdés", "description": "Az első szám sorszáma (0 = az első)." }
+        "entity_id": {
+          "name": "Lejátszó",
+          "description": "A lejátszó."
+        },
+        "tracks": {
+          "name": "Számok",
+          "description": "Média-forrás azonosítók vagy URL-ek listája, sorrendben."
+        },
+        "start": {
+          "name": "Kezdés",
+          "description": "Az első szám sorszáma (0 = az első)."
+        }
       }
     },
     "stop_tracks": {
       "name": "Sorozatlejátszás leállítása",
       "description": "Leállítja a „Számok lejátszása egymás után” sorozatot.",
       "fields": {
-        "entity_id": { "name": "Lejátszó", "description": "A lejátszó; üresen mind." }
+        "entity_id": {
+          "name": "Lejátszó",
+          "description": "A lejátszó; üresen mind."
+        }
       }
     },
     "sleep_timer": {
       "name": "Alvásidőzítő",
       "description": "A megadott perc múlva leállítja a lejátszót (az utolsó 30 mp-ben lehalkít). Sonoson a hangszóró saját időzítője fut. 0 törli az időzítőt.",
       "fields": {
-        "entity_id": { "name": "Lejátszó", "description": "A lejátszó." },
-        "minutes": { "name": "Perc", "description": "Idő a leállásig; 0 törli." }
+        "entity_id": {
+          "name": "Lejátszó",
+          "description": "A lejátszó."
+        },
+        "minutes": {
+          "name": "Perc",
+          "description": "Idő a leállásig; 0 törli."
+        }
+      }
+    },
+    "move_queue_item": {
+      "name": "Szám áthelyezése a sorban",
+      "description": "Áthelyez egy számot a Sonos lejátszási sorában (a helyek 0-tól számozva).",
+      "fields": {
+        "entity_id": {
+          "name": "Lejátszó",
+          "description": "Sonos lejátszó (a csoport vezetője)."
+        },
+        "from": {
+          "name": "Honnan",
+          "description": "A mostani hely."
+        },
+        "to": {
+          "name": "Hova",
+          "description": "Az új hely."
+        }
+      }
+    },
+    "set_order": {
+      "name": "Sorozat átrendezése",
+      "description": "A futó „Számok lejátszása egymás után” sorozat új sorrendje; a szóló szám után ebben folytatja.",
+      "fields": {
+        "entity_id": {
+          "name": "Lejátszó",
+          "description": "A lejátszó."
+        },
+        "tracks": {
+          "name": "Számok",
+          "description": "Ugyanazok a számok, az új sorrendben."
+        }
       }
     }
   }

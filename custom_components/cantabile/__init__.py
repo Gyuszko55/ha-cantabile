@@ -8,7 +8,10 @@ kártyához a szerveren kell:
   - ismétlésszám (number), alvásidőzítő és NET-adó (sensor) – a kártyák között közös állapot;
   - szolgáltatások: `cantabile.play` (zene / rádió név alapján), `cantabile.play_tracks` és `cantabile.stop_tracks`
     (sorozatlejátszás a sor nélküli lejátszókon), `cantabile.sleep_timer`;
-  - „Cantabile” LLM API: az Assist (bármelyik LLM-es ügynök) ezzel indít zenét.
+  - „Cantabile” LLM API: az Assist (bármelyik LLM-es ügynök) ezzel indít zenét;
+  - HA-újraindítás után a szóló Sonos zenemappás sorának cseréje friss linkekre a szám végén (sonossor.py),
+    sor-átrendezés (`cantabile.move_queue_item`, `cantabile.set_order`), halkítás bemondáskor (halkitas.py),
+    hézagmentes WiiM-lejátszás (hezagmentes.py).
 """
 
 from __future__ import annotations
@@ -30,8 +33,11 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
-from . import library, llm, lyrics, music, vu
-from .const import CARD_URL, CONF_LLM_API, DOMAIN, STATIC_URL, UID_NET, UID_ROUNDS, UID_SLEEP, VERSION
+from . import halkitas, library, llm, lyrics, music, sonossor, vu
+from .const import (
+    CARD_URL, CONF_DUCK_LEVEL, CONF_DUCK_SOURCES, CONF_LLM_API, DOMAIN, DUCK_LEVEL_DEFAULT, STATIC_URL, UID_NET, UID_ROUNDS,
+    UID_SLEEP, VERSION,
+)
 from .runtime import Cantabile
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,6 +54,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         [StaticPathConfig(STATIC_URL, str(Path(__file__).parent / "www"), cache_headers=False)]
     )
     indult = time.time()      # a NAS-számok aláírt linkjei ennél régebbiek érvénytelenek (új kulcs induláskor)
+    hass.data[DOMAIN] = {"indult": indult}
     library.regisztral(hass)
     lyrics.regisztral(hass)
     vu.regisztral(hass)
@@ -118,6 +125,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: CantabileConfigEntry) ->
         DOMAIN, "sleep_timer", sleep_timer,
         schema=vol.Schema({vol.Required("entity_id"): cv.entity_ids, vol.Required("minutes"): vol.All(vol.Coerce(float), vol.Range(min=0, max=720))}),
     )
+    async def move_queue_item(call: ServiceCall) -> None:
+        await sonossor.athelyez(hass, call.data["entity_id"], call.data["from"], call.data["to"])
+
+    async def set_order(call: ServiceCall) -> None:
+        rt.set_order(call.data["entity_id"], call.data["tracks"])
+
+    hass.services.async_register(
+        DOMAIN, "move_queue_item", move_queue_item,
+        schema=vol.Schema({vol.Required("entity_id"): cv.entity_id, vol.Required("from"): vol.Coerce(int), vol.Required("to"): vol.Coerce(int)}),
+    )
+    hass.services.async_register(
+        DOMAIN, "set_order", set_order,
+        schema=vol.Schema({vol.Required("entity_id"): cv.entity_id, vol.Required("tracks"): [cv.string]}),
+    )
+    folytato = sonossor.Folytato(hass, hass.data[DOMAIN]["indult"])
+    folytato.start()
+    entry.async_on_unload(folytato.stop)
+    halkito = halkitas.Halkito(hass, entry.options.get(CONF_DUCK_SOURCES, []), entry.options.get(CONF_DUCK_LEVEL, DUCK_LEVEL_DEFAULT) / 100)
+    halkito.start()
+    entry.async_on_unload(halkito.stop)
     if entry.options.get(CONF_LLM_API, True):
         entry.async_on_unload(llm.regisztral(hass, zene))
     entry.async_on_unload(entry.add_update_listener(_ujratolt))
@@ -133,6 +160,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: CantabileConfigEntry) -
     ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if ok:
         entry.runtime_data.stop()
-        for s in ("play", "play_tracks", "stop_tracks", "sleep_timer"):
+        for s in ("play", "play_tracks", "stop_tracks", "sleep_timer", "move_queue_item", "set_order"):
             hass.services.async_remove(DOMAIN, s)
     return ok

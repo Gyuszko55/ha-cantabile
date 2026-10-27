@@ -23,6 +23,10 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
   - **NAS** – your music folder (artist → album), with instant search;
   - **PHONE** – play music from the phone/tablet on its own Bluetooth output, or upload it to the music folder;
   - **QUEUE** – the current queue: jump, remove, play next, add to end (Sonos).
+- **QUEUE reorder**: drag a track by its handle (⋮⋮) – Sonos, WiiM and BT.
+- **Gapless**: Sonos (its own queue) and WiiM (the next track is handed over in advance via DLNA); near-gapless on BT.
+- **Announcements**: music is turned down while Assist (e.g. Voice PE) or a TTS message speaks (Cantabile options).
+- **After a Home Assistant restart** a playing music-folder queue on Sonos continues by itself after the current track.
 - **LYRICS**: tap the song title on the cassette (or the radio's now-playing line when it shows a song) – the lyrics
   come from [LRCLIB](https://lrclib.net); on the tape the current line is highlighted and follows the music.
 

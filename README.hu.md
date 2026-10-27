@@ -23,6 +23,10 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
   - **NAS** – a zenemappa (előadó → album), azonnali kereséssel;
   - **TELEFON** – a telefon/tablet zenéje a saját Bluetooth-kimenetén, vagy feltöltve a zenemappába;
   - **SOR** – a lejátszási sor: ugrás, törlés, következőnek, sor végére (Sonos).
+- **Sor átrendezése**: a számot a fogantyújánál (⋮⋮) húzd – Sonos, WiiM és BT.
+- **Hézagmentes lejátszás**: Sonoson (saját sor) és WiiM-en (a következő számot DLNA-n előre megkapja); BT-n közel hézagmentes.
+- **Bemondás**: amíg az Assist (pl. Voice PE) vagy egy TTS-üzenet beszél, a zene lehalkul (Cantabile beállításai).
+- **HA-újraindítás után** a Sonoson szóló zenemappás sor a szóló szám után magától folytatódik.
 - **DALSZÖVEG**: koppints a kazettán a dal címére (vagy a rádió műsorinfójára, ha dalt mutat) – a szöveg az
   [LRCLIB](https://lrclib.net)-ről jön; a magnón az épp szóló sor kiemelve, a zenével együtt halad.
 
