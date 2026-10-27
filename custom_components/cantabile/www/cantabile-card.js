@@ -220,6 +220,17 @@ const EN = {
   "— üres —": "— empty —",
   "EJECT: kazetta választás": "EJECT: choose a tape",
   "Dalszöveg": "Lyrics",
+  "Üres hely – koppints, és a NET-katalógusból tegyél ide adót": "Empty slot – tap to put a station here from the NET catalogue",
+  "70-es évekbeli ezüst rádió és tape deck: adógombok, NET-rádió, forgó kazetta, valódi VU-mérők, NAS és Deezer.": "1970s silver radio and tape deck: station buttons, internet radio, turning cassette, real VU meters, music folder and Deezer.",
+  "A(z) {h} nem tud zenét fogadni a Cantabile-tól (nincs lejátszás-indítás funkciója) – válassz másik lejátszót a ⚙ beállításokban.": "{h} can't receive music from Cantabile (it has no play-media function) – pick another player in ⚙ settings.",
+  "FORGÓN": "ON DIAL",
+  "DEEZER fül": "DEEZER tab",
+  "Látszik (a Sonos appban bekötött Deezer-fiókkal szól)": "Shown (plays with the Deezer account linked in the Sonos app)",
+  "Rejtve (nincs Deezer)": "Hidden (no Deezer)",
+  "{n}: a frekvencia 87,5 és 108 közé essen (vagy hagyd üresen)": "{n}: the frequency must be between 87.5 and 108 (or leave it empty)",
+  "A gombok frekvencia szerint rendeződnek, 12 hely van. A frekvencia elhagyható (csak internetes adó: a skálán egyenletesen elosztva, a gombon WEB). Sonosnál a furcsa portos https-cím helyett próbáld http-vel.": "Buttons are sorted by frequency; there are 12 slots. The frequency is optional (internet-only station: spread evenly on the dial, WEB on the button). On Sonos, try http instead of an https address with an odd port.",
+  "Zenemappa": "Music folder",
+  "A Deezer nem indult el ({h}). A Sonos appban kösd be a Deezer-fiókot (Beállítások → Szolgáltatások), vagy a ⚙ beállításokban rejtsd el a DEEZER fület.": "Deezer did not start ({h}). Link your Deezer account in the Sonos app (Settings → Services), or hide the DEEZER tab in ⚙ settings.",
   "A tekerés nem sikerült: {h}": "Seeking failed: {h}",
   "A Deezer és a Sonos-kedvencek csak Sonoson szólnak – a(z) {h} szól tovább.": "Deezer and Sonos favourites only play on Sonos – {h} keeps playing.",
   "A telefonról választott zene csak BT-n szól – ott marad.": "Music chosen from the phone only plays on BT – it stays there.",
@@ -373,10 +384,21 @@ class CantabileCard extends HTMLElement {
   setConfig(eredeti) {
     // angol kulcsok (speakers, stations…) is jók; belül a magyar nevek
     this._angol = !!(eredeti?.speakers || eredeti?.stations || eredeti?.tape || eredeti?.brand);
+    this._eredetiCfg = eredeti;
     const config = ATKULCS(eredeti || {}, KULCS);
+    // a hangszóró típusa magától: Sonos-platform → sonos (sor, csoport, kedvencek), minden más → url
+    (config.hangszorok || []).forEach((h) => {
+      if (h && h.mod !== "sonos" && h.mod !== "url") { h.mod = this._hass?.entities?.[h.entity]?.platform === "sonos" ? "sonos" : "url"; h.automod = true; }
+    });
+    this._autoMod = !this._hass && (config.hangszorok || []).some((h) => h?.automod);
     if (config.magno?.vu_kijelzo in KIJELZO_BE) config.magno.vu_kijelzo = KIJELZO_BE[config.magno.vu_kijelzo];
     if (!Array.isArray(config.hangszorok) || !config.hangszorok.length) throw new Error(T("Adj meg legalább egy hangszórót (speakers)."));
-    this._config = { magno: {}, ...config, adok: [...(config.adok || [])].filter((a) => a && a.url).sort((a, b) => a.frekvencia - b.frekvencia) };
+    // frekvencia nélküli (csak internetes) adók: a skálán egyenletesen elosztva, a gombon WEB felirattal
+    const adok = [...(config.adok || [])].filter((a) => a && a.url).map((a) => ({ ...a }));
+    const nincsF = adok.filter((a) => !(Number(a.frekvencia) >= MIN_F && Number(a.frekvencia) <= MAX_F));
+    nincsF.forEach((a, k) => { a.frekvencia = Math.round((88.5 + ((k + 1) * 19) / (nincsF.length + 1)) * 10) / 10; a.virt = true; });
+    adok.forEach((a) => { a.frekvencia = Number(a.frekvencia); });
+    this._config = { magno: {}, ...config, adok: adok.sort((a, b) => a.frekvencia - b.frekvencia) };
     // multiroom: ha legalább két Sonos van, a SPEAKERS kapcsoló kap egy közös állást is (mint a receivereken az A+B) –
     // ilyenkor a Sonos egy csoportba fogja őket (media_player.join), a hangerő mindegyikre megy; `multiroom: false` kikapcsolja
     const hl = [...config.hangszorok], sonosok = hl.filter((h) => h.mod === "sonos");
@@ -397,6 +419,8 @@ class CantabileCard extends HTMLElement {
   set hass(hass) {
     const elso = !this._hass;
     this._hass = hass;
+    // a típus nélküli hangszórók a platformból kapják meg (ehhez a hass kell): újraépítés egyszer
+    if (elso && this._autoMod) { this._autoMod = false; this.setConfig(this._eredetiCfg); }
     if (elso) this._infoKer();
     if (this._hsz == null) this._hsz = this._kezdoHangszoro();
     if (this._mod == null) this._mod = this._kezdoMod();
@@ -429,6 +453,9 @@ class CantabileCard extends HTMLElement {
       this._meret = new ResizeObserver((e) => {
         const sz = e[0]?.contentRect.width;
         if (sz) this.toggleAttribute("keskeny", sz < 600);
+        // panel nézet / magas kártyahely: az előlap a saját magasságában, függőlegesen középen (nem nyúlik szét)
+        const mag = e[0]?.contentRect.height;
+        if (sz && mag) this.toggleAttribute("magas", sz >= 600 && mag > sz * 0.62);
         const sr = this.shadowRoot; if (sr) { this._gorgo(sr.getElementById("kcim")); this._gorgo(sr.querySelector("#ksor .kea")); }
         this._igazitKesobb();
       });
@@ -506,7 +533,7 @@ class CantabileCard extends HTMLElement {
     const adojel = c.adok.map((a, i) => `<i class="aj" data-i="${i}" style="left:${POZ(a.frekvencia)}%"></i>`).join("");
     const ADOHELY = 12;
     const gombok = c.adok.map((a, i) => `
-      <button class="bill ado" data-i="${i}"><span class="led"></span><b>${ESC(a.rovid || a.nev)}</b><small>${MHZ(a.frekvencia)}</small></button>`).join("")
+      <button class="bill ado" data-i="${i}"><span class="led"></span><b>${ESC(a.rovid || a.nev)}</b><small>${a.virt ? "WEB" : MHZ(a.frekvencia)}</small></button>`).join("")
       + Array.from({ length: Math.max(0, ADOHELY - c.adok.length) }, () => `<button class="bill adoures" title="${T("Üres hely – koppints, és a NET-katalógusból tegyél ide adót")}"><span class="plusz">+</span></button>`).join("");
     // kimenetválasztó a Technics RS-M205 „tape select” tolókapcsolóinak mintájára: függőleges kapcsoló a hangszórókhoz
     // (annyi állás, ahány hangszóró), mellette külön kétállású BT kapcsoló; a kiválasztott név félkövér
@@ -531,7 +558,7 @@ class CantabileCard extends HTMLElement {
     this._forgoSzog = (i) => (nL > 1 ? -82 + (164 * L0.indexOf(i)) / (nL - 1) : 0);
     const fPont = (i, r) => { const a = (this._forgoSzog(i) * Math.PI) / 180; return [100 + r * Math.sin(a), 64 - r * Math.cos(a)]; };
     const forgo = `<div class="kimenet forgo"><div class="valaszto">
-      ${L0.map((i) => { const [x, y] = fPont(i, 56); return `<i class="vt" style="transform:rotate(${this._forgoSzog(i)}deg)"></i><button class="fhsz" data-i="${i}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><span class="lamp"></span>${ESC(kim[i].rovid || kim[i].nev)}</button>`; }).join("")}
+      ${L0.map((i) => { const [x, y] = fPont(i, 56); const szg = this._forgoSzog(i), old = szg < -60 ? " bal" : szg > 60 ? " jobb" : ""; return `<i class="vt" style="transform:rotate(${this._forgoSzog(i)}deg)"></i><button class="fhsz${old}" data-i="${i}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><span class="lamp"></span><span class="fn">${ESC(kim[i].rovid || kim[i].nev)}</span></button>`; }).join("")}
       <div class="vgomb" title="${T("Hangszóró váltása")}"><div class="vsapka"></div></div><small>SPEAKERS</small></div></div>`;
     const valto = `<button class="valto" title="${T("Rádió / tape")}"><span class="vr">RADIO</span><span class="kapcs"></span><span class="vm">TAPE</span></button>`;
     let beosztas = "";
@@ -980,6 +1007,10 @@ class CantabileCard extends HTMLElement {
           white-space: nowrap; cursor: pointer; font: 700 8px/1 Arial, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: #6d7179; -webkit-tap-highlight-color: transparent; }
         .valaszto .fhsz .lamp { width: 5px; height: 5px; border-radius: 50%; background: #9a9fa6; box-shadow: inset 0 1px 1px rgba(0,0,0,.4); }
         .valaszto .fhsz.akt { color: #23262b; }
+        .valaszto .fhsz .fn { max-width: 78px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        /* oldalsó állások: a név kifelé nyúlik, a lámpa a gomb felőli oldalon – hosszú név sem csúszik a gomb alá */
+        .valaszto .fhsz.bal { transform: translate(calc(-100% + 6px), -50%); flex-direction: row-reverse; }
+        .valaszto .fhsz.jobb { transform: translate(-6px, -50%); }
         .valaszto .fhsz.akt .lamp { background: #ffb020; box-shadow: 0 0 5px #ffb020; }
         .magno .mjobb > .forgo .valaszto { zoom: .92; }
         :host([keskeny]) .magno .mjobb > .forgo .valaszto { zoom: 1.1; }
@@ -1094,14 +1125,14 @@ class CantabileCard extends HTMLElement {
         .bresz h3 .bgomb { margin-left: auto; letter-spacing: 0; text-transform: none; padding: 3px 9px; }
         .bsor { display: grid; gap: 6px; align-items: center; }
         .bsor.ado { grid-template-columns: 1.3fr .8fr 70px 2.4fr auto auto; }
-        .bsor.hsz2 { grid-template-columns: 1fr 2fr 1fr auto; }
+        .bsor.hsz2 { grid-template-columns: 1fr .7fr 2fr 1fr auto; }
         .bsor.ket { grid-template-columns: 150px 1fr; }
         .bsor input, .bsor select { width: 100%; box-sizing: border-box; border: 1px solid #c9bfa9; border-radius: 4px; padding: 5px 7px; font: 13px/1.2 "Helvetica Neue", Arial, sans-serif;
           background: #fffdf8; color: #2b2622; min-width: 0; }
         .bsor input.rossz { border-color: #c62828; background: #fff1f0; }
         .bsor label { color: #6a5f4e; font-size: 12px; }
         .bfejlec { display: grid; gap: 6px; font: 600 10px/1 Arial, sans-serif; color: #8a7d68; letter-spacing: .05em; }
-        .bfejlec.ado { grid-template-columns: 1.3fr .8fr 70px 2.4fr auto auto; } .bfejlec.hsz2 { grid-template-columns: 1fr 2fr 1fr auto; }
+        .bfejlec.ado { grid-template-columns: 1.3fr .8fr 70px 2.4fr auto auto; } .bfejlec.hsz2 { grid-template-columns: 1fr .7fr 2fr 1fr auto; }
         .bx { border: 0; background: none; color: #a33; font: 700 16px/1 Arial; cursor: pointer; padding: 2px 6px; }
         .bproba { border: 1px solid #b9ad97; background: #fffdf8; border-radius: 4px; cursor: pointer; padding: 4px 8px; font: 12px/1 Arial; color: #2b2622; }
         .bker { display: flex; gap: 6px; }
@@ -1254,7 +1285,7 @@ class CantabileCard extends HTMLElement {
         :host([keskeny]) .bsor.ado input[data-m=url] { grid-column: 1 / -1; }
         :host([keskeny]) .bsor.ado .bproba { justify-self: start; }
         :host([keskeny]) .bsor.ado .bx { grid-column: 3; justify-self: end; }
-        :host([keskeny]) .bsor.hsz2 { grid-template-columns: 1fr 1fr auto; }
+        :host([keskeny]) .bsor.hsz2 { grid-template-columns: 1fr 1fr 1fr auto; }
         :host([keskeny]) .bsor.hsz2 select[data-m=entity] { grid-column: 1 / -1; grid-row: 2; }
         :host([keskeny]) .bsor.ket { grid-template-columns: 1fr; gap: 3px; }
         :host([keskeny]) .bker { flex-wrap: wrap; }
@@ -1288,6 +1319,8 @@ class CantabileCard extends HTMLElement {
         :host([keskeny]) .rjobb > .forgo { align-self: start; }
         :host([keskeny]) .rjobb > .forgo .valaszto { zoom: .78; }
         :host([keskeny]) .rotg .og-net { order: 1; } :host([keskeny]) .rotg .og-sleep { order: 2; } :host([keskeny]) .rotg .og-bt { order: 3; }
+        :host([magas]) ha-card { grid-template-rows: auto; align-content: center; }
+        :host([magas]) .elo { height: auto; aspect-ratio: 2.3; max-height: 100%; }
       </style>
       <ha-card>
         <div class="elo" id="elo">
@@ -1864,6 +1897,13 @@ class CantabileCard extends HTMLElement {
   _kimenetValt(i, atvisz = true) {
     const n = this._kimenetek.length, regi = this._hangszoro(), regiAll = this._allapot(regi);
     const cel = this._kimenetek[((i % n) + n) % n], kiz = atvisz ? this._kizarolagos(regi, regiAll) : null;
+    const celAll = cel && cel.entity !== HELYI ? this._hass?.states[cel.entity] : null;
+    if (celAll && celAll.state !== "unavailable" && !(Number(celAll.attributes?.supported_features) & 512)) {
+      // nem tud webcímet / fájlt lejátszani (pl. csak távirányítható lejátszó): nem váltunk rá, ami szól, szól tovább
+      this._uzen(T("A(z) {h} nem tud zenét fogadni a Cantabile-tól (nincs lejátszás-indítás funkciója) – válassz másik lejátszót a ⚙ beállításokban.", { h: cel.nev }));
+      this._frissit();
+      return;
+    }
     if ((kiz === "sonos" && cel?.mod !== "sonos") || (kiz === "bt" && cel?.entity !== HELYI)) {
       // a Deezer / Sonos-kedvenc csak Sonoson, a telefonos zene csak BT-n szól: a választó marad, a zene szól tovább
       this._uzen(kiz === "sonos" ? T("A Deezer és a Sonos-kedvencek csak Sonoson szólnak – a(z) {h} szól tovább.", { h: regi.nev })
@@ -1995,7 +2035,9 @@ class CantabileCard extends HTMLElement {
 
   _beallNyit() {
     const c = this._config;
-    this._szerk = JSON.parse(JSON.stringify({ marka: c.marka || "Cantabile", hangszorok: c.hangszorok, adok: c.adok, magno: c.magno || {} }));
+    this._szerk = JSON.parse(JSON.stringify({ marka: c.marka || "Cantabile", deezer: c.deezer !== false,
+      hangszorok: c.hangszorok.map(({ automod, ...h }) => h),
+      adok: c.adok.map(({ virt, ...a }) => (virt ? { ...a, frekvencia: "" } : a)), magno: c.magno || {} }));
     this._talalatok = [];
     this._beallRajz();
   }
@@ -2010,7 +2052,9 @@ class CantabileCard extends HTMLElement {
     const b = this.shadowRoot.getElementById("beall"), sz = this._szerk;
     if (!sz) return;
     b.hidden = false;
-    const lejatszok = Object.values(this._hass?.states || {}).filter((x) => x.entity_id.startsWith("media_player."))
+    // csak olyan lejátszó választható, amelyik tud médiát indítani (PLAY_MEDIA); a már beállítottat mindig mutatjuk
+    const beallitott = new Set(sz.hangszorok.map((h) => h.entity));
+    const lejatszok = Object.values(this._hass?.states || {}).filter((x) => x.entity_id.startsWith("media_player.") && ((Number(x.attributes?.supported_features) & 512) || beallitott.has(x.entity_id)))
       .sort((x, y) => (x.attributes.friendly_name || x.entity_id).localeCompare(y.attributes.friendly_name || y.entity_id, NYELV()));
     const opc = (val) => lejatszok.map((x) => `<option value="${x.entity_id}" ${x.entity_id === val ? "selected" : ""}>${ESC(x.attributes.friendly_name || x.entity_id)} (${x.entity_id.slice(13)})</option>`).join("");
     const be = (lista, i, mezo, ertek, extra = "") => `<input data-l="${lista}" data-i="${i}" data-m="${mezo}" value="${ESC(ertek ?? "")}" ${extra}>`;
@@ -2021,20 +2065,21 @@ class CantabileCard extends HTMLElement {
         <div class="bhiba">${ESC(uzenet)}</div>
         <section class="bresz"><h3>${T("Általános")}</h3>
           <div class="bsor ket"><label>${T("Márkanév")}</label>${be("_", 0, "marka", sz.marka)}</div>
+          ${sz.hangszorok.some((h) => h.mod === "sonos") ? `<div class="bsor ket"><label>${T("DEEZER fül")}</label><select data-l="_" data-i="0" data-m="deezer"><option value="1" ${sz.deezer !== false ? "selected" : ""}>${T("Látszik (a Sonos appban bekötött Deezer-fiókkal szól)")}</option><option value="0" ${sz.deezer === false ? "selected" : ""}>${T("Rejtve (nincs Deezer)")}</option></select></div>` : ""}
         </section>
         <section class="bresz"><h3>${T("Rádióadók")} <button class="bgomb" data-a="ujado">${T("+ Új adó")}</button></h3>
           <div class="bfejlec ado"><span>${T("NÉV")}</span><span>${T("GOMBON")}</span><span>MHZ</span><span>${T("STREAM-CÍM")}</span><span></span><span></span></div>
           ${sz.adok.map((a, i) => `<div class="bsor ado">${be("adok", i, "nev", a.nev, `placeholder="${T("Név")}"`)}${be("adok", i, "rovid", a.rovid, `placeholder="${T("(a név)")}"`)}${be("adok", i, "frekvencia", a.frekvencia, 'inputmode="decimal" placeholder="87,5–108"')}${be("adok", i, "url", a.url, 'placeholder="https://…"')}<button class="bproba" data-a="proba" data-i="${i}" title="${T("Lejátszás a választott hangszórón")}">${T("▶ Próba")}</button><button class="bx" data-a="torol" data-l="adok" data-i="${i}" title="${T("Törlés")}">×</button></div>`).join("")}
-          <p class="bmeg">${T("A gombok frekvencia szerint rendeződnek; 6–7 gomb fér el kényelmesen. Sonosnál a furcsa portos https-cím helyett próbáld http-vel.")}</p>
+          <p class="bmeg">${T("A gombok frekvencia szerint rendeződnek, 12 hely van. A frekvencia elhagyható (csak internetes adó: a skálán egyenletesen elosztva, a gombon WEB). Sonosnál a furcsa portos https-cím helyett próbáld http-vel.")}</p>
           <div class="bker"><input id="bkeres" placeholder="${T("Adó keresése név szerint (Radio Browser), pl. Kossuth, Jazzy, Rock FM")}" value="${ESC(this._keresett || "")}"><button class="bgomb" data-a="keres">${T("Keresés")}</button></div>
           <div class="btalalat">${(this._talalatok || []).map((t, i) => `<div><em>${ESC(t.name)}</em><small>${ESC([t.codec, t.bitrate ? t.bitrate + " kbps" : "", t.countrycode].filter(Boolean).join(" · "))}</small><button class="bgomb" data-a="felvesz" data-i="${i}">${T("+ Felvesz")}</button></div>`).join("")}</div>
         </section>
         <section class="bresz"><h3>${T("Hangszórók")} <button class="bgomb" data-a="ujhsz">${T("+ Új hangszóró")}</button></h3>
-          <div class="bfejlec hsz2"><span>${T("NÉV")}</span><span>${T("LEJÁTSZÓ")}</span><span>${T("FAJTA")}</span><span></span></div>
-          ${sz.hangszorok.map((h, i) => `<div class="bsor hsz2">${be("hangszorok", i, "nev", h.nev, `placeholder="${T("Név")}"`)}<select data-l="hangszorok" data-i="${i}" data-m="entity">${opc(h.entity)}</select><select data-l="hangszorok" data-i="${i}" data-m="mod"><option value="sonos" ${h.mod === "sonos" ? "selected" : ""}>Sonos</option><option value="url" ${h.mod !== "sonos" ? "selected" : ""}>${T("Egyéb (sor nélkül, pl. WiiM)")}</option></select><button class="bx" data-a="torol" data-l="hangszorok" data-i="${i}" title="${T("Törlés")}">×</button></div>`).join("")}
+          <div class="bfejlec hsz2"><span>${T("NÉV")}</span><span>${T("FORGÓN")}</span><span>${T("LEJÁTSZÓ")}</span><span>${T("FAJTA")}</span><span></span></div>
+          ${sz.hangszorok.map((h, i) => `<div class="bsor hsz2">${be("hangszorok", i, "nev", h.nev, `placeholder="${T("Név")}"`)}${be("hangszorok", i, "rovid", h.rovid, `placeholder="${T("(a név)")}"`)}<select data-l="hangszorok" data-i="${i}" data-m="entity">${opc(h.entity)}</select><select data-l="hangszorok" data-i="${i}" data-m="mod"><option value="sonos" ${h.mod === "sonos" ? "selected" : ""}>Sonos</option><option value="url" ${h.mod !== "sonos" ? "selected" : ""}>${T("Egyéb (sor nélkül, pl. WiiM)")}</option></select><button class="bx" data-a="torol" data-l="hangszorok" data-i="${i}" title="${T("Törlés")}">×</button></div>`).join("")}
         </section>
         <section class="bresz"><h3>${T("Tape deck")}</h3>
-          <div class="bsor ket"><label>${T("Zenemappa")}</label>${be("magno", 0, "nas", sz.magno.nas, 'placeholder="media-source://media_source/local/Zene"')}</div>
+          <div class="bsor ket"><label>${T("Zenemappa")}</label>${be("magno", 0, "nas", sz.magno.nas, 'placeholder="media-source://media_source/local/Music"')}</div>
           <div class="bsor ket"><label>${T("48 kHz-es másolatok mappája")}</label>${be("magno", 0, "hires", sz.magno.hires, `placeholder="${T("(nincs)")}"`)}</div>
           <div class="bsor ket"><label>${T("Feltöltések mappája")}</label>${be("magno", 0, "feltoltes", sz.magno.feltoltes, `placeholder="${TEL_ALAP}"`)}</div>
           <div class="bsor ket"><label>${T("Saját lejátszó-szkript")}</label>${be("magno", 0, "szkript", sz.magno.szkript, `placeholder="${T("(beépített)")}"`)}</div>
@@ -2050,7 +2095,13 @@ class CantabileCard extends HTMLElement {
 
   _beallIr(el) {
     const sz = this._szerk, { l, i, m } = el.dataset;
-    if (l === "_") sz[m] = el.value;
+    if (l === "_") sz[m] = m === "deezer" ? el.value === "1" : el.value;
+    else if (l === "hangszorok" && m === "entity") {
+      // új lejátszó: a típus a platformjából
+      sz.hangszorok[Number(i)].entity = el.value;
+      sz.hangszorok[Number(i)].mod = this._hass?.entities?.[el.value]?.platform === "sonos" ? "sonos" : "url";
+      if (el.tagName === "SELECT") { const t = el.parentElement.querySelector('select[data-m="mod"]'); if (t) t.value = sz.hangszorok[Number(i)].mod; }
+    }
     else if (l === "magno") sz.magno[m] = el.value;
     else sz[l][Number(i)][m] = el.value;
   }
@@ -2096,10 +2147,10 @@ class CantabileCard extends HTMLElement {
     const adok = sz.adok.map((a) => ({ ...a, nev: String(a.nev || "").trim(), rovid: String(a.rovid || "").trim(), url: String(a.url || "").trim(), frekvencia: Number(String(a.frekvencia).replace(",", ".")) }));
     adok.forEach((a, i) => {
       if (!a.nev) hibak.push(T("{n}. adó: hiányzik a név", { n: i + 1 }));
-      if (!(a.frekvencia >= 87.5 && a.frekvencia <= 108)) hibak.push(T("{n}: a frekvencia 87,5 és 108 közé essen", { n: a.nev || T("{n}. adó", { n: i + 1 }) }));
+      if (Number.isFinite(a.frekvencia) && !(a.frekvencia >= 87.5 && a.frekvencia <= 108)) hibak.push(T("{n}: a frekvencia 87,5 és 108 közé essen (vagy hagyd üresen)", { n: a.nev || T("{n}. adó", { n: i + 1 }) }));
       if (!/^https?:\/\//.test(a.url)) hibak.push(T("{n}: a stream-cím http:// vagy https:// kezdetű legyen", { n: a.nev || T("{n}. adó", { n: i + 1 }) }));
     });
-    const hsz = sz.hangszorok.map((h) => ({ nev: String(h.nev || "").trim(), entity: h.entity, mod: h.mod === "sonos" ? "sonos" : "url" }));
+    const hsz = sz.hangszorok.map((h) => { const o = { nev: String(h.nev || "").trim(), entity: h.entity, mod: h.mod === "sonos" ? "sonos" : "url" }; if (String(h.rovid || "").trim()) o.rovid = String(h.rovid).trim(); return o; });
     hsz.forEach((h, i) => { if (!h.nev || !h.entity) hibak.push(T("{n}. hangszóró: név és lejátszó kell", { n: i + 1 })); });
     if (!hsz.length) hibak.push(T("Legalább egy hangszóró kell."));
     if (hibak.length) return this._beallRajz(hibak.join(" · "));
@@ -2110,7 +2161,8 @@ class CantabileCard extends HTMLElement {
     }
     // csak a szerkeszthető kulcsok: a többi (elrendezés stb.) vezérlőpultonként marad
     const uj = { marka: String(sz.marka || "").trim() || "Cantabile", hangszorok: hsz, magno,
-      adok: adok.map((a) => { const o = { nev: a.nev, frekvencia: a.frekvencia, url: a.url }; if (a.rovid) o.rovid = a.rovid; return o; }) };
+      adok: adok.map((a) => { const o = { nev: a.nev, url: a.url }; if (Number.isFinite(a.frekvencia)) o.frekvencia = a.frekvencia; if (a.rovid) o.rovid = a.rovid; return o; }) };
+    if (sz.deezer === false) uj.deezer = false;
     try {
       // minden (UI-ban tárolt) vezérlőpult minden rádió-kártyája megkapja: a tablet és a Mobil „Zene” oldala azonos marad
       const itt = decodeURIComponent(location.pathname.split("/")[1] || "");
@@ -2390,7 +2442,8 @@ class CantabileCard extends HTMLElement {
       TAR.ir("tablet-magno-kazetta", JSON.stringify({ ...kaz, entity: hsz.entity }));
       this._frissit();
     } catch (err) {
-      this._uzen(err?.message || String(err));
+      const m = err?.message || String(err);
+      this._uzen(kaz?.tipus === "deezer" ? T("A Deezer nem indult el ({h}). A Sonos appban kösd be a Deezer-fiókot (Beállítások → Szolgáltatások), vagy a ⚙ beállításokban rejtsd el a DEEZER fület.", { h: m }) : m);
     }
   }
 
@@ -2987,7 +3040,7 @@ class CantabileCard extends HTMLElement {
       : pl.ful === "sor" ? ""
       : pl.ful === "deezer" ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés a Deezeren…")}" value="${ESC(pl.keres || "")}">`
       : nasGyoker ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés a zenemappában…")}" value="${ESC(pl.keres || "")}">`
-      : (pl.ful === "tel" ? T("Saját zene") : T("Sonos kedvencek"));
+      : (pl.ful === "tel" ? T("Saját zene") : pl.ful === "nas" ? T("Zenemappa") : T("Sonos kedvencek"));
     p.innerHTML = `
       <div class="pfej">
         ${this._vanSonos() ? `<button class="pful ${pl.ful === "stream" ? "akt" : ""}" data-ful="stream">STREAMING</button>` : ""}
@@ -3262,7 +3315,7 @@ class CantabileCard extends HTMLElement {
     const adoNev = kulso ? kulso.nev : c.adok[i]?.nev;
     const dal = [a.media_artist, a.media_title].filter((x) => x && x !== adoNev && !URLSZERU(x)).join(" – ");
     sr.getElementById("ado").innerHTML = radioSzol && kulso ? `<b>${ESC(kulso.nev)}</b> · NET${kulso.orszag ? ` · ${ESC(kulso.orszag)}` : ""}`
-      : radioSzol ? `<b>${ESC(c.adok[i].nev)}</b> · ${MHZ(c.adok[i].frekvencia)} MHz`
+      : radioSzol ? `<b>${ESC(c.adok[i].nev)}</b> · ${c.adok[i].virt ? "WEB" : `${MHZ(c.adok[i].frekvencia)} MHz`}`
       : SZOL(s) ? `<b>TAPE DECK PLAYING</b>` : "OFF";
     sr.getElementById("cim").textContent = radioSzol ? dal : "";
     {

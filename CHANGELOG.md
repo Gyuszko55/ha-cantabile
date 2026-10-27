@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.0 – unreleased
+
+Portability – tested in a clean Home Assistant without Sonos, WiiM, Deezer, stations or music folder, in English.
+
+- Speakers: only players that can play media (PLAY_MEDIA) are offered in ⚙; switching to one that can't is refused with a message and the music keeps playing (it used to go silent). The speaker type is detected from the platform (Sonos → `sonos`, everything else → `url`) – `mode` is optional in YAML and set automatically in ⚙. New optional short name (`short`) for the rotary selector; long names no longer slide under the knob (side positions are anchored outwards).
+- Stations: the frequency is optional. Internet-only stations are spread evenly on the dial and show WEB instead of MHz.
+- Deezer: the DEEZER tab can be hidden in ⚙; if the Sonos can't play Deezer, the message explains how to link the account in the Sonos app.
+- Panel view / tall card: the front panel keeps its proportions and is centred instead of stretching apart.
+- The shelf header no longer says “Sonos favourites” without Sonos; all UI texts are translated; the music-folder example is English.
+- Security: the BT radio proxy only passes audio (audio/*, ogg, octet-stream) – no web pages or JSON from the local network; the temporary upload folder is capped at 2 GB (oldest files go first).
+
 ## 1.6.0 – unreleased
 
 - Your own music (picked on the phone / computer in the PHONE tab) now plays on any speaker: on BT directly, elsewhere it is uploaded to Home Assistant temporarily (`/api/cantabile/upload`, hidden `.cantabile_atmeneti` folder in the local media directory, deleted automatically after 24 hours). The first track plays as soon as it is uploaded; the rest are appended in the background (Sonos queue, or the new `cantabile.add_tracks` for the integration's sequence). The tape shows TEMP (with upload progress, e.g. TEMP ↑3/12).

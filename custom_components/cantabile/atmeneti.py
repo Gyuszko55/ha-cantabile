@@ -4,7 +4,8 @@ A saját zene a böngészőben van; a Sonos / WiiM / Cast viszont webcímről t�
 zenét nem a BT-n (a böngészőben) hallgatjuk, a kártya számonként feltölti ide: `POST /api/cantabile/upload`
 (bejelentkezett felhasználó, fájlonként legfeljebb 300 MB). A fájlok a helyi médiamappa rejtett
 `.cantabile_atmeneti` mappájába kerülnek (a zenemappa listájában és a keresőben nem látszanak), és 24 óra múlva
-maguktól törlődnek – a takarítás induláskor és utána óránként fut.
+maguktól törlődnek – a takarítás induláskor és utána óránként fut. A mappa legfeljebb 2 GB; fölötte a legrégebbi
+fájlok törlődnek.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 MAPPA = ".cantabile_atmeneti"
 MAX_MERET = 300 * 1024 * 1024
 ELETTARTAM = 24 * 3600
+OSSZES_MAX = 2 * 1024 * 1024 * 1024     # az átmeneti mappa legfeljebb ennyi; fölötte a legrégebbiek törlődnek
 _NEM_JO = re.compile(r"[^\w .,()&'+-]+", re.UNICODE)
 
 
@@ -35,6 +37,22 @@ def _forras(hass: HomeAssistant) -> tuple[str, Path]:
     dirs = hass.config.media_dirs or {}
     kulcs = "local" if "local" in dirs else next(iter(dirs), "")
     return kulcs, Path(dirs.get(kulcs, "/media")) / MAPPA
+
+
+def _helyet(mappa: Path, kell: int) -> None:
+    """Ha az új fájllal együtt túllépnénk a keretet, a legrégebbi átmeneti fájlok törlődnek."""
+    if not mappa.is_dir():
+        return
+    fajlok = sorted((f for f in mappa.iterdir() if f.is_file()), key=lambda f: f.stat().st_mtime)
+    osszes = sum(f.stat().st_size for f in fajlok)
+    for f in fajlok:
+        if osszes + kell <= OSSZES_MAX:
+            break
+        try:
+            osszes -= f.stat().st_size
+            f.unlink()
+        except OSError:
+            continue
 
 
 def _takarit(mappa: Path) -> int:
@@ -89,6 +107,7 @@ class Feltolto(HomeAssistantView):
         nev = _NEM_JO.sub("_", os.path.basename(mezo.filename)).strip(" ._") or "zene"
         cel = mappa / f"{int(time.time() * 1000)}_{nev}"
         await self.hass.async_add_executor_job(lambda: mappa.mkdir(parents=True, exist_ok=True))
+        await self.hass.async_add_executor_job(_helyet, mappa, int(request.content_length or 0))
         fajl = await self.hass.async_add_executor_job(cel.open, "wb")
         meret = 0
         try:

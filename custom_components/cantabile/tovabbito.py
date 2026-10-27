@@ -3,7 +3,9 @@
 A BT kimenet a böngészőben szól. Ha a Home Assistantot https-en éri el a készülék, a böngésző a http-s adókat nem
 engedi lejátszani (vegyes tartalom), és idegen szerverről jövő hangot a VU-mérő sem elemezhet. Ezért a kártya a
 webes adót ezen az útvonalon kéri: a HA letölti, és a saját címén adja tovább. Csak bejelentkezett felhasználó érheti
-el (a kártya aláírt linket kér hozzá), és csak http(s) cím adható meg.
+el (a kártya aláírt linket kér hozzá), csak http(s) cím adható meg, és csak hangot ad tovább (audio/… vagy
+ogg / bináris tartalomtípus) – weboldalt, JSON-t vagy más adatot nem, így a belső hálózat szolgáltatásai nem
+olvashatók vele.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from .const import VERSION
 _LOGGER = logging.getLogger(__name__)
 
 UA = f"Cantabile/{VERSION} (Home Assistant)"
+HANG_TIPUSOK = ("application/ogg", "application/octet-stream", "video/mp2t", "application/x-mpegurl")
 DARAB = 16384
 
 
@@ -44,6 +47,9 @@ class Tovabbito(HomeAssistantView):
                                 timeout=aiohttp.ClientTimeout(total=None, sock_connect=10, sock_read=30)) as be:
                 if be.status >= 400:
                     return web.Response(status=502, text=f"az adó válasza: {be.status}")
+                tipus = be.headers.get("Content-Type", "").split(";")[0].strip().lower()
+                if tipus and not (tipus.startswith("audio/") or tipus in HANG_TIPUSOK):
+                    return web.Response(status=415, text="nem hangfolyam")
                 ki = web.StreamResponse(status=200, headers={
                     "Content-Type": be.headers.get("Content-Type", "audio/mpeg"),
                     "Cache-Control": "no-cache, no-store",
