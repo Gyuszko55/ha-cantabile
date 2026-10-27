@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.3 – 2026-10-27
+
+- When a station starts on the selected speaker while the card shows the cassette deck (by voice, from another card or the speaker's own app), the card switches to the radio by itself. Flipping back to TAPE by hand is respected while the same station plays; changing speakers never flips the view.
+
 ## 1.9.2 – 2026-10-27
 
 - Phone layout of the cassette deck: the five function buttons get their own full-width row, the volume knob sits next to the RADIO / TAPE switch, and the speaker selector has a row of its own – the outer speaker names no longer run off the card, and the button labels no longer overlap on narrow phones (360 px).

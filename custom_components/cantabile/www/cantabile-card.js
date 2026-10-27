@@ -3480,6 +3480,13 @@ class CantabileCard extends HTMLElement {
     if (this._kezi && (i === this._kezi.i || Date.now() - this._kezi.ido > 15000)) this._kezi = null;
     if (this._kezi) i = this._kezi.i;
     const radioSzol = (i >= 0 || i === KULSO) && (SZOL(s) || !!this._kezi);
+    // ugyanazon a hangszórón új adó indult (hangparancs, másik kártya, a hangszóró appja): a magnóról magától a rádióra vált;
+    // hangszóróváltáskor nem (a kazetta átvitele előtt a cél még a régi adót szólhatja)
+    const radioKulcs = radioSzol ? String(i) : "";
+    if (this._radioKulcs?.e === hsz.entity && radioKulcs && radioKulcs !== this._radioKulcs.k && this._mod === "magno" && !this._polc && !this._szerk) {
+      this._mod = "radio"; TAR.ir("tablet-radio-mod", this._mod); this._netZar(); this._dalZar(); this._igazitKesobb();
+    }
+    this._radioKulcs = { e: hsz.entity, k: radioKulcs };
     const kulso = i === KULSO ? this._kulso() : null;
     if (i >= 0) this._utolso = i;
     const mutat = i >= 0 ? i : this._utolso ?? Math.max(0, c.adok.findIndex((a) => a.nev === TAR.olvas("tablet-radio-ado")));
