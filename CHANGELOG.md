@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3 – unreleased
+
+- Cassette display: long titles and the artist · album line scroll back and forth when they don't fit; the quality stays fixed on the right.
+- Cassette display: if something else was started meanwhile (voice, Sonos app, another device), the top line shows the list / album actually playing instead of the last loaded tape.
+
 ## 1.0.2 – unreleased
 
 - Tape deck: the status text next to the RADIO / TAPE switch may wrap, so it fits on narrow tablet panels.

@@ -398,6 +398,7 @@ class CantabileCard extends HTMLElement {
       this._meret = new ResizeObserver((e) => {
         const sz = e[0]?.contentRect.width;
         if (sz) this.toggleAttribute("keskeny", sz < 600);
+        const sr = this.shadowRoot; if (sr) { this._gorgo(sr.getElementById("kcim")); this._gorgo(sr.querySelector("#ksor .kea")); }
       });
       this._meret.observe(this);
     }
@@ -460,6 +461,7 @@ class CantabileCard extends HTMLElement {
 
   _epit() {
     const c = this._config;
+    this._kcimHtml = this._ksorHtml = null;
     let jelek = "";
     for (let f = 88; f <= 108; f += 0.5) {
       const egesz = Number.isInteger(f);
@@ -852,8 +854,20 @@ class CantabileCard extends HTMLElement {
         .ksav .kapcsolo { cursor: pointer; }
         .ksav .ki { opacity: .38; }
         .kcim { position: absolute; left: 7%; right: 13%; top: 13.2%; text-align: center; font-size: 5cqw; font-weight: 800; letter-spacing: .02em;
-          text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .ksor { position: absolute; left: 7%; right: 13%; top: 21.6%; display: grid; grid-template-columns: 1.2fr 1fr .8fr; gap: 2cqw; font-size: 3.7cqw; font-weight: 600; }
+          text-transform: uppercase; }
+        .ksor { position: absolute; left: 7%; right: 13%; top: 21.6%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3cqw; font-size: 3.7cqw; font-weight: 600; }
+        .ksor .kmin { display: flex; align-items: center; gap: 1cqw; justify-content: flex-end; white-space: nowrap; }
+        .ksor .kures { grid-column: 1 / -1; display: flex; justify-content: center; }
+        .ksor .kea .gord { align-items: center; gap: 1cqw; }
+        .ksor .kea .gord > * { flex: none; }
+        .ksor .ksep { display: inline-block; width: 2cqw; flex: none; }
+        /* görgetett szöveg: a doboz levágja, a belső sor oda-vissza úszik (csak ha nem fér ki) */
+        .gdoboz, .kcim { overflow: hidden; white-space: nowrap; min-width: 0; text-overflow: clip; }
+        .gord { display: inline-flex; white-space: nowrap; }
+        .kcim .gord { display: inline-block; }
+        .tul { text-align: left; }
+        .tul > .gord { animation: gord var(--ido, 8s) ease-in-out infinite alternate; }
+        @keyframes gord { 0%, 18% { transform: translateX(0); } 82%, 100% { transform: translateX(var(--tav, 0)); } }
         .ksor span { display: flex; align-items: center; gap: 1cqw; min-width: 0; }
         .ksor span:nth-child(2) { justify-content: center; } .ksor span:nth-child(3) { justify-content: flex-end; }
         .ksor em { font-style: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2714,11 +2728,27 @@ class CantabileCard extends HTMLElement {
     this._animIndit();
   }
 
+  // görgetés (mint a régi kijelzőkön), ha a szöveg nem fér ki: megáll az elején, végigúszik, megáll a végén, vissza
+  _gorgo(doboz) {
+    const g = doboz?.querySelector(".gord"); if (!g) return;
+    requestAnimationFrame(() => {
+      const tul = g.scrollWidth - doboz.clientWidth;
+      doboz.classList.toggle("tul", tul > 2);
+      if (tul > 2) { g.style.setProperty("--tav", `${-tul}px`); g.style.setProperty("--ido", `${(5 + tul / 22).toFixed(1)}s`); }
+    });
+  }
+
   // a kijelző-kazetta szövegei (Snowsky Echo mintára)
-  _infoRajz(a, kaz, megy) {
+  _infoRajz(a, kazTarolt, megy) {
     const sr = this.shadowRoot, hsz = this._hangszoro();
     const id = String(a.media_content_id || "");
     const sid = (/[?&]sid=(\d+)/.exec(id) || [])[1];
+    // a betöltött kazetta szól-e még – ha közben mást indítottak (hanggal, a Sonos appból, másik eszközről), a kijelzőn
+    // a ténylegesen szóló lista / album neve kell, nem a régi kazettáé
+    const nasMost = /\/media\/local\//.test(id) || /\/media\/local\//.test(a.media_title || "");
+    const kaz = !kazTarolt || !megy ? kazTarolt
+      : kazTarolt.forras === "nas" ? (nasMost && (!kazTarolt.szamok?.length || this._szamIndex(kazTarolt, a) >= 0) ? kazTarolt : null)
+      : kazTarolt.forras === "stream" ? (nasMost ? null : kazTarolt) : kazTarolt;
     const nas = kaz?.forras === "nas" || /\/media\/local\//.test(id) || /\/media\/local\//.test(a.media_title || "");
     const forras = megy ? (nas ? "NAS" : SZOLGALTATO[sid] ? "STREAM" : kaz?.forras === "stream" ? "STREAM" : kaz?.forras === "tel" ? T("TELEFON") : "") : (kaz ? (kaz.forras === "nas" ? "NAS" : kaz.forras === "tel" ? T("TELEFON") : "STREAM") : "");
     // állapotsor: hangerő · hangszóró · sorszám · lista · keverés · ismétlés · forrás
@@ -2750,10 +2780,13 @@ class CantabileCard extends HTMLElement {
     const f = this._formatum;
     const minoseg = f?.kodek || SZOLGALTATO[sid] || (forras === "NAS" ? "NAS" : "");
     sr.getElementById("ablak").classList.toggle("ures", !cim);
-    sr.getElementById("kcim").textContent = cim || T("— üres —");
-    sr.getElementById("ksor").innerHTML = cim
-      ? `<span>${KI.ember}<em>${ESC(eloado || "–")}</em></span><span>${KI.lemez}<em>${ESC(album || "–")}</em></span><span>${KI.szint}<em>${ESC(minoseg || "–")}</em></span>`
-      : `<span style="grid-column:1/-1;justify-content:center"><em>${T("EJECT: kazetta választás")}</em></span>`;
+    const kcimHtml = `<span class="gord">${ESC(cim || T("— üres —"))}</span>`;
+    const ksorHtml = cim
+      ? `<span class="gdoboz kea"><span class="gord">${KI.ember}<em>${ESC(eloado || "–")}</em>${album ? `<i class="ksep"></i>${KI.lemez}<em>${ESC(album)}</em>` : ""}</span></span><span class="kmin">${KI.szint}<em>${ESC(minoseg || "–")}</em></span>`
+      : `<span class="kures"><em>${T("EJECT: kazetta választás")}</em></span>`;
+    // csak változáskor írjuk át (különben a görgetés minden frissítésnél elölről indulna)
+    if (kcimHtml !== this._kcimHtml) { this._kcimHtml = kcimHtml; sr.getElementById("kcim").innerHTML = kcimHtml; this._gorgo(sr.getElementById("kcim")); }
+    if (ksorHtml !== this._ksorHtml) { this._ksorHtml = ksorHtml; sr.getElementById("ksor").innerHTML = ksorHtml; this._gorgo(sr.querySelector("#ksor .kea")); }
     sr.getElementById("sav").setAttribute("fill", cim ? SZIN(kaz?.cim || album || cim) : "#888");
     // formátum-sor: MP3 | 44.1kHz | 16bit | 320kbps + SQ/HQ jel + szív (Sonos-kedvenc)
     let form = "";
