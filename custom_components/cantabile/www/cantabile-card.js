@@ -217,6 +217,7 @@ const EN = {
   "— üres —": "— empty —",
   "EJECT: kazetta választás": "EJECT: choose a tape",
   "Dalszöveg": "Lyrics",
+  "A tekerés nem sikerült: {h}": "Seeking failed: {h}",
   "A Deezer és a Sonos-kedvencek csak Sonoson szólnak – a(z) {h} szól tovább.": "Deezer and Sonos favourites only play on Sonos – {h} keeps playing.",
   "A telefonról választott zene csak BT-n szól – ott marad.": "Music chosen from the phone only plays on BT – it stays there.",
   "Húzd az átrendezéshez": "Drag to reorder",
@@ -765,7 +766,7 @@ class CantabileCard extends HTMLElement {
           background: linear-gradient(180deg, #f3f4f5 0%, #d2d5d9 55%, #b6babf 100%);
           box-shadow: 0 0 0 1px #6f737a, 0 3px 0 #7d8188, 0 4px 5px rgba(0,0,0,.35), inset 0 1px 0 #fff; }
         .mbill::before { content: ""; position: absolute; left: 22%; right: 22%; top: 5px; height: 2px; border-radius: 1px; background: var(--j, transparent); }
-        .mg.akt .mbill, .mg:active .mbill { transform: translateY(3px); box-shadow: 0 0 0 1px #6f737a, 0 0 0 #7d8188, 0 1px 2px rgba(0,0,0,.35), inset 0 1px 0 #fff; }
+        .mg.akt .mbill, .mg:active .mbill, .mg.lenyomva .mbill { transform: translateY(3px); box-shadow: 0 0 0 1px #6f737a, 0 0 0 #7d8188, 0 1px 2px rgba(0,0,0,.35), inset 0 1px 0 #fff; }
         .mg.akt .mbill::before { box-shadow: 0 0 4px var(--j, transparent); }
         .tilt .mg { opacity: .5; pointer-events: none; }
         /* jobb oszlop: fent a hangerőgomb, alatta a forgó kimenetválasztó és a RÁDIÓ/MAGNÓ kapcsoló (+ POWER / állapot) */
@@ -918,6 +919,8 @@ class CantabileCard extends HTMLElement {
         .kido svg { height: 3.4cqw; fill: #fff; margin-right: .8cqw; }
         .kcsik { position: absolute; left: 30%; right: 25%; top: 74%; height: 1.4%; background: rgba(255,255,255,.2); border-radius: 1px; }
         .kcsik i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #e53935; border-radius: 1px; }
+        .kcsik { cursor: pointer; touch-action: none; }
+        .kcsik::before { content: ""; position: absolute; left: -3%; right: -3%; top: -700%; bottom: -700%; }
         .kcsik i::after { content: ""; position: absolute; right: -1px; top: -150%; width: 2px; height: 400%; background: #fff; border-radius: 1px; }
         .kform { position: absolute; left: 30%; right: 4%; top: 62.4%; height: 7%; display: flex; justify-content: flex-end; align-items: center; gap: 1.6cqw;
           font-size: 3.1cqw; font-weight: 700; color: #d9c08a; white-space: nowrap; }
@@ -1370,7 +1373,11 @@ class CantabileCard extends HTMLElement {
       g.addEventListener("wheel", (e) => { e.preventDefault(); e.stopPropagation(); hszLep((e.deltaY || e.deltaX) > 0 ? 1 : -1); }, { passive: false });
     });
     sr.querySelectorAll(".fogas").forEach((b) => b.addEventListener("click", () => this._beallNyit()));
-    sr.querySelectorAll(".mg").forEach((b) => b.addEventListener("click", () => this._magnoGomb(b.dataset.k)));
+    sr.querySelectorAll(".mg").forEach((b) => {
+      if (b.dataset.k === "rew" || b.dataset.k === "ff") return this._tekerKezel(b);
+      b.addEventListener("click", () => this._magnoGomb(b.dataset.k));
+    });
+    this._csikKezel(sr.querySelector(".kcsik"));
     sr.querySelectorAll(".gomb").forEach((g) => this._gombKezel(g));
     this._frissit();
     this._igazitKesobb(); setTimeout(() => this._igazit(), 600);   // a betűkészlet és a kazetta-kép betöltése után újra
@@ -2197,6 +2204,91 @@ class CantabileCard extends HTMLElement {
       }
       return this._hiv("media_player", k === "ff" ? "media_next_track" : "media_previous_track", e);
     }
+  }
+
+  // REW / FF: rövid koppintás = előző / következő szám; nyomva tartva = tekerés a számon belül (mint a deckek CUE /
+  // REVIEW-ja): a kijelző fél másodpercenként 10 mp-et lép (3 mp után 30-at), közben másfél másodpercenként oda is ugrik,
+  // elengedéskor onnan szól
+  _tekerKezel(b) {
+    const k = b.dataset.k, elore = k === "ff";
+    let ido = null, tekert = false;
+    const vege = (megszakit = false) => {
+      if (ido == null && !tekert) return;
+      clearTimeout(ido); ido = null; b.classList.remove("lenyomva");
+      if (tekert) { tekert = false; this._tekerVege(); } else if (!megszakit) this._magnoGomb(k);
+    };
+    b.addEventListener("pointerdown", (e) => {
+      if (e.button > 0) return;
+      e.preventDefault();
+      try { b.setPointerCapture(e.pointerId); } catch (err) { /* régi böngésző */ }
+      b.classList.add("lenyomva"); tekert = false;
+      ido = setTimeout(() => { ido = null; tekert = this._tekerIndit(elore); }, 450);
+    });
+    b.addEventListener("pointerup", () => vege());
+    b.addEventListener("pointercancel", () => vege(true));
+    b.addEventListener("contextmenu", (e) => e.preventDefault());
+    b.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._magnoGomb(k); } });
+  }
+
+  _tekerIndit(elore) {
+    const m = this._magnoAllapot;
+    if (!(m?.szol || m?.szunet)) return false;
+    const { ido, hossz } = this._halad();
+    if (!hossz) return false;            // élő adás: nincs mit tekerni
+    const t = this._tekeres = { poz: ido, hossz, elore, kezd: Date.now(), ugrott: Date.now() };
+    const mag = this.shadowRoot.getElementById("magno");
+    mag.classList.add("gyors"); mag.classList.toggle("vissza", !elore);
+    const lep = () => {
+      if (this._tekeres !== t) return;
+      const mennyi = Date.now() - t.kezd > 3000 ? 30 : 10;
+      t.poz = Math.max(0, Math.min(t.hossz - 2, t.poz + (elore ? mennyi : -mennyi)));
+      if (Date.now() - t.ugrott > 1500) { t.ugrott = Date.now(); this._ugrik(t.poz); }
+      this._szalagRajz();
+      t.ido = setTimeout(lep, 500);
+    };
+    lep();
+    return true;
+  }
+
+  _tekerVege() {
+    const t = this._tekeres; this._tekeres = null;
+    this.shadowRoot.getElementById("magno").classList.remove("gyors", "vissza");
+    if (!t) return;
+    clearTimeout(t.ido);
+    this._ugrik(t.poz);
+  }
+
+  // ugrás a szóló számon belül (mp); a kijelző addig ezt mutatja, amíg a lejátszó vissza nem jelez
+  _ugrik(poz) {
+    const hsz = this._hangszoro(); if (!hsz) return;
+    this._ugras = { poz, mikor: Date.now() };
+    this._szalagRajz();
+    this._hiv("media_player", "media_seek", { entity_id: hsz.entity, seek_position: Math.round(poz) })
+      .catch((e) => this._uzen(T("A tekerés nem sikerült: {h}", { h: e?.message || e })));
+  }
+
+  // a kazetta idősávja: koppintásra / húzásra oda ugrik a számban
+  _csikKezel(el) {
+    if (!el) return;
+    const hely = (e) => { const r = el.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); };
+    let fog = null;
+    el.addEventListener("pointerdown", (e) => {
+      const m = this._magnoAllapot, { hossz } = m?.szol || m?.szunet ? this._halad() : { hossz: 0 };
+      if (!hossz || e.button > 0) return;
+      e.preventDefault(); e.stopPropagation();
+      try { el.setPointerCapture(e.pointerId); } catch (err) { /* régi böngésző */ }
+      fog = { hossz };
+      this._tekeres = { poz: hely(e) * hossz, hossz, csik: true };
+      this._szalagRajz();
+    });
+    el.addEventListener("pointermove", (e) => { if (fog && this._tekeres?.csik) { this._tekeres.poz = hely(e) * fog.hossz; this._szalagRajz(); } });
+    const vege = (e, ugrik) => {
+      if (!fog) return;
+      const poz = hely(e) * fog.hossz; fog = null; this._tekeres = null;
+      if (ugrik) this._ugrik(Math.min(poz, (this._halad().hossz || poz) - 2)); else this._szalagRajz();
+    };
+    el.addEventListener("pointerup", (e) => vege(e, true));
+    el.addEventListener("pointercancel", (e) => vege(e, false));
   }
 
   _gyors(vissza) {
@@ -3302,6 +3394,10 @@ class CantabileCard extends HTMLElement {
     const a = m.s.attributes || {};
     let poz = Number(a.media_position) || 0;
     if (m.szol && a.media_position_updated_at) poz += (Date.now() - Date.parse(a.media_position_updated_at)) / 1000;
+    // tekerés közben a választott hely; ugrás után addig, amíg a lejátszó vissza nem jelez (legfeljebb 4 mp)
+    const u = this._ugras;
+    if (this._tekeres) poz = this._tekeres.poz;
+    else if (u && Date.now() - u.mikor < 4000 && !(Date.parse(a.media_position_updated_at || 0) > u.mikor)) poz = u.poz + (m.szol ? (Date.now() - u.mikor) / 1000 : 0);
     const hossz = Number(a.media_duration) || 0;
     // ugyanazt a számot ismételve a Sonos nem jelez, a becsült idő túlfutna: ismétlésnél elölről számolunk, különben a végén megáll
     if (hossz > 0 && poz > hossz) poz = a.repeat === "one" || (a.repeat === "all" && !(a.queue_size > 1)) ? poz % hossz : hossz;

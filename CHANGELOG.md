@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0 – unreleased
+
+- Fast winding within a track (like a deck's CUE / REVIEW): a short tap on REW / FF still skips tracks; held, the display moves 10 s every half second (30 s after 3 s), the player jumps there every 1.5 s so you hear where you are, and playback continues from the release point. The reels spin fast meanwhile.
+- The cassette's time bar is a scrubber: tap or drag to jump within the track.
+- Works on Sonos (music folder and Deezer), WiiM, Cast and BT; not shown for live streams.
+- Verified live on Nappali (music folder and Deezer) and BT.
+
 ## 1.4.2 – unreleased
 
 - Choosing music from the phone / computer (PHONE tab) switches to BT and now stops what was playing on the previous output first (Sonos paused, others stopped) – like inserting a new tape. Verified live on Háló.
