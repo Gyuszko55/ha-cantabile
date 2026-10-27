@@ -14,6 +14,7 @@ kártyához a szerveren kell:
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     await hass.http.async_register_static_paths(
         [StaticPathConfig(STATIC_URL, str(Path(__file__).parent / "www"), cache_headers=False)]
     )
+    indult = time.time()      # a NAS-számok aláírt linkjei ennél régebbiek érvénytelenek (új kulcs induláskor)
     library.regisztral(hass)
     lyrics.regisztral(hass)
     vu.regisztral(hass)
@@ -60,7 +62,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             eid = entries[0].entry_id
             for kulcs, uid, platform in (("rounds", UID_ROUNDS, "number"), ("sleep", UID_SLEEP, "sensor"), ("net", UID_NET, "sensor")):
                 ent[kulcs] = reg.async_get_entity_id(platform, DOMAIN, f"{eid}_{uid}")
-        connection.send_result(msg["id"], {"version": VERSION, "configured": bool(entries), "entities": ent})
+        connection.send_result(msg["id"], {"version": VERSION, "configured": bool(entries), "entities": ent, "started": indult})
 
     websocket_api.async_register_command(hass, ws_info)
     return True

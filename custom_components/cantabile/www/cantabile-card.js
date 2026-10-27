@@ -217,6 +217,7 @@ const EN = {
   "— üres —": "— empty —",
   "EJECT: kazetta választás": "EJECT: choose a tape",
   "Dalszöveg": "Lyrics",
+  "Újraindult a Home Assistant – a kazettát friss linkekkel töltöm újra.": "Home Assistant restarted – reloading the tape with fresh links.",
   "Nincs dalszöveg ehhez a dalhoz.": "No lyrics found for this song.",
   "Instrumentális szám – nincs szövege.": "Instrumental – no lyrics.",
   "A dalszöveg-szolgáltatás nem érhető el.": "The lyrics service is unavailable.",
@@ -394,7 +395,7 @@ class CantabileCard extends HTMLElement {
 
   // az integráció entitásai (ismétlésszám, alvásidőzítő, NET-adó) a cantabile/info parancsból
   async _infoKer() {
-    try { const v = await this._hass.callWS({ type: "cantabile/info" }); this._ent = v.entities || {}; }
+    try { const v = await this._hass.callWS({ type: "cantabile/info" }); this._ent = v.entities || {}; this._haIndult = v.started ? v.started * 1000 : null; }
     catch (e) { this._ent = {}; this._nincsIntegracio = true; }
     this._frissit();
   }
@@ -1950,6 +1951,41 @@ class CantabileCard extends HTMLElement {
     return k.szamok.findIndex((id) => { const f = id.split("/").pop(); return most.includes(f) || dekod.includes(f); });
   }
 
+  // HA-újraindítás után a Sonos sorában lévő NAS-számok aláírt linkjei (authSig) érvénytelenek (401): a szóló szám még
+  // végigszól, de a következőt a Sonos már nem tudja letölteni. A link kiállítási ideje (iat) az indulás előtti → elavult.
+  _elavultSor(hsz) {
+    if (hsz?.mod !== "sonos" || !this._haIndult) return false;
+    const vez = this._hass?.states[hsz.entity]?.attributes?.group_members?.[0] || hsz.entity;
+    const m = /[?&]authSig=([^&\s]+)/.exec(this._hass?.states[vez]?.attributes?.media_content_id || "");
+    if (!m) return false;
+    try {
+      const resz = m[1].split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      const iat = JSON.parse(atob(resz + "=".repeat((4 - (resz.length % 4)) % 4))).iat;
+      return Number(iat) * 1000 < this._haIndult - 2000;
+    } catch (e) { return false; }
+  }
+
+  // elavult linkek esetén a kazetta újratöltése friss linkekkel, a kért számnál. A számlista a Sonos saját sorából jön
+  // (/media/local/… → media-source://media_source/local/…), így akkor is megy, ha másik készülékről töltötték be
+  async _ujratoltElavult(hsz, hova) {
+    if (!this._elavultSor(hsz)) return false;
+    const vez = this._hass.states[hsz.entity]?.attributes?.group_members?.[0] || hsz.entity;
+    let sor;
+    try {
+      const v = await this._hass.callWS({ type: "call_service", domain: "sonos", service: "get_queue", service_data: { entity_id: vez }, return_response: true });
+      sor = (v?.response?.[vez] || []).map((x) => /\/media\/local\/([^?#]+)/.exec(x.media_content_id || "")?.[1]);
+    } catch (e) { return false; }
+    if (!sor.length || sor.some((x) => !x)) return false;
+    const szamok = sor.map((x) => { try { return `media-source://media_source/local/${decodeURIComponent(x)}`; } catch (e) { return null; } });
+    if (szamok.some((x) => !x)) return false;
+    const regi = this._kazetta(), a = this._hass.states[vez]?.attributes || {};
+    const kaz = { ...(regi?.forras === "nas" ? regi : {}), forras: "nas", szamok,
+      cim: regi?.forras === "nas" ? regi.cim : a.media_album_name || FAJLNEV(szamok[0]), alcim: regi?.forras === "nas" ? regi.alcim : a.media_artist || "" };
+    this._uzen(T("Újraindult a Home Assistant – a kazettát friss linkekkel töltöm újra."));
+    await this._betolt(kaz, Math.min(Math.max(0, hova), szamok.length - 1));
+    return true;
+  }
+
   async _magnoGomb(k) {
     const hsz = this._hangszoro(), h = this._hass;
     if (!h || !hsz) return;
@@ -1959,6 +1995,10 @@ class CantabileCard extends HTMLElement {
     if (k === "eject") return this._polcNyit();
     if (k === "stop") { this._szkriptLeallit(); return this._hiv("media_player", "media_stop", e); }
     if (k === "pause") return this._hiv("media_player", s?.state === "paused" ? "media_play" : "media_pause", e);
+    const sorHely = (Number(a.queue_position) || 1) - 1;
+    if ((k === "play" && s?.state === "paused") || k === "ff" || k === "rew") {
+      if (await this._ujratoltElavult(hsz, k === "ff" ? sorHely + 1 : k === "rew" ? sorHely - 1 : sorHely)) return;
+    }
     if (k === "play") {
       if (s?.state === "paused") return this._hiv("media_player", "media_play", e);
       if (SZOL(s) && this._adoIndex(hsz) < 0) return;
@@ -2544,6 +2584,7 @@ class CantabileCard extends HTMLElement {
   async _sorUgrik(i) {
     const f = this._sorForras();
     try {
+      if (f.mod === "sonos" && await this._ujratoltElavult(f.hsz, i)) return;
       if (f.mod === "sonos") await this._hiv("sonos", "play_queue", { entity_id: f.vez, queue_position: i });
       else if (f.mod === "helyi") await this._helyiSzam(i);
       else if (f.mod === "wiim") await this._sorozat(f.hsz, f.kaz.szamok, i);
