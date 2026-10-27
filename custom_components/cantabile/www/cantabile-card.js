@@ -917,7 +917,7 @@ class CantabileCard extends HTMLElement {
         .valaszto .fhsz.akt .lamp { background: #ffb020; box-shadow: 0 0 5px #ffb020; }
         .magno .mjobb > .forgo .valaszto { zoom: .84; }
         :host([keskeny]) .magno .mjobb > .forgo .valaszto { zoom: 1; }
-        .magno .mjobb .mfelirat { white-space: nowrap; font-size: 7px; letter-spacing: .03em; }
+        .magno .mjobb .mfelirat { max-width: 66px; font-size: 7.5px; letter-spacing: .04em; }
         :host([keskeny]) .magno .mjobb .mfelirat { font-size: 8px; letter-spacing: .08em; }
         .forgo.bton .fhsz.akt { color: #8a8e94; } .forgo.bton .fhsz.akt .lamp { background: #c9a14a; box-shadow: none; }
         .valaszto small { position: absolute; left: 0; right: 0; bottom: -4px; text-align: center; font: 700 7px/1 Arial, sans-serif; letter-spacing: .22em; color: #6d7179; }

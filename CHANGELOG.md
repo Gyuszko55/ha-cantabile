@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 – unreleased
+
+- Tape deck: the status text next to the RADIO / TAPE switch may wrap, so it fits on narrow tablet panels.
+
 ## 1.0.1 – unreleased
 
 - Tape deck: five equal icon buttons with labels below – REPEAT, SHUFFLE, FADE, SLEEP, BT (BT toggles playback on this device).
