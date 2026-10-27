@@ -45,7 +45,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     await hass.http.async_register_static_paths(
         [StaticPathConfig(STATIC_URL, str(Path(__file__).parent / "www"), cache_headers=False)]
     )
-    add_extra_js_url(hass, f"{CARD_URL}?v={VERSION}")
     library.regisztral(hass)
     vu.regisztral(hass)
 
@@ -65,7 +64,29 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+async def _kartya_bejegyzes(hass: HomeAssistant) -> None:
+    """A kártya Lovelace-erőforrásként (tárolós módban), verziószámmal – így a frissítés után a böngésző újratölti.
+
+    A korai beinjektálás (add_extra_js_url) a szekciós nézetekben nem elég: ott a vezérlőpult a modul előtt rajzol, és
+    a hibakártyát nem építi újra. YAML-módú erőforrásoknál marad a beinjektálás (és a README kéri a kézi bejegyzést).
+    """
+    url = f"{CARD_URL}?v={VERSION}"
+    ll = hass.data.get("lovelace")
+    res = getattr(ll, "resources", None)
+    if res is None or getattr(ll, "resource_mode", "storage") != "storage" or not hasattr(res, "async_create_item"):
+        add_extra_js_url(hass, url)
+        return
+    await res.async_get_info()          # betölti a tárat
+    for elem in res.async_items():
+        if str(elem.get("url", "")).split("?")[0] == CARD_URL:
+            if elem["url"] != url:
+                await res.async_update_item(elem["id"], {"res_type": "module", "url": url})
+            return
+    await res.async_create_item({"res_type": "module", "url": url})
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: CantabileConfigEntry) -> bool:
+    await _kartya_bejegyzes(hass)
     rt = Cantabile(hass)
     entry.runtime_data = rt
     rt.start()
