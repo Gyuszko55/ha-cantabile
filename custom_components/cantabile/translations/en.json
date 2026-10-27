@@ -170,6 +170,20 @@
           "description": "The same tracks in the new order."
         }
       }
+    },
+    "add_tracks": {
+      "name": "Add tracks to sequence",
+      "description": "Appends tracks to the running “Play tracks one after another” sequence.",
+      "fields": {
+        "entity_id": {
+          "name": "Player",
+          "description": "The media player."
+        },
+        "tracks": {
+          "name": "Tracks",
+          "description": "media-source IDs to append."
+        }
+      }
     }
   }
 }

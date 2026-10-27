@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.0 – unreleased
+
+- Your own music (picked on the phone / computer in the PHONE tab) now plays on any speaker: on BT directly, elsewhere it is uploaded to Home Assistant temporarily (`/api/cantabile/upload`, hidden `.cantabile_atmeneti` folder in the local media directory, deleted automatically after 24 hours). The first track plays as soon as it is uploaded; the rest are appended in the background (Sonos queue, or the new `cantabile.add_tracks` for the integration's sequence). The tape shows TEMP (with upload progress, e.g. TEMP ↑3/12).
+- Own music playing on BT can now be moved to other speakers like any tape (the selector used to snap back).
+- The track-by-track sequence (Cast etc.) now runs on the same live order as the WiiM one: reorderable and extendable while playing.
+- File-like titles (WiiM reports the raw file name) are cleaned on the display.
+- Verified live: own music on Háló with TEMP, Háló → WiiM → BT, and BT → Háló.
+
 ## 1.5.0 – unreleased
 
 - Fast winding within a track (like a deck's CUE / REVIEW): a short tap on REW / FF still skips tracks; held, the display moves 10 s every half second (30 s after 3 s), the player jumps there every 1.5 s so you hear where you are, and playback continues from the release point. The reels spin fast meanwhile.

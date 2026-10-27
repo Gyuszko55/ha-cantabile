@@ -108,3 +108,15 @@ set_order:
       required: true
       selector:
         object:
+
+add_tracks:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          domain: media_player
+    tracks:
+      required: true
+      selector:
+        object:

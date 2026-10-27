@@ -11,7 +11,8 @@ kártyához a szerveren kell:
   - „Cantabile” LLM API: az Assist (bármelyik LLM-es ügynök) ezzel indít zenét;
   - HA-újraindítás után a szóló Sonos zenemappás sorának cseréje friss linkekre a szám végén (sonossor.py),
     sor-átrendezés (`cantabile.move_queue_item`, `cantabile.set_order`), halkítás bemondáskor (halkitas.py),
-    hézagmentes WiiM-lejátszás (hezagmentes.py), rádióadó-továbbító a BT kimenethez (tovabbito.py).
+    hézagmentes WiiM-lejátszás (hezagmentes.py), rádióadó-továbbító a BT kimenethez (tovabbito.py), saját zene
+    átmeneti feltöltése más hangszórókhoz (atmeneti.py).
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
-from . import halkitas, library, llm, lyrics, music, sonossor, tovabbito, vu
+from . import atmeneti, halkitas, library, llm, lyrics, music, sonossor, tovabbito, vu
 from .const import (
     CARD_URL, CONF_DUCK_LEVEL, CONF_DUCK_SOURCES, CONF_LLM_API, DOMAIN, DUCK_LEVEL_DEFAULT, STATIC_URL, UID_NET, UID_ROUNDS,
     UID_SLEEP, VERSION,
@@ -58,6 +59,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     library.regisztral(hass)
     lyrics.regisztral(hass)
     hass.http.register_view(tovabbito.Tovabbito(hass))
+    atmeneti.regisztral(hass)
     vu.regisztral(hass)
 
     @websocket_api.websocket_command({vol.Required("type"): "cantabile/info"})
@@ -153,9 +155,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: CantabileConfigEntry) ->
     async def set_order(call: ServiceCall) -> None:
         rt.set_order(call.data["entity_id"], call.data["tracks"])
 
+    async def add_tracks(call: ServiceCall) -> None:
+        rt.add_tracks(call.data["entity_id"], call.data["tracks"])
+
     hass.services.async_register(
         DOMAIN, "move_queue_item", move_queue_item,
         schema=vol.Schema({vol.Required("entity_id"): cv.entity_id, vol.Required("from"): vol.Coerce(int), vol.Required("to"): vol.Coerce(int)}),
+    )
+    hass.services.async_register(
+        DOMAIN, "add_tracks", add_tracks,
+        schema=vol.Schema({vol.Required("entity_id"): cv.entity_id, vol.Required("tracks"): [cv.string]}),
     )
     hass.services.async_register(
         DOMAIN, "set_order", set_order,
@@ -182,6 +191,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: CantabileConfigEntry) -
     ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if ok:
         entry.runtime_data.stop()
-        for s in ("play", "play_tracks", "stop_tracks", "sleep_timer", "move_queue_item", "set_order"):
+        for s in ("play", "play_tracks", "stop_tracks", "sleep_timer", "move_queue_item", "set_order", "add_tracks"):
             hass.services.async_remove(DOMAIN, s)
     return ok

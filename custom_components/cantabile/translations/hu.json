@@ -170,6 +170,20 @@
           "description": "Ugyanazok a számok, az új sorrendben."
         }
       }
+    },
+    "add_tracks": {
+      "name": "Számok hozzáfűzése",
+      "description": "A futó „Számok lejátszása egymás után” sorozat végére fűz.",
+      "fields": {
+        "entity_id": {
+          "name": "Lejátszó",
+          "description": "A lejátszó."
+        },
+        "tracks": {
+          "name": "Számok",
+          "description": "A hozzáfűzendő media-source azonosítók."
+        }
+      }
     }
   }
 }

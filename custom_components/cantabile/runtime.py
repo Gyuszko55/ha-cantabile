@@ -87,6 +87,12 @@ class Sorrend:
         self.i += 1
         return self.utolso
 
+    def hozzaad(self, uj: list[str]) -> None:
+        """Új számok a sor végére (pl. a háttérben feltöltött saját zene); az első körben még sorra kerülnek."""
+        self.szamok.extend(uj)
+        if self.kor == 1:
+            self.lista.extend(uj)
+
     def atrendez(self, uj: list[str]) -> None:
         if sorted(uj) != sorted(self.szamok):
             return
@@ -151,6 +157,12 @@ class Cantabile:
                 t.cancel()
 
     @callback
+    def add_tracks(self, entity_id: str, tracks: list[str]) -> None:
+        """A szóló sorozat végére fűz (a háttérben feltöltött saját zene)."""
+        if (s := self._sorrend.get(entity_id)) is not None:
+            s.hozzaad(tracks)
+
+    @callback
     def set_order(self, entity_id: str, tracks: list[str]) -> None:
         """A szóló sorozat új sorrendje (a SOR fülön húzással): a szóló szám után ebben a sorrendben folytatja."""
         if (s := self._sorrend.get(entity_id)) is not None:
@@ -169,46 +181,38 @@ class Cantabile:
         return bool(t and not t.done())
 
     async def _sorozat_fut(self, entity_id: str, szamok: list[str], kezdo: int) -> None:
-        kor = 0
         try:
             dmr = None
             try:
                 dmr = await hezagmentes.wiim_renderelo(self.hass, entity_id)
             except Exception:  # noqa: BLE001
                 _LOGGER.debug("Cantabile: %s UPnP-n nem érhető el, számonként indítom", entity_id, exc_info=True)
+            self._sorrend[entity_id] = sorrend = Sorrend(self, entity_id, szamok, kezdo)
             if dmr is not None:
-                self._sorrend[entity_id] = sorrend = Sorrend(self, entity_id, szamok, kezdo)
                 await hezagmentes.lejatszik(self.hass, dmr, entity_id, sorrend)
                 return
-            while True:
-                kor += 1
-                lista = szamok[kezdo:] if kor == 1 else szamok[:]
-                s = self.hass.states.get(entity_id)
-                if kor > 1 and s and s.attributes.get("shuffle"):
-                    random.shuffle(lista)
-                for id_ in lista:
-                    fajl = id_.rsplit("/", 1)[-1]
-                    valtozatok = {fajl, quote(fajl), quote_plus(fajl)}
-                    await self.hass.services.async_call(
-                        "media_player", "play_media",
-                        {"entity_id": entity_id, "media_content_id": id_, "media_content_type": "music"}, blocking=True,
-                    )
-                    if not await var(self.hass, entity_id, lambda st: bool(st and st.state == "playing"), 30):
-                        return
-                    # addig vár, amíg ez a szám szól vagy szünetel (a WiiM a címbe a fájl URL-jét írja)
-
-                    def masik(st: State | None) -> bool:
-                        if not st or st.state not in AKTIV:
-                            return True
-                        most = f"{st.attributes.get('media_title') or ''} {st.attributes.get('media_content_id') or ''}"
-                        return not any(v in most for v in valtozatok)
-
-                    await var(self.hass, entity_id, masik)
-                    st = self.hass.states.get(entity_id)
-                    if st and st.state in AKTIV:
-                        return          # más szól a lejátszón: a magnó leáll
-                if self.rounds < ROUNDS_INFINITE and kor >= self.rounds:
+            for id_ in sorrend:
+                sorrend.most = id_
+                fajl = id_.rsplit("/", 1)[-1]
+                valtozatok = {fajl, quote(fajl), quote_plus(fajl)}
+                await self.hass.services.async_call(
+                    "media_player", "play_media",
+                    {"entity_id": entity_id, "media_content_id": id_, "media_content_type": "music"}, blocking=True,
+                )
+                if not await var(self.hass, entity_id, lambda st: bool(st and st.state == "playing"), 30):
                     return
+                # addig vár, amíg ez a szám szól vagy szünetel (a WiiM a címbe a fájl URL-jét írja)
+
+                def masik(st: State | None) -> bool:
+                    if not st or st.state not in AKTIV:
+                        return True
+                    most = f"{st.attributes.get('media_title') or ''} {st.attributes.get('media_content_id') or ''}"
+                    return not any(v in most for v in valtozatok)
+
+                await var(self.hass, entity_id, masik)
+                st = self.hass.states.get(entity_id)
+                if st and st.state in AKTIV:
+                    return          # más szól a lejátszón: a magnó leáll
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001

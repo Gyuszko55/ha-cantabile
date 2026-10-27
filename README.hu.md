@@ -21,7 +21,7 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
   - **STREAMING** – a Sonos-kedvencek (listák, albumok);
   - **DEEZER** – a teljes Deezer-kínálat: toplista, keresés, előadó-oldalak (csak Sonoson);
   - **NAS** – a zenemappa (előadó → album), azonnali kereséssel;
-  - **TELEFON** – a telefon/tablet zenéje a saját Bluetooth-kimenetén, vagy feltöltve a zenemappába;
+  - **TELEFON** – a telefon / gép zenéje: BT-n közvetlenül, más hangszórón átmeneti feltöltéssel (TEMP jelzés, 24 óra múlva törlődik), vagy véglegesen a zenemappába;
   - **SOR** – a lejátszási sor: ugrás, törlés, következőnek, sor végére (Sonos).
 - **Sor átrendezése**: a számot a fogantyújánál (⋮⋮) húzd – Sonos, WiiM és BT.
 - **Hézagmentes lejátszás**: Sonoson (saját sor) és WiiM-en (a következő számot DLNA-n előre megkapja); BT-n közel hézagmentes.

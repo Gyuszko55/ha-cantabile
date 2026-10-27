@@ -21,7 +21,7 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
   - **STREAMING** – your Sonos favourites (playlists and albums);
   - **DEEZER** – the whole Deezer catalogue: charts, search, artist pages (Sonos only);
   - **NAS** – your music folder (artist → album), with instant search;
-  - **PHONE** – play music from the phone/tablet on its own Bluetooth output, or upload it to the music folder;
+  - **PHONE** – music from the phone / computer: on BT directly, on any other speaker via a temporary upload (TEMP on the tape, deleted after 24 h); or upload it to the music folder for good;
   - **QUEUE** – the current queue: jump, remove, play next, add to end (Sonos).
 - **QUEUE reorder**: drag a track by its handle (⋮⋮) – Sonos, WiiM and BT.
 - **Gapless**: Sonos (its own queue) and WiiM (the next track is handed over in advance via DLNA); near-gapless on BT.

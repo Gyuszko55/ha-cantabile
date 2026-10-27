@@ -185,8 +185,11 @@ const EN = {
   "Nincs megadva zenemappa (⚙ → Tape deck → Zenemappa).": "No music folder set (⚙ → Tape deck → Music folder).",
   "Üres mappa.": "Empty folder.",
   "Hiba: {h}": "Error: {h}",
-  "EZEN A KÉSZÜLÉKEN · BT": "ON THIS DEVICE · BT",
-  "Válassz zenét erről a telefonról vagy tabletről: kazettaként azonnal szól a BT kimeneten (fülhallgató, Bluetooth hangszóró). Nem tölt fel semmit, otthonon kívül is megy.": "Pick music from this phone or tablet: it plays right away as a tape on the BT output (headphones, Bluetooth speaker). Nothing is uploaded, so it works away from home too.",
+  "EZEN A KÉSZÜLÉKEN · BÁRMELYIK HANGSZÓRÓN": "ON THIS DEVICE · ANY SPEAKER",
+  "Saját zene a(z) {h} hangszórón: átmeneti feltöltés (24 óra múlva törlődik)…": "Your music on {h}: temporary upload (deleted after 24 hours)…",
+  "A feltöltés nem sikerült: {h}": "Upload failed: {h}",
+  "A fájl már nem érhető el – válaszd ki újra.": "The file is no longer available – pick it again.",
+  "Válassz zenét erről a készülékről: a BT kimeneten közvetlenül szól; más hangszórón átmenetileg feltöltődik a Home Assistantra (a kazettán TEMP jelzés), és 24 óra múlva magától törlődik.": "Pick music from this device: it plays directly on the BT output; on any other speaker it is uploaded to Home Assistant temporarily (TEMP on the tape) and deleted automatically after 24 hours.",
   "♪ Zene választása…": "♪ Choose music…",
   "FELTÖLTVE · BÁRMELYIK HANGSZÓRÓN": "UPLOADED · ON ANY SPEAKER",
   "A kiválasztott számok a zenemappa „{m}” mappájába kerülnek (fájlonként legfeljebb 20 MB), utána bármelyik hangszóró és a BT is lejátssza.": "The chosen tracks go to the “{m}” folder of the music folder (max. 20 MB per file); then any speaker and BT can play them.",
@@ -1750,8 +1753,46 @@ class CantabileCard extends HTMLElement {
     if (ado === KULSO) { const k = this._kulso(); if (k) return this._netIndit({ name: k.nev, url_resolved: k.url, favicon: k.ikon, countrycode: k.orszag, codec: k.kodek, bitrate: k.kbps }, false); }
     if (forras) {
       this._atvitel = { ado: -1, forras, hova: uj.entity, ido: Date.now() };
+      if (forras.tel) return this._telAtmenet(forras.kaz, forras.kezdo, forras.poz, uj);
       await this._kazettaFolytat(forras, uj);
     }
+  }
+
+  // saját zene (a böngészőben lévő fájlok) nem BT kimeneten: számonként átmenetileg feltölti a HA-ra (24 óra múlva
+  // törlődik); az első szám után már szól, a többi a háttérben kerül a sor végére. A kazettán TEMP jelzés.
+  async _telAtmenet(kaz, kezdo, poz, uj) {
+    const fajlok = this._telFajlok, lista = kaz.szamok.slice(Math.max(0, kezdo));
+    if (!lista.length) return;
+    const all = this._atmenetiAll = { kesz: 0, db: lista.length };
+    const fel = async (u) => {
+      const f = fajlok?.get(u);
+      if (!f) throw new Error(T("A fájl már nem érhető el – válaszd ki újra."));
+      const fd = new FormData(); fd.append("file", f, f.name);
+      const v = await this._hass.fetchWithAuth("/api/cantabile/upload", { method: "POST", body: fd });
+      const j = await v.json().catch(() => ({}));
+      if (!v.ok) throw new Error(j.error || String(v.status));
+      return j.media_content_id;
+    };
+    this._uzen(T("Saját zene a(z) {h} hangszórón: átmeneti feltöltés (24 óra múlva törlődik)…", { h: uj.nev }));
+    this._frissit();
+    let elso;
+    try { elso = await fel(lista[0]); } catch (e) { this._atmenetiAll = null; this._frissit(); return this._uzen(T("A feltöltés nem sikerült: {h}", { h: e?.message || e })); }
+    all.kesz = 1;
+    const tkaz = { forras: "nas", atmeneti: true, cim: kaz.cim, alcim: kaz.alcim, id: `tmp:${Date.now()}`, szamok: [elso] };
+    await this._kazettaFolytat({ kaz: tkaz, kezdo: 0, poz }, uj);
+    const vez = this._hass.states[uj.entity]?.attributes?.group_members?.[0] || uj.entity;
+    for (const u of lista.slice(1)) {
+      if (this._atmenetiAll !== all) return;          // közben új kazetta került be
+      let id;
+      try { id = await fel(u); } catch (e) { this._uzen(T("A feltöltés nem sikerült: {h}", { h: e?.message || e })); break; }
+      if (this._atmenetiAll !== all) return;
+      tkaz.szamok.push(id); all.kesz++;
+      TAR.ir("tablet-magno-kazetta", JSON.stringify({ ...tkaz, entity: uj.entity }));
+      if (uj.mod === "sonos") await this._hiv("media_player", "play_media", { entity_id: vez, media_content_id: id, media_content_type: "music", enqueue: "add" }).catch(() => {});
+      else await this._hiv("cantabile", "add_tracks", { entity_id: uj.entity, tracks: [id] }).catch(() => {});
+      this._frissit();
+    }
+    this._frissit();
   }
 
   // a kazetta folytatása az új kimeneten: ugyanattól a számtól, ugyanonnan
@@ -1782,7 +1823,8 @@ class CantabileCard extends HTMLElement {
     let szamok = null, kezdo = 0;
     if (hsz.entity === HELYI) {
       const l = this._helyiLista;
-      if (!l?.szamok?.length || l.tel) return null;
+      if (!l?.szamok?.length) return null;
+      if (l.tel) return this._telKaz ? { tel: true, kaz: { ...this._telKaz, szamok: [...l.szamok] }, kezdo: l.i, poz: this._aktAudio?.currentTime || 0 } : null;
       szamok = [...l.szamok]; kezdo = l.i; poz = this._aktAudio?.currentTime || 0;
     } else if (hsz.mod === "sonos") {
       const vez = a.group_members?.[0] || hsz.entity;
@@ -1816,7 +1858,6 @@ class CantabileCard extends HTMLElement {
     if (!hsz || !SZOL(s) || this._adoIndex(hsz) !== -1) return null;
     const cid = String(s.attributes?.media_content_id || "");
     if (hsz.mod === "sonos" && cid && !/\/media\//.test(cid) && !/^x-rincon-mp3radio:/i.test(cid)) return "sonos";
-    if (hsz.entity === HELYI && this._helyiLista?.tel) return "bt";
     return null;
   }
 
@@ -2301,6 +2342,7 @@ class CantabileCard extends HTMLElement {
   // kazetta betöltése: {cim, alcim, forras: stream|nas, id, tipus, szamok?}
   async _betolt(kaz, kezdo = 0) {
     const hsz = this._hangszoro(), h = this._hass, e = { entity_id: hsz.entity };
+    if (!kaz.atmeneti) this._atmenetiAll = null;     // új kazetta: a háttérben futó átmeneti feltöltés leáll
     const ablak = this.shadowRoot.getElementById("ablak");
     ablak.classList.add("tolt");
     setTimeout(() => ablak.classList.remove("tolt"), 450);
@@ -2308,16 +2350,9 @@ class CantabileCard extends HTMLElement {
       if (kaz.forras === "tel") {
         // a telefonról választott számok: csak a BT kimeneten (ezen a készüléken) szólnak
         if (!kaz.szamok?.length) { this._polc = { ful: "tel", ut: [] }; this._polcRajz(); return; }
-        if (hsz.entity !== HELYI) {
-          // új forrás a BT-n: ami eddig a másik kimeneten szólt, az leáll (mint új kazetta betételekor)
-          if (SZOL(this._allapot(hsz)) || SZUNETEL(this._allapot(hsz))) {
-            if (hsz.mod === "url") this._szkriptLeallit(hsz);
-            await this._hiv("media_player", hsz.mod === "sonos" ? "media_pause" : "media_stop", { entity_id: hsz.entity }).catch(() => {});
-          }
-          this._kimenetValt(this._kimenetek.findIndex((x) => x.entity === HELYI), false);
-          this._uzen(T("A telefonról választott zene a BT kimeneten szól – átváltottam."));
-        }
         this._telKaz = kaz;
+        // nem BT kimenet: átmeneti feltöltéssel a választott hangszórón szól (a régi tartalmát az új kazetta lecseréli)
+        if (hsz.entity !== HELYI) return this._telAtmenet(kaz, kezdo, 0, hsz);
         this._helyiLista = { szamok: kaz.szamok, i: 0, tel: true };
         await this._helyiSzam(0);
         TAR.ir("tablet-magno-kazetta", JSON.stringify({ cim: kaz.cim, alcim: kaz.alcim, forras: "tel", id: kaz.id, entity: HELYI }));
@@ -3046,8 +3081,8 @@ class CantabileCard extends HTMLElement {
     if (this._polc?.ful !== "tel" || KERES_NORM(this._polc?.keres || "").length >= 2) return;
     const tk = this._telKaz;
     lista.innerHTML = `<div class="tel">
-      <section class="tblokk"><h4>${T("EZEN A KÉSZÜLÉKEN · BT")}</h4>
-        <p>${T("Válassz zenét erről a telefonról vagy tabletről: kazettaként azonnal szól a BT kimeneten (fülhallgató, Bluetooth hangszóró). Nem tölt fel semmit, otthonon kívül is megy.")}</p>
+      <section class="tblokk"><h4>${T("EZEN A KÉSZÜLÉKEN · BÁRMELYIK HANGSZÓRÓN")}</h4>
+        <p>${T("Válassz zenét erről a készülékről: a BT kimeneten közvetlenül szól; más hangszórón átmenetileg feltöltődik a Home Assistantra (a kazettán TEMP jelzés), és 24 óra múlva magától törlődik.")}</p>
         <div class="tsor"><button class="tgomb" data-t="helyi">${T("♪ Zene választása…")}</button></div>
         ${tk ? `<div class="kazettak">${this._kazettaCsempe({ cim: tk.cim, alcim: tk.alcim }, "tk")}</div>` : ""}
       </section>
@@ -3084,8 +3119,10 @@ class CantabileCard extends HTMLElement {
     this._telKaz?.szamok?.forEach((u) => URL.revokeObjectURL(u));
     this._helyiNevek = new Map();
     this._helyiMeret = new Map();
+    this._telFajlok = new Map();          // a fájlok maguk is kellenek: más hangszórón átmeneti feltöltéssel szólnak
     const szamok = fajlok.map((f) => {
       const u = URL.createObjectURL(f);
+      this._telFajlok.set(u, f);
       this._helyiNevek.set(u, f.name.replace(/\.[^.]+$/, ""));
       this._helyiMeret.set(u, { size: f.size, ext: (f.name.match(/\.([^.]+)$/) || [])[1] || "" });
       return u;
@@ -3302,7 +3339,9 @@ class CantabileCard extends HTMLElement {
       : kazTarolt.forras === "nas" ? (nasMost && (!kazTarolt.szamok?.length || this._szamIndex(kazTarolt, a) >= 0) ? kazTarolt : null)
       : kazTarolt.forras === "stream" ? (nasMost ? null : kazTarolt) : kazTarolt;
     const nas = kaz?.forras === "nas" || /\/media\/local\//.test(id) || /\/media\/local\//.test(a.media_title || "");
-    const forras = megy ? (nas ? "NAS" : SZOLGALTATO[sid] ? "STREAM" : kaz?.forras === "stream" ? "STREAM" : kaz?.forras === "tel" ? "PHONE" : "") : (kaz ? (kaz.forras === "nas" ? "NAS" : kaz.forras === "tel" ? "PHONE" : "STREAM") : "");
+    const atm = kaz?.atmeneti || /\.cantabile_atmeneti\//.test(`${id} ${a.media_title || ""}`);
+    const am = this._atmenetiAll;
+    const forras = atm && (megy || kaz) ? (am && am.kesz < am.db ? `TEMP ↑${am.kesz}/${am.db}` : "TEMP") : megy ? (nas ? "NAS" : SZOLGALTATO[sid] ? "STREAM" : kaz?.forras === "stream" ? "STREAM" : kaz?.forras === "tel" ? "PHONE" : "") : (kaz ? (kaz.forras === "nas" ? "NAS" : kaz.forras === "tel" ? "PHONE" : "STREAM") : "");
     // állapotsor: hangerő · hangszóró · sorszám · lista · keverés · ismétlés · forrás
     let sorsz = "–/–";
     if (megy && a.queue_size) sorsz = `${String(a.queue_position || 1).padStart(3, "0")}/${String(a.queue_size).padStart(3, "0")}`;
@@ -3324,7 +3363,9 @@ class CantabileCard extends HTMLElement {
     // cím, előadó · album · minőség
     let cim = "", eloado = "", album = "";
     if (megy) {
-      cim = !URLSZERU(a.media_title) && a.media_title ? a.media_title : FAJLNEV(a.media_title || id);
+      // a WiiM a nyers fájlnevet adja címként (átmeneti feltöltésnél időbélyeg-előtaggal): azt is megtisztítjuk
+      const fajlszeru = /^\d{10,}_|\.(mp3|flac|m4a|aac|ogg|opus|wav|wma)$/i.test(a.media_title || "");
+      cim = !URLSZERU(a.media_title) && a.media_title && !fajlszeru ? a.media_title : FAJLNEV(a.media_title || id);
       eloado = a.media_artist || kaz?.alcim || "";
       album = a.media_album_name || kaz?.cim || "";
       if (!a.media_artist && cim.includes(" – ")) [eloado, cim] = cim.split(" – ", 2);
