@@ -251,6 +251,7 @@ const OI = {
   fade: '<svg viewBox="0 0 24 24"><path d="M3.5 6.5v11L12 12zM20.5 6.5v11L12 12z"/></svg>',
   sleep: '<svg viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7"/><path d="M12 10v3.5l2.5 2M4.5 4.5 2.5 6.5M19.5 4.5l2 2"/></svg>',
   bt: '<svg viewBox="0 0 24 24"><path d="M7 7.5 17 16.5 12 21V3l5 4.5L7 16.5"/></svg>',
+  net: '<svg viewBox="0 0 24 24"><path d="M12 11v10M8.5 21h7M8.3 6.3a5.2 5.2 0 0 0 0 7.4M15.7 6.3a5.2 5.2 0 0 1 0 7.4M5.4 3.4a9.3 9.3 0 0 0 0 13.2M18.6 3.4a9.3 9.3 0 0 1 0 13.2"/><circle cx="12" cy="10" r="1.4"/></svg>',
 };
 // NET-adó: a Radio Browserből választott, gombra nem tett adó (az _adoIndex ezt adja vissza)
 const KULSO = -2;
@@ -492,8 +493,10 @@ class CantabileCard extends HTMLElement {
       if (egesz && f % 2 === 0) jelek += `<b class="sz${f % 4 === 2 ? " ptl" : ""}" style="left:${POZ(f)}%">${f}</b>`;
     }
     const adojel = c.adok.map((a, i) => `<i class="aj" data-i="${i}" style="left:${POZ(a.frekvencia)}%"></i>`).join("");
+    const ADOHELY = 12;
     const gombok = c.adok.map((a, i) => `
-      <button class="bill ado" data-i="${i}"><span class="led"></span><b>${ESC(a.rovid || a.nev)}</b><small>${MHZ(a.frekvencia)}</small></button>`).join("");
+      <button class="bill ado" data-i="${i}"><span class="led"></span><b>${ESC(a.rovid || a.nev)}</b><small>${MHZ(a.frekvencia)}</small></button>`).join("")
+      + Array.from({ length: Math.max(0, ADOHELY - c.adok.length) }, () => `<button class="bill adoures" title="${T("Üres hely – koppints, és a NET-katalógusból tegyél ide adót")}"><span class="plusz">+</span></button>`).join("");
     // kimenetválasztó a Technics RS-M205 „tape select” tolókapcsolóinak mintájára: függőleges kapcsoló a hangszórókhoz
     // (annyi állás, ahány hangszóró), mellette külön kétállású BT kapcsoló; a kiválasztott név félkövér
     const kim = this._kimenetek, hszIdx = kim.map((h, i) => i).filter((i) => kim[i].entity !== HELYI), btIdx = kim.findIndex((h) => h.entity === HELYI);
@@ -503,7 +506,7 @@ class CantabileCard extends HTMLElement {
       + `<button class="fgomb" data-f="fade" title="${T("Áttűnés a számok között (csak Sonos)")}"><span class="led"></span>FADE</button>`;
     const alvasGomb = `<button class="sleep" title="${T("Időzített kikapcsolás: 15 · 30 · 45 · 60 · 90 perc · ki")}"><span class="led"></span>SLEEP<b class="amar"></b></button>`;
     // a magnó öt funkciógombja: egyforma, ikonos gombok, a felirat alattuk (REPEAT · SHUFFLE · FADE · SLEEP · BT)
-    const og = (f, cim, felirat) => `<div class="og"><button class="ogomb" data-f="${f}" title="${cim}"><span class="led"></span><i>${OI[f]}${f === "korok" ? '<b class="oszam"></b>' : ""}</i></button><small>${felirat}<b class="amar"></b></small></div>`;
+    const og = (f, cim, felirat) => `<div class="og og-${f}"><button class="ogomb" data-f="${f}" title="${cim}"><span class="led"></span><i>${OI[f]}${f === "korok" ? '<b class="oszam"></b>' : ""}</i></button><small>${felirat}<b class="amar"></b></small></div>`;
     const otGomb = `<div class="otg">${og("korok", T("Ismétlés: 1 · 2 · 3 · 4 · 5 kör · végtelen"), "REPEAT")}${og("kever", T("Véletlenszerű lejátszás"), "SHUFFLE")}`
       + `${og("fade", T("Áttűnés a számok között (csak Sonos)"), "FADE")}${og("sleep", T("Időzített kikapcsolás: 15 · 30 · 45 · 60 · 90 perc · ki"), "SLEEP")}`
       + `${this._kimenetek.some((h) => h.entity === HELYI) ? og("bt", T("BT: ezen a készüléken szól (újra koppintva vissza a hangszóróra)"), "BT") : ""}</div>`;
@@ -691,7 +694,8 @@ class CantabileCard extends HTMLElement {
         .be .feny { opacity: 1; }
         /* Marantz-ablak: SIGNAL-műszer | kéken világító skála | Gyro-Touch lendkerék */
         .skala { display: grid; grid-template-columns: 92px minmax(0, 1fr) 46px; gap: 10px; padding: 8px 10px; box-sizing: border-box; }
-        .skkoz { position: relative; min-width: 0; }
+        .skkoz { position: relative; min-width: 0; container-type: inline-size; }
+        @container (max-width: 420px) { .sz.ptl { display: none; } }
         .jelm { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
         .jelsvg { width: 100%; height: auto; border-radius: 3px; box-shadow: 0 0 0 1px #2a2d31; }
         .jelsvg .jl1 { stop-color: #1b4f49; transition: stop-color .8s; } .jelsvg .jl2 { stop-color: #0a201e; transition: stop-color .8s; }
@@ -765,9 +769,9 @@ class CantabileCard extends HTMLElement {
         :host(:not([keskeny])) .magno .mjobb > .forgo, :host(:not([keskeny])) .magno .mjobb > .kap { transform: translateY(var(--fgy, 0px)); }
         .kimenet { grid-area: kim; }
         .kap { grid-area: kap; display: flex; flex-direction: column; align-items: center; gap: 7px; }
-        .kap .valto { flex-direction: column; gap: 4px; }
-        .kap .kapcs { width: 20px; height: 40px; }
-        .kap .kapcs::after { left: 2px; top: 2px; width: 16px; height: 18px; transition: top .2s; }
+        .kap .valto, .rbal .valto { flex-direction: column; gap: 4px; }
+        .kap .kapcs, .rbal .kapcs { width: 20px; height: 40px; }
+        .kap .kapcs::after, .rbal .kapcs::after { left: 2px; top: 2px; width: 16px; height: 18px; transition: top .2s; }
         .magno .kap .kapcs::after { left: 2px; top: 20px; }
         .sleep, .fgomb { position: relative; border: 1px solid #7c8189; border-radius: 3px; cursor: pointer; padding: 11px 6px 3px; min-width: 64px; display: flex; gap: 4px; justify-content: center; align-items: baseline;
           font: 700 8px/1 Arial, sans-serif; letter-spacing: .18em; color: #2b2e33; background: linear-gradient(180deg, #f6f7f8, #d0d4d9); box-shadow: 0 2px 0 #80858c; -webkit-tap-highlight-color: transparent; }
@@ -1245,6 +1249,32 @@ class CantabileCard extends HTMLElement {
         :host([keskeny]) .btalalat div { grid-template-columns: 1fr auto; }
         :host([keskeny]) .btalalat small { grid-column: 1; grid-row: 2; }
         :host([keskeny]) .btalalat .bgomb { grid-row: 1 / 3; grid-column: 2; }
+        /* rádió 1.3.0: fél magas állomásgombok 6 × 2 helyen (telefonon 4 × 3), jobb oldalt POWER + RADIO/TAPE balra fent,
+           hangerő, alatta BT · NET · SLEEP ikonos gombok, legalul a SPEAKERS forgókapcsoló */
+        .elo:not(.magno) .adosor { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); height: 74px; gap: 6px 7px; }
+        .adosor .bill { flex: none; height: auto; padding: 7px 3px 1px; flex-direction: column; justify-content: center; align-items: center; gap: 1px; box-shadow: 0 3px 0 #80858c, 0 4px 6px rgba(0,0,0,.25); }
+        .adosor .bill .led { top: 3px; width: 12px; height: 3px; margin-left: -6px; }
+        .adosor .bill b { font-size: 11.5px; line-height: 1.05; }
+        .adosor .bill small { font-size: 9px; line-height: 1; flex: none; }
+        .adosor .bill.akt, .adosor .bill:active { transform: translateY(2px); box-shadow: 0 1px 0 #80858c, 0 2px 3px rgba(0,0,0,.25); }
+        .adosor .adoures { background: linear-gradient(180deg, #eceef0, #d6dade); border-style: dashed; border-color: #a3a8af; box-shadow: 0 2px 0 #9ca1a8; align-items: center; padding: 0; }
+        .adosor .adoures .plusz { font: 300 20px/1 Arial, sans-serif; color: #8a8f97; }
+        .jobb.rjobb { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "rbal hang" "otg otg" "kim kim"; justify-content: stretch; align-content: space-between; align-items: center; gap: 2px 4px; }
+        .rjobb > .rbal { grid-area: rbal; display: flex; flex-direction: column; align-items: center; gap: 12px; align-self: start; padding-top: 4px; }
+        .rjobb > .hangero { grid-area: hang; justify-self: center; transform: scale(.74); margin: -24px; }
+        .rjobb > .rotg { grid-area: otg; }
+        .rjobb > .forgo { grid-area: kim; justify-self: center; }
+        .rjobb > .forgo .valaszto { zoom: .86; }
+        :host([keskeny]) .elo:not(.magno) .adosor { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 39px; height: auto; gap: 9px 6px; order: 3; padding-bottom: 4px; }
+        :host([keskeny]) .elo:not(.magno) .adosor .bill { height: 39px; flex-direction: column; align-items: center; gap: 2px; padding: 9px 2px 2px; }
+        :host([keskeny]) .elo:not(.magno) .adosor .bill b { font-size: 12px; }
+        :host([keskeny]) .jobb.rjobb { order: 4; grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "rbal hang otg" "rbal hang kim"; justify-content: stretch; align-content: center; gap: 2px 4px; }
+        :host([keskeny]) .rjobb > .rbal { align-self: center; padding-top: 0; }
+        :host([keskeny]) .rjobb > .hangero { transform: scale(.68); margin: -28px; }
+        :host([keskeny]) .rjobb > .rotg { align-self: end; }
+        :host([keskeny]) .rjobb > .forgo { align-self: start; }
+        :host([keskeny]) .rjobb > .forgo .valaszto { zoom: .78; }
+        :host([keskeny]) .rotg .og-net { order: 1; } :host([keskeny]) .rotg .og-sleep { order: 2; } :host([keskeny]) .rotg .og-bt { order: 3; }
       </style>
       <ha-card>
         <div class="elo" id="elo">
@@ -1260,12 +1290,13 @@ class CantabileCard extends HTMLElement {
               </div>
               <div class="giro" id="giro" title="${T("Hangolás: húzd oldalra vagy görgess")}"><div class="kerek" id="kerek"></div><small>TUNING</small></div>
             </div>
-            <div class="gombsor">${gombok || `<div class="nincsado">${T("Még nincs adó a gombokon – a NET gombbal keress, és a „+ gombra” teszi ide.")}</div>`}</div>
+            <div class="gombsor adosor">${gombok}</div>
           </div>
-          <div class="jobb">
+          <div class="jobb rjobb">
+            <div class="rbal"><button class="power" id="power">POWER</button>${valto}</div>
             ${hangero}
-            ${valaszto}
-            <div class="kap">${valto}<div class="pwsor"><button class="power" id="power">POWER</button><button class="power netgomb" id="netgomb" title="${T("Internetes rádióadók (Radio Browser)")}">NET</button></div>${alvasGomb}</div>
+            <div class="otg rotg">${btIdx >= 0 ? og("bt", T("BT: ezen a készüléken szól (újra koppintva vissza a hangszóróra)"), "BT") : ""}${og("net", T("Internetes rádióadók (Radio Browser)"), "NET")}${og("sleep", T("Időzített kikapcsolás: 15 · 30 · 45 · 60 · 90 perc · ki"), "SLEEP")}</div>
+            ${forgo}
           </div>
           <div class="polc" id="netpolc" hidden></div>
           <div class="polc dalpolc" id="dalpolc_r" hidden></div>
@@ -1310,7 +1341,7 @@ class CantabileCard extends HTMLElement {
     sr.getElementById("power").addEventListener("click", () => this._bekapcs());
     sr.getElementById("kcim").addEventListener("click", (e) => { if (this._kazDal) { e.stopPropagation(); this._dalNyit("m"); } });
     sr.getElementById("cim").addEventListener("click", (e) => { if (this._radioDal) { e.stopPropagation(); this._dalNyit("r"); } });
-    sr.getElementById("netgomb").addEventListener("click", () => (this._net ? this._netZar() : this._netNyit()));
+    sr.querySelectorAll(".adoures").forEach((b) => b.addEventListener("click", () => this._netNyit()));
     this._giroKezel(sr.getElementById("giro"));
     sr.querySelectorAll(".sleep").forEach((b) => b.addEventListener("click", () => this._alvasLep()));
     sr.querySelectorAll(".fgomb").forEach((b) => b.addEventListener("click", () => this._funkGomb(b.dataset.f)));
@@ -1318,6 +1349,7 @@ class CantabileCard extends HTMLElement {
       const f = b.dataset.f;
       if (f === "sleep") return this._alvasLep();
       if (f === "bt") return btAllit(this._hsz !== this._btIdx);
+      if (f === "net") return this._net ? this._netZar() : this._netNyit();
       this._funkGomb(f);
     }));
     sr.querySelectorAll(".fhsz").forEach((b) => b.addEventListener("click", () => this._kimenetValt(Number(b.dataset.i))));
@@ -1539,7 +1571,7 @@ class CantabileCard extends HTMLElement {
     const bton = !!hsz && hsz.entity === HELYI;
     sr.querySelectorAll(".ogomb").forEach((b) => {
       const f = b.dataset.f, am = b.parentElement.querySelector(".amar");
-      if (f === "sleep") return;
+      if (f === "sleep" || f === "net") return;
       if (f === "bt") { b.classList.toggle("be", bton); return; }
       b.classList.toggle("tiltva", helyi || (f === "fade" && !fade.length));
       b.parentElement.classList.toggle("tiltva", helyi || (f === "fade" && !fade.length));
@@ -2251,12 +2283,14 @@ class CantabileCard extends HTMLElement {
     const ful = TAR.olvas("tablet-radio-netful");
     this._net = { ful: ["hu", "vilag", "mufaj"].includes(ful) ? ful : "hu", tag: null, keres: "" };
     this._netRajz();
+    this._frissit();
   }
 
   _netZar() {
     this._net = null;
     const p = this.shadowRoot?.getElementById("netpolc");
     if (p) { p.hidden = true; p.innerHTML = ""; }
+    this._frissit();
   }
 
   _netRajz() {
@@ -2945,6 +2979,7 @@ class CantabileCard extends HTMLElement {
     magno.classList.toggle("rejt", this._mod !== "magno");
     elo.classList.toggle("be", radioSzol);
     elo.classList.toggle("net", radioSzol && !!kulso);
+    sr.querySelectorAll('.ogomb[data-f="net"]').forEach((b) => b.classList.toggle("be", !!this._net || (radioSzol && !!kulso)));
     elo.classList.toggle("tilt", !elerheto);
     magno.classList.toggle("tilt", !elerheto);
     sr.getElementById("mutato").style.left = `${POZ(c.adok[mutat]?.frekvencia ?? 98)}%`;
