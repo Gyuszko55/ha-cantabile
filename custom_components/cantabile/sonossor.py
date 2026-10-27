@@ -19,12 +19,12 @@ import logging
 import re
 import time
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import CoreState, Event, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 
 _LOGGER = logging.getLogger(__name__)
@@ -176,15 +176,52 @@ class Folytato:
             _LOGGER.exception("Cantabile: %s sorának újraépítése nem sikerült", e)
 
 
-def _soco(hass: HomeAssistant, entity_id: str) -> Any:
+_SOCO_TAR: dict[str, Any] = {}       # Sonos-azonosító (RINCON_…) → SoCo, ha a hálózatról kellett megkeresni
+
+
+def _soco_halozatrol(uid: str) -> Any:
+    """Tartalék: a hangszóró megkeresése a hálózaton (SoCo-felfedezés), ha a HA Sonos-integrációjának belső tárolója
+    nem érhető el (más HA-verzióban más a szerkezete)."""
+    if uid in _SOCO_TAR:
+        return _SOCO_TAR[uid]
+    from soco import discovery  # noqa: PLC0415 – a Sonos-integráció függősége, csak ha kell
+
+    for z in discovery.discover(timeout=3) or ():
+        _SOCO_TAR[z.uid] = z
+    return _SOCO_TAR.get(uid)
+
+
+async def _soco(hass: HomeAssistant, entity_id: str) -> Any:
     ent = er.async_get(hass).async_get(entity_id)
     if not ent or ent.platform != "sonos":
         raise HomeAssistantError(f"{entity_id} nem Sonos-lejátszó")
-    for bej in hass.config_entries.async_loaded_entries("sonos"):
-        hangszoro = getattr(getattr(bej, "runtime_data", None), "discovered", {}).get(ent.unique_id)
-        if hangszoro is not None:
-            return hangszoro.soco
-    raise HomeAssistantError(f"{entity_id}: a Sonos-hangszóró nem érhető el")
+    # elsőként a HA Sonos-integrációjának saját példánya (gyors, és a HA is ezt használja)
+    try:
+        for bej in hass.config_entries.async_entries("sonos"):
+            hangszoro = getattr(getattr(bej, "runtime_data", None), "discovered", {}).get(ent.unique_id)
+            if hangszoro is not None:
+                return hangszoro.soco
+    except Exception:  # noqa: BLE001 – más HA-verzióban más a belső szerkezet
+        _LOGGER.debug("Cantabile: a Sonos-integráció belső tárolója nem olvasható", exc_info=True)
+    # második: az eszköz-nyilvántartás beállítási címéből (http://<ip>:1400/…) – nyilvános adat, minden HA-verzióban
+    eszk = dr.async_get(hass).async_get(ent.device_id) if ent.device_id else None
+    host = urlsplit(eszk.configuration_url or "").hostname if eszk else None
+    if host:
+        try:
+            from soco import SoCo  # noqa: PLC0415
+
+            z = await hass.async_add_executor_job(SoCo, host)
+            if await hass.async_add_executor_job(lambda: z.uid) == ent.unique_id:
+                return z
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Cantabile: %s nem érhető el SoCo-val", host, exc_info=True)
+    try:
+        z = await hass.async_add_executor_job(_soco_halozatrol, ent.unique_id)
+    except ImportError as err:
+        raise HomeAssistantError("a SoCo könyvtár nem érhető el") from err
+    if z is None:
+        raise HomeAssistantError(f"{entity_id}: a Sonos-hangszóró nem érhető el")
+    return z
 
 
 def uj_hely(c: int, honnan: int, hova: int) -> int:
@@ -231,7 +268,7 @@ def _athelyez_szinkron(soco: Any, honnan: int, hova: int) -> str:
 
 async def pozicio(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
     """A szóló szám helye és pozíciója közvetlenül a hangszórótól (a HA zenemappás számnál nem mindig jelenti)."""
-    soco = _soco(hass, entity_id)
+    soco = await _soco(hass, entity_id)
     info = await hass.async_add_executor_job(soco.get_current_track_info)
     ora, perc, mp = ([0, 0] + [int(x) for x in str(info.get("position") or "0:00:00").split(":")])[-3:]
     return {"position": ora * 3600 + perc * 60 + mp, "track": int(info.get("playlist_position") or 0) - 1}
@@ -241,6 +278,6 @@ async def athelyez(hass: HomeAssistant, entity_id: str, honnan: int, hova: int) 
     """A sor `honnan`. elemét (0-tól) a `hova`. helyre teszi (a többi elcsúszik); a szóló zene nem áll le."""
     if honnan == hova:
         return
-    soco = _soco(hass, entity_id)
+    soco = await _soco(hass, entity_id)
     eredmeny = await hass.async_add_executor_job(_athelyez_szinkron, soco, honnan, hova)
     _LOGGER.debug("Cantabile: %s sorában %d → %d (%s)", entity_id, honnan + 1, hova + 1, eredmeny)

@@ -43,12 +43,26 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
 
 Az előlapok feliratai mindig angolok, mint egy igazi 70-es évekbeli hifin; a beállítások, az üzenetek és a súgók a Home Assistant nyelvét követik: **magyar** vagy **angol**.
 
-## Feltételek
+## Feltételek és kompatibilitás
 
-- Home Assistant **2026.10** vagy újabb.
-- Legalább egy médialejátszó. **Sonosszal** a teljes élmény (sor, Deezer, kedvencek, áttűnés, csoport);
-  más lejátszón (WiiM, Chromecast…) a rádió és a zenemappa szól.
-- Elhagyható: zenemappa a Home Assistant média-forrásai között (pl. a `/media` alá csatolt NAS-megosztás).
+- Home Assistant **2025.1** vagy újabb (fejlesztve és teljesen kipróbálva 2026.10-en; az importok és az API-k 2025.1-en
+  ellenőrizve). A nem helyi zenetárak keresőjéhez újabb HA kell (a médiakereső 2026.10-ben megvan, 2025.1-ben még
+  nincs); a böngészés és minden más régebbin is megy.
+- Legalább egy médialejátszót indítani tudó `media_player`. Hogy mit kapsz, a lejátszón múlik:
+
+| Lejátszó (HA-integráció) | Rádió | Zenemappa | Hézagmentes | Sor fül / húzás | Multiroom | Deezer / Sonos-kedvencek |
+|---|---|---|---|---|---|---|
+| **Sonos** | ✔ | ✔ | ✔ (Sonos-sor) | ✔ | ✔ (csak Sonos) | ✔ |
+| **WiiM**, **LinkPlay** (Arylic, Audio Pro…), **DLNA-renderelők** | ✔ | ✔ | ✔ (DLNA következő szám) | ✔ | – | – |
+| **Chromecast / Google Cast**, **Music Assistant**, **Squeezebox**, más *play media*-képes | ✔ | ✔ (számonként) | – | ✔ | – | – |
+| **BT** (a készülék, amelyiken a kártya nyitva van) | ✔ | ✔ | közel hézagmentes | ✔ | – | – |
+
+- A lejátszás-indítás nélküli lejátszók (pl. csak távirányítható tévék, Spotify Connect entitások) nem használhatók,
+  nem is kerülnek a listába.
+- Elhagyható: zenemappa (a HA médiájában NAS-megosztás vagy helyi mappa, vagy más médiaforrás, pl. Jellyfin vagy
+  DLNA-médiaszerver – böngészhető, és ahol a HA-ban van médiakereső, kereshető is). A Plex a HA-ban nem médiaforrás, zenemappának nem jó.
+- Elhagyható: `ffmpeg` a gazdagépen a valódi VU-jelhez (a Home Assistant OS-ben és a konténerben benne van; nélküle a
+  mérők élethű utánzatot mutatnak).
 - A Deezer lejátszásához a Sonos appban be kell kötni a Deezert. A Deezer-kereséshez nem kell fiók.
 
 ## Telepítés
@@ -72,6 +86,38 @@ Másold a `custom_components/cantabile` mappát a `config/custom_components` map
 ### Hangvezérlés
 Az integráció beállítása után nyisd meg a beszélgetőügynök beállításait (pl. **Google Gemini → Beállítás**), és a
 *Home Assistant vezérlése* résznél az *Assist* mellett kapcsold be a **Cantabile**-t is.
+
+## Saját hangszórók és források hozzáadása
+
+- **Hangszórók**: a kártya ⚙ → *Hangszórók* → **+ Új hangszóró** → a lejátszó kiválasztása. Csak lejátszani tudó
+  lejátszók szerepelnek; a fajtát (Sonos / egyéb) magától beállítja. Hosszú névnél adj *rövid* nevet – az kerül a forgó
+  választóra. Két vagy több Sonosnál *Multiroom* állás is lesz (Sonos-csoport).
+- **Rádióadók**: ⚙ → keresés a Radio Browserben név szerint, vagy név és stream-cím kézzel. A frekvencia elhagyható
+  (csak a skálán való helyét adja). A rádión egy üres **+** helyre vagy a **NET** gombra koppintva több ezer adó közül
+  választhatsz, és gombra teheted.
+- **Saját zenemappa**: előbb vedd fel a mappát a HA médiájába (Beállítások → Rendszer → Tárhely → *Hálózati tárhely
+  hozzáadása* NAS-hoz, típusa *Média*), majd ⚙ → *Zenemappa*: a médiaforrás-útvonal, pl.
+  `media-source://media_source/local/Zene` (az oldalsáv **Média** menüjében látod). Elvárt felépítés: előadó / album /
+  számok. Jellyfin vagy DLNA-szerver zenetára is jó: a médiaforrás-útvonalát add meg.
+- **Streaming**: Sonoson a Sonos-kedvencek (listák, albumok) és a teljes Deezer-kínálat (a Sonos appban bekötött
+  Deezer-fiókkal). Ha nem használod, a ⚙-ben rejtsd el a DEEZER fület.
+- **Zene a telefonodról / gépedről**: TELEFON fül → *Zene választása*. BT-n közvetlenül szól, más hangszórón átmenetileg
+  feltöltődik (TEMP a kazettán, 24 óra múlva törlődik).
+- **Hang**: LLM-es beszélgetőügynök, a *Cantabile* eszköz bekapcsolva (lásd Hangvezérlés).
+- **Bemondások**: az integráció beállításai → bemondó eszközök (Assist-segédállomások, TTS-lejátszók) és a zene hangereje
+  bemondás alatt; amíg beszélnek, a Cantabile-hangszórókon a zene halkabban szól.
+
+## Hibaelhárítás
+
+| Mit látsz | Ok / teendő |
+|---|---|
+| „Custom element doesn't exist” | YAML-módú erőforrások: vedd fel a `/cantabile_static/cantabile-card.js` modult. |
+| A ⚙ *Mentés* nem sikerül | Rendszergazda és felületen szerkesztett vezérlőpult kell; YAML-vezérlőpultnál a YAML-t szerkeszd. |
+| Egy lejátszó nincs a listában / nem választható | Nincs lejátszás-indítás funkciója. |
+| A Deezer nem indul | A Sonos appban kösd be a Deezert, vagy rejtsd el a DEEZER fület. |
+| Egy adó Sonoson szól, BT-n nem | Próbáld a stream-cím http-s változatát; a BT-rádió az integráción át megy (`/api/cantabile/stream`). |
+| A VU-mérő csak „utánoz” | Nincs `ffmpeg` a gazdagépen, vagy titkosított a stream (Deezer). |
+| Üres a zenemappa | Ellenőrizd a ⚙-ben a médiaforrás-útvonalat, és hogy a mappa látszik-e a **Média** menüben. |
 
 ## A kártya beállításai (YAML)
 

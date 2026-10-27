@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.8.0 – unreleased
+
+Portability, part 2.
+
+- Gapless playback on every DLNA renderer (`dlna_dmr`), WiiM and LinkPlay (Arylic, Audio Pro…) player – the UPnP description comes from the DLNA integration or the device registry; players without next-track support fall back to track-by-track.
+- Ducking for announcements now covers every speaker on any Cantabile card (Cast, DLNA, Music Assistant…), across all dashboards; previously only Sonos / WiiM / LinkPlay, and only the first card's speakers.
+- Sonos queue reorder and position no longer depend only on the Sonos integration's internals: fallback via the device registry (the speaker's address) and SoCo network discovery.
+- Music folder can be any media source (Jellyfin, DLNA media server…): tracks are recognised by media class / content type, not only by file extension; search uses Home Assistant's media search where available, otherwise the tab asks you to browse.
+- Moving a tape whose source the card doesn't know (e.g. started from the player's own app) no longer stops the old speaker – it keeps playing with a message.
+- Voice tool works on older Home Assistant (no `llm.ToolResult` before late 2025).
+- Minimum Home Assistant lowered to 2025.1 (imports and APIs checked on 2025.1.4).
+- README: compatibility table, adding your own speakers and sources, troubleshooting.
+
 ## 1.7.0 – unreleased
 
 Portability – tested in a clean Home Assistant without Sonos, WiiM, Deezer, stations or music folder, in English.

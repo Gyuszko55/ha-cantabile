@@ -220,6 +220,8 @@ const EN = {
   "— üres —": "— empty —",
   "EJECT: kazetta választás": "EJECT: choose a tape",
   "Dalszöveg": "Lyrics",
+  "Ebben a zenetárban nincs keresés – böngéssz a mappák között (töröld a keresőt).": "This library can't be searched – browse the folders instead (clear the search box).",
+  "Ezt, ami most szól, nem tudom átvinni a(z) {h} hangszóróra – a(z) {r} szól tovább.": "I can't move what's playing now to {h} – it keeps playing on {r}.",
   "Üres hely – koppints, és a NET-katalógusból tegyél ide adót": "Empty slot – tap to put a station here from the NET catalogue",
   "70-es évekbeli ezüst rádió és tape deck: adógombok, NET-rádió, forgó kazetta, valódi VU-mérők, NAS és Deezer.": "1970s silver radio and tape deck: station buttons, internet radio, turning cassette, real VU meters, music folder and Deezer.",
   "A(z) {h} nem tud zenét fogadni a Cantabile-tól (nincs lejátszás-indítás funkciója) – válassz másik lejátszót a ⚙ beállításokban.": "{h} can't receive music from Cantabile (it has no play-media function) – pick another player in ⚙ settings.",
@@ -291,6 +293,11 @@ const KIJELZO_BE = { vu: "deprez", vfd: "fluor" }, KIJELZO_KI = { deprez: "vu", 
 const KARTYAK = ["custom:cantabile-card", "custom:tablet-radio"];
 const URLSZERU = (x) => /^[a-z0-9+.-]+:\/\//i.test(String(x || ""));
 const HANGFAJL = /\.(mp3|flac|m4a|aac|ogg|wav|wma)$/i;
+// lejátszható zeneszám-e egy médiaböngésző-elem: helyi fájlnál a kiterjesztés, más zenetárnál (Jellyfin, DLNA-médiaszerver…)
+// a médiaosztály vagy a tartalomtípus dönt
+const ZENE = (x) => !!x?.can_play && (HANGFAJL.test(x.media_content_id || "") || ["music", "track"].includes(x.media_class) || /^audio\//.test(x.media_content_type || ""));
+// helyi médiamappa-e (ott a kereső a teljes fájllistán dolgozik; máshol a HA médiakeresője)
+const HELYI_TAR = (id) => String(id || "").startsWith("media-source://media_source/");
 // fájlnév → olvasható cím: „401-abba_-_when_i_kissed_the_teacher.mp3?authSig=…” → „abba – when i kissed the teacher”
 const FAJLNEV = (u) => {
   let n = String(u || "").replace(/\?.*$/, "").split("/").pop();
@@ -1776,6 +1783,12 @@ class CantabileCard extends HTMLElement {
     // magnó: a szóló számsor és hely a lejátszótól (a leállítás előtt kell kiolvasni)
     let forras = null;
     if (ado === -1) forras = szol ? await this._szoloForras(regi, s) : fb?.forras || null;
+    if (szol && ado === -1 && !forras) {
+      // ismeretlen forrás (pl. a lejátszó saját appjából indított zene): nem visszük át, és nem is állítjuk le
+      this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso();
+      this._uzen(T("Ezt, ami most szól, nem tudom átvinni a(z) {h} hangszóróra – a(z) {r} szól tovább.", { h: uj.nev, r: regi.nev }));
+      return this._frissit();
+    }
     if (regi.mod === "url") this._szkriptLeallit(regi);
     await this._hiv("media_player", regi.mod === "sonos" ? "media_pause" : "media_stop", { entity_id: regi.entity });
     // Sonos célnál a csoport mindig a választás szerinti (egyedül, vagy mindkettő) – különben egy korábbi Multiroom-csoport
@@ -1864,8 +1877,12 @@ class CantabileCard extends HTMLElement {
       try {
         const v = await this._hass.callWS({ type: "call_service", domain: "sonos", service: "get_queue", service_data: { entity_id: vez }, return_response: true });
         const sor = (v?.response?.[vez] || []).map((x) => /\/media\/([^/?#]+)\/([^?#]+)/.exec(x.media_content_id || ""));
-        if (!sor.length || sor.some((m) => !m)) return null;
-        szamok = sor.map((m) => `media-source://media_source/${m[1]}/${decodeURIComponent(m[2])}`);
+        if (sor.length && !sor.some((m) => !m)) szamok = sor.map((m) => `media-source://media_source/${m[1]}/${decodeURIComponent(m[2])}`);
+        else {
+          // nem helyi zenetár (Jellyfin…): a kazetta emlékezetéből, ha a sor hossza egyezik
+          const kt = TAR.json("tablet-magno-kazetta");
+          if (kt?.forras === "nas" && kt.szamok?.length && kt.szamok.length === sor.length) szamok = kt.szamok; else return null;
+        }
       } catch (e) { return null; }
       kezdo = Math.max(0, (Number(a.queue_position) || 1) - 1);
       // a pozíció közvetlenül a hangszórótól (zenemappás számnál a HA nem mindig jelenti)
@@ -1890,7 +1907,7 @@ class CantabileCard extends HTMLElement {
   _kizarolagos(hsz, s) {
     if (!hsz || !SZOL(s) || this._adoIndex(hsz) !== -1) return null;
     const cid = String(s.attributes?.media_content_id || "");
-    if (hsz.mod === "sonos" && cid && !/\/media\//.test(cid) && !/^x-rincon-mp3radio:/i.test(cid)) return "sonos";
+    if (hsz.mod === "sonos" && /^(x-sonos-http|x-sonosapi|x-rincon-cpcontainer|x-sonos-spotify|x-sonosprog-http):/i.test(cid)) return "sonos";
     return null;
   }
 
@@ -2477,7 +2494,7 @@ class CantabileCard extends HTMLElement {
 
   async _albumSzamok(id) {
     const r = await this._bongesz(id);
-    return (r.children || []).filter((x) => x.can_play && HANGFAJL.test(x.media_content_id))
+    return (r.children || []).filter(ZENE)
       .sort((x, y) => x.title.localeCompare(y.title, NYELV(), { numeric: true })).slice(0, 80).map((x) => x.media_content_id);
   }
 
@@ -2716,7 +2733,28 @@ class CantabileCard extends HTMLElement {
     return l;
   }
 
+  // nem helyi zenetár (pl. Jellyfin, DLNA-médiaszerver): a HA médiakeresője; ahol nincs ilyen, böngészni kell
+  async _kulsoKeresRajz(lista) {
+    const pl = this._polc, kerdes = pl.keres || "";
+    lista.innerHTML = `<div class="puzenet">${T("Keresés…")}</div>`;
+    let r;
+    try { r = await this._hass.callWS({ type: "media_source/search_media", media_content_id: this._config.magno.nas, search_query: kerdes }); }
+    catch (e) { if (this._polc === pl) lista.innerHTML = `<div class="puzenet">${T("Ebben a zenetárban nincs keresés – böngéssz a mappák között (töröld a keresőt).")}</div>`; return; }
+    if (this._polc !== pl || pl.keres !== kerdes) return;
+    const elemek = (r?.result || []).slice(0, 80), mappak = elemek.filter((x) => x.can_expand), szamok = elemek.filter(ZENE);
+    const sor = (t, i, x) => `<div class="ktsor"><button data-${t}="${i}"><b>${ESC(x.title)}</b>${x.media_class ? `<small>${ESC(x.media_class)}</small>` : ""}</button></div>`;
+    lista.innerHTML = !mappak.length && !szamok.length ? `<div class="puzenet">${T("Nincs találat erre: „{q}”.", { q: ESC(kerdes) })}</div>`
+      : (mappak.length ? `<h5 class="kcsop">ALBUMS<span>${mappak.length}</span></h5><div class="ktalal">${mappak.map((x, i) => sor("m", i, x)).join("")}</div>` : "")
+      + (szamok.length ? `<h5 class="kcsop">TRACKS<span>${szamok.length}</span></h5><div class="ktalal">${szamok.map((x, i) => sor("s", i, x)).join("")}</div>` : "");
+    lista.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => { const x = mappak[Number(b.dataset.m)]; pl.ut = [{ id: x.media_content_id, cim: x.title }]; pl.keres = ""; this._polcRajz(); }));
+    lista.querySelectorAll("[data-s]").forEach((b) => b.addEventListener("click", () => {
+      const x = szamok[Number(b.dataset.s)]; this._polcZar();
+      this._betolt({ cim: x.title, alcim: "", forras: "nas", id: x.media_content_id, szamok: [x.media_content_id] });
+    }));
+  }
+
   async _keresRajz(lista) {
+    if (!HELYI_TAR(this._config.magno?.nas)) return this._kulsoKeresRajz(lista);
     const pl = this._polc, nas = this._config.magno?.nas; if (!pl || !nas) return;
     const kerdes = pl.keres || "", szavak = KERES_NORM(kerdes).split(/\s+/).filter(Boolean);
     lista.innerHTML = `<div class="puzenet">${T("Keresés…")}</div>`;
@@ -3088,7 +3126,7 @@ class CantabileCard extends HTMLElement {
       const r = await this._bongesz(hol.id);
       if (allapot !== kulcs(this._polc)) return;
       const mappak = (r.children || []).filter((x) => x.can_expand && !(!pl.ut.length && [this._telMappa(), this._config.magno?.hires].includes(x.title))).sort((x, y) => x.title.localeCompare(y.title, NYELV(), { numeric: true }));
-      const szamok = (r.children || []).filter((x) => x.can_play && HANGFAJL.test(x.media_content_id));
+      const szamok = (r.children || []).filter(ZENE);
       if (!pl.ut.length) {
         // előadók betűrenddel, bal oldalt betű-ugró
         const betu = (t) => { const b = t.normalize("NFD").replace(/[̀-ͯ]/g, "").charAt(0).toUpperCase(); return /[A-Z]/.test(b) ? b : "#"; };

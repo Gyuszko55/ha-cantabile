@@ -159,6 +159,40 @@ async def kartya(hass: HomeAssistant) -> dict[str, Any]:
     raise HibaUzenet("no_card")
 
 
+_hangszoro_tar: dict[str, Any] = {}
+
+
+async def osszes_hangszoro(hass: HomeAssistant) -> set[str]:
+    """Az összes vezérlőpult összes Cantabile kártyáján felvett hangszórók (5 percig tárolva)."""
+    if _hangszoro_tar and time.monotonic() - _hangszoro_tar["ido"] < 300:
+        return _hangszoro_tar["h"]
+    ll = hass.data.get("lovelace")
+    dashboards = getattr(ll, "dashboards", None)
+    if dashboards is None and isinstance(ll, dict):
+        dashboards = ll.get("dashboards")
+    talalt: set[str] = set()
+
+    def bejar(o: Any) -> None:
+        if isinstance(o, dict):
+            if o.get("type") in KARTYAK:
+                for h in o.get("speakers") or o.get("hangszorok") or []:
+                    if isinstance(h, dict) and h.get("entity"):
+                        talalt.add(h["entity"])
+            for v in o.values():
+                bejar(v)
+        elif isinstance(o, list):
+            for v in o:
+                bejar(v)
+
+    for d in (dashboards or {}).values():
+        try:
+            bejar(await d.async_load(False))
+        except Exception:  # noqa: BLE001 – üres vagy YAML-hibás vezérlőpult
+            continue
+    _hangszoro_tar.update(ido=time.monotonic(), h=talalt)
+    return talalt
+
+
 class HibaUzenet(Exception):
     """Kimondható hiba: üzenetkulcs (const._TEXT) és a behelyettesítendő értékek."""
 

@@ -46,7 +46,10 @@ class Lejatszas(llm.Tool):
 
     async def async_call(self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext) -> llm.ToolResult:
         valasz = await self._zene.play(dict(tool_input.tool_args))
-        return llm.ToolResult(data=valasz, error=not valasz.get("success"))
+        # a ToolResult a HA 2025 végén jelent meg; régebbi HA-n az eszköz egyszerű választ ad vissza
+        if hasattr(llm, "ToolResult"):
+            return llm.ToolResult(data=valasz, error=not valasz.get("success"))
+        return valasz
 
 
 class CantabileAPI(llm.API):

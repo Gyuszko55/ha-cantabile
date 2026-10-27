@@ -43,12 +43,26 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
 
 Front-panel labels are always English, like on a real 1970s hi-fi; settings, messages and tooltips follow your Home Assistant language: **Hungarian** or **English**.
 
-## Requirements
+## Requirements and compatibility
 
-- Home Assistant **2026.10** or newer.
-- At least one media player. **Sonos** gives the full experience (queue, Deezer, favourites, crossfade, grouping);
-  other players (WiiM, Chromecast…) play radio and the music folder.
-- Optional: a music folder in Home Assistant's media sources (e.g. a NAS share mounted under `/media`).
+- Home Assistant **2025.1** or newer (developed and fully tested on 2026.10; imports and APIs checked on 2025.1).
+  Searching non-local music libraries needs a newer HA (the media search API is in 2026.10, not yet in 2025.1);
+  browsing them and everything else works on older versions.
+- At least one `media_player` that can play media. What you get depends on the player:
+
+| Player (HA integration) | Radio | Music folder | Gapless | Queue tab / drag | Multiroom | Deezer / Sonos favourites |
+|---|---|---|---|---|---|---|
+| **Sonos** | ✔ | ✔ | ✔ (Sonos queue) | ✔ | ✔ (Sonos only) | ✔ |
+| **WiiM**, **LinkPlay** (Arylic, Audio Pro…), **DLNA renderers** | ✔ | ✔ | ✔ (DLNA next-track) | ✔ | – | – |
+| **Chromecast / Google Cast**, **Music Assistant**, **Squeezebox**, others with *play media* | ✔ | ✔ (track by track) | – | ✔ | – | – |
+| **BT** (the device the card is open on) | ✔ | ✔ | near-gapless | ✔ | – | – |
+
+- Players without a *play media* function (e.g. remote-only TVs, Spotify Connect entities) can't be used and aren't offered.
+- Optional: a music folder (a NAS share or local folder in Home Assistant's media, or another media source such as
+  Jellyfin or a DLNA media server – browsable, and searchable where Home Assistant has the media search API). Plex is not a media source in Home
+  Assistant and can't be used as the music folder.
+- Optional: `ffmpeg` on the host for the real VU signal (included in Home Assistant OS and the container image;
+  without it the meters show a realistic simulation).
 - Deezer playback needs the Deezer service added to your Sonos app. Searching Deezer needs no account.
 
 ## Installation
@@ -71,6 +85,38 @@ Copy `custom_components/cantabile` into your `config/custom_components` folder a
 ### Voice control
 After setting up the integration, open your conversation agent's options (e.g. **Google Gemini → Configure**) and turn on
 **Cantabile** next to *Assist* under *Control Home Assistant*.
+
+## Adding your own speakers and sources
+
+- **Speakers**: card ⚙ → *Speakers* → **+ New speaker** → pick the player. Only players that can play media are listed;
+  the type (Sonos / other) is set automatically. Give a *short* name if the full name is long – it goes on the rotary
+  selector. With two or more Sonos speakers a *Multiroom* position appears (Sonos grouping).
+- **Radio stations**: ⚙ → search the Radio Browser by name, or add a name and stream URL by hand. The frequency is
+  optional (it only places the station on the dial). On the radio, tap an empty **+** slot or **NET** to browse thousands
+  of stations and put one on a button.
+- **Your music folder**: add the folder to Home Assistant's media first (Settings → System → Storage → *Add network
+  storage* for a NAS, type *Media*), then ⚙ → *Music folder*: the media-source path, e.g.
+  `media-source://media_source/local/Music` (open **Media** in the sidebar to see the path). Expected layout:
+  artist / album / tracks. A Jellyfin or DLNA-server library works too: use its media-source path.
+- **Streaming**: on Sonos, your Sonos favourites (playlists, albums) and the whole Deezer catalogue (with the Deezer
+  account linked in the Sonos app). Hide the DEEZER tab in ⚙ if you don't use it.
+- **Music on your phone / computer**: PHONE tab → *Choose music*. On BT it plays directly; on any other speaker it is
+  uploaded temporarily (TEMP on the tape, deleted after 24 hours).
+- **Voice**: an LLM conversation agent with the *Cantabile* tool turned on (see Voice control).
+- **Announcements**: integration options → announcers (Assist satellites, TTS media players) and the music volume during
+  announcements; the music on the Cantabile speakers is turned down while they speak.
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| “Custom element doesn't exist” | Resources in YAML mode: add `/cantabile_static/cantabile-card.js` as a *module* resource. |
+| ⚙ *Save* fails | Needs an administrator and a UI-managed dashboard; with YAML dashboards edit the YAML. |
+| A player isn't in the list / can't be selected | It has no *play media* function. |
+| Deezer doesn't start | Link Deezer in the Sonos app, or hide the DEEZER tab. |
+| A station plays on Sonos but not on BT | Try the http variant of the stream URL; BT radio goes through the integration (`/api/cantabile/stream`). |
+| VU meters only “simulate” | No `ffmpeg` on the host, or an encrypted stream (Deezer). |
+| Music folder is empty | Check the media-source path in ⚙ and that the folder is visible under **Media**. |
 
 ## Card configuration (YAML)
 

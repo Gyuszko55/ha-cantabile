@@ -1,4 +1,4 @@
-"""Hézagmentes sorozatlejátszás WiiM-en (UPnP / DLNA).
+"""Hézagmentes sorozatlejátszás WiiM-en és minden DLNA-renderelőn (UPnP).
 
 A WiiM-nek nincs a HA felől elérhető lejátszási sora, ezért a kazetta számait mi adjuk egymás után. Ha ezt
 play_media-val tennénk, minden szám után szünet lenne (a következőt csak a vége után kezdi letölteni). A WiiM viszont
@@ -22,7 +22,7 @@ from async_upnp_client.profiles.dlna import DmrDevice, TransportState
 from homeassistant.components import media_source
 from homeassistant.components.media_player.browse_media import async_process_play_media_url
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,17 +31,32 @@ UPNP_PORT = 49152
 INDULASI_TURES = 20       # mp, amíg az első számnak el kell indulnia
 
 
-async def wiim_renderelo(hass: HomeAssistant, entity_id: str) -> DmrDevice | None:
-    """A WiiM DLNA-renderelője, ha a lejátszó a HA WiiM-integrációjához tartozik; különben None."""
+DLNA_PLATFORMOK = ("wiim", "linkplay", "dlna_dmr")
+
+
+def leiro_cim(hass: HomeAssistant, entity_id: str) -> str | None:
+    """A lejátszó UPnP-leírójának címe: DLNA-integrációnál a tárolt cím, WiiM / LinkPlay (Arylic, Audio Pro…)
+    eszköznél a gazdagép a beállításból vagy az eszköz-nyilvántartásból, a szokásos 49152-es porton."""
     ent = er.async_get(hass).async_get(entity_id)
-    if not ent or ent.platform != "wiim" or not ent.config_entry_id:
+    if not ent or ent.platform not in DLNA_PLATFORMOK:
         return None
-    bej = hass.config_entries.async_get_entry(ent.config_entry_id)
-    host = bej.data.get("host") if bej else None
-    if not host:
+    bej = hass.config_entries.async_get_entry(ent.config_entry_id) if ent.config_entry_id else None
+    adat = dict(bej.data) if bej else {}
+    if ent.platform == "dlna_dmr":
+        return adat.get("url")
+    host = adat.get("host")
+    if not host and ent.device_id and (eszk := dr.async_get(hass).async_get(ent.device_id)):
+        host = urlsplit(eszk.configuration_url or "").hostname
+    return f"http://{host}:{UPNP_PORT}/description.xml" if host else None
+
+
+async def wiim_renderelo(hass: HomeAssistant, entity_id: str) -> DmrDevice | None:
+    """A lejátszó DLNA-renderelője (WiiM, LinkPlay, DLNA), ha a következő szám előre megadható; különben None."""
+    cim = leiro_cim(hass, entity_id)
+    if not cim:
         return None
     keres = AiohttpSessionRequester(async_get_clientsession(hass), with_sleep=True, timeout=10)
-    eszkoz = await UpnpFactory(keres, non_strict=True).async_create_device(f"http://{host}:{UPNP_PORT}/description.xml")
+    eszkoz = await UpnpFactory(keres, non_strict=True).async_create_device(cim)
     dmr = DmrDevice(eszkoz, None)
     if not dmr.has_next_transport_uri:
         return None

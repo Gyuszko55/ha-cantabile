@@ -3,7 +3,9 @@
 Bemondó eszköz (a beállításokban választható):
   - Assist-segédállomás (assist_satellite, pl. Voice PE): hallgat, gondolkodik vagy válaszol;
   - médialejátszó (pl. Nest Hub): szöveget mond (a lejátszott tartalom a TTS-ből jön).
-A halkított lejátszók: minden szóló Sonos és WiiM (a csoport minden tagja külön, mert a hangerő hangszórónkénti). A
+A halkított lejátszók: minden szóló Sonos, WiiM és LinkPlay, valamint a Cantabile kártyán hangszóróként felvett minden
+lejátszó, bármilyen platformon (Cast, DLNA, Music Assistant…) – a csoport minden tagja külön, mert a hangerő
+hangszórónkénti. A
 hangerőt rövid áttűnéssel a beállított arányra viszi, a bemondás után 1,5 mp-cel visszaállítja – kivéve, ha közben
 valaki kézzel állított rajta. Biztonsági korlát: 2 perc után mindenképp visszaállít.
 """
@@ -93,7 +95,16 @@ class Halkito:
         # @callback: az időzítő az eseményhurokban hívja (egy sima lambdát a HA külön szálon futtatna)
         self.hass.async_create_task(self._visszaallit())
 
-    def _celok(self) -> list[str]:
+    async def _kartya_hangszorok(self) -> set[str]:
+        """A Cantabile kártyán felvett hangszórók (bármilyen platform)."""
+        from . import music  # noqa: PLC0415 – körkörös import elkerülése
+
+        try:
+            return await music.osszes_hangszoro(self.hass)
+        except Exception:  # noqa: BLE001 – olvashatatlan vezérlőpult
+            return set()
+
+    def _celok(self, kartyan: set[str] | None = None) -> list[str]:
         reg = er.async_get(self.hass)
         celok = []
         for s in self.hass.states.async_all("media_player"):
@@ -101,7 +112,7 @@ class Halkito:
                     or not int(s.attributes.get("supported_features") or 0) & HANGERO_ALLITAS:
                 continue
             ent = reg.async_get(s.entity_id)
-            if ent and ent.platform in PLATFORMOK:
+            if (ent and ent.platform in PLATFORMOK) or s.entity_id in (kartyan or ()):
                 celok.append(s.entity_id)
         return celok
 
@@ -118,7 +129,7 @@ class Halkito:
         async with self._zar:
             if self._eredeti or not self._aktiv():
                 return
-            for e in self._celok():
+            for e in self._celok(await self._kartya_hangszorok()):
                 v = float(self.hass.states.get(e).attributes.get("volume_level") or 0)
                 self._eredeti[e] = v
                 self._halk[e] = round(v * self.szint, 3)
