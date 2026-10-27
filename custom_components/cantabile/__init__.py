@@ -11,7 +11,7 @@ kártyához a szerveren kell:
   - „Cantabile” LLM API: az Assist (bármelyik LLM-es ügynök) ezzel indít zenét;
   - HA-újraindítás után a szóló Sonos zenemappás sorának cseréje friss linkekre a szám végén (sonossor.py),
     sor-átrendezés (`cantabile.move_queue_item`, `cantabile.set_order`), halkítás bemondáskor (halkitas.py),
-    hézagmentes WiiM-lejátszás (hezagmentes.py).
+    hézagmentes WiiM-lejátszás (hezagmentes.py), rádióadó-továbbító a BT kimenethez (tovabbito.py).
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
-from . import halkitas, library, llm, lyrics, music, sonossor, vu
+from . import halkitas, library, llm, lyrics, music, sonossor, tovabbito, vu
 from .const import (
     CARD_URL, CONF_DUCK_LEVEL, CONF_DUCK_SOURCES, CONF_LLM_API, DOMAIN, DUCK_LEVEL_DEFAULT, STATIC_URL, UID_NET, UID_ROUNDS,
     UID_SLEEP, VERSION,
@@ -57,6 +57,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.data[DOMAIN] = {"indult": indult}
     library.regisztral(hass)
     lyrics.regisztral(hass)
+    hass.http.register_view(tovabbito.Tovabbito(hass))
     vu.regisztral(hass)
 
     @websocket_api.websocket_command({vol.Required("type"): "cantabile/info"})

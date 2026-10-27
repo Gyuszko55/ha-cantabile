@@ -463,13 +463,16 @@ class CantabileCard extends HTMLElement {
     if (!SZOL(s)) return -1;
     const a = s.attributes, adok = this._config.adok;
     let i = a.media_content_id ? adok.findIndex((x) => x.url && CIM(a.media_content_id) === CIM(x.url)) : -1;
+    // a WiiM és a Cast az adó URL-jét a címmezőbe írja, a tartalom-azonosító üres
+    const cimUrl = URLSZERU(a.media_title) ? CIM(a.media_title) : "";
+    if (i < 0 && cimUrl) i = adok.findIndex((x) => x.url && CIM(x.url) === cimUrl);
     if (i < 0) {
       const szoveg = `${a.media_channel || ""} ${a.media_title || ""} ${a.source || ""}`.toLowerCase();
       i = adok.findIndex((x) => szoveg.includes(x.nev.toLowerCase()));
     }
-    if (i < 0 && a.media_content_id) {
-      const k = this._kulso(), c = CIM(a.media_content_id);
-      if (k?.url && (c === CIM(k.url) || c === k.alias)) return KULSO;
+    if (i < 0 && (a.media_content_id || cimUrl)) {
+      const k = this._kulso(), c = a.media_content_id ? CIM(a.media_content_id) : cimUrl;
+      if (k?.url && (c === CIM(k.url) || c === k.alias || (cimUrl && cimUrl === CIM(k.url)))) return KULSO;
     }
     return i;
   }
@@ -1332,7 +1335,12 @@ class CantabileCard extends HTMLElement {
       g.addEventListener("click", () => hszLep(1));
       g.addEventListener("wheel", (e) => { e.preventDefault(); e.stopPropagation(); hszLep((e.deltaY || e.deltaX) > 0 ? 1 : -1); }, { passive: false });
     });
-    const btAllit = (be) => { if (be) this._kimenetValt(this._btIdx); else if (this._hsz === this._btIdx) this._kimenetValt(this._hangUtolso()); };
+    const btAllit = (be) => {
+      if (be) return this._kimenetValt(this._btIdx);
+      if (this._hsz !== this._btIdx) return;
+      const vissza = this._kimenetek[this._btElotte] && this._btElotte !== this._btIdx ? this._btElotte : this._hangUtolso();
+      this._kimenetValt(vissza);
+    };
     sr.querySelectorAll(".btv").forEach((b) => b.addEventListener("click", () => btAllit(b.dataset.b === "1")));
     sr.querySelectorAll(".tbt .sin").forEach((g) => g.addEventListener("click", () => btAllit(this._hsz !== this._btIdx)));
     sr.querySelectorAll(".valto").forEach((b) => b.addEventListener("click", () => {
@@ -1424,7 +1432,10 @@ class CantabileCard extends HTMLElement {
       const l = this._helyiLista;
       if (l && l.i + 1 < l.szamok.length) k()._helyiSzam(l.i + 1); else { this._helyiId = null; k()._frissit(); }
     });
-    au.addEventListener("error", () => { if (this._helyiId && this._aktAudio === au) k()._uzen(T("A BT kimeneten ez nem játszható le (otthoni hálózaton próbáld, vagy válassz másik adót).")); });
+    au.addEventListener("error", () => {
+      // az integráción át nem ment (pl. régebbi integráció): még egyszer közvetlenül
+      if (this._aktAudio === au && this._helyiTovabb && this._helyiTovabb === this._helyiId) { const id = this._helyiTovabb; this._helyiTovabb = null; return k()._helyiIndit(id, true); }
+      if (this._helyiId && this._aktAudio === au) k()._uzen(T("A BT kimeneten ez nem játszható le (otthoni hálózaton próbáld, vagy válassz másik adót).")); });
     au.addEventListener("loadedmetadata", () => {
       // formátum a kijelző aranycsíkjára: kiterjesztés + átlagos bitráta a fájlméretből (telefonos fájlnál)
       const m = this._helyiMeret?.get(this._helyiId), ext = (m?.ext || FAJLNEV(this._helyiId || "").split(".").pop() || "").toUpperCase();
@@ -1447,7 +1458,13 @@ class CantabileCard extends HTMLElement {
     return [db[0], db[1], pk[0], pk[1]];
   }
 
-  async _helyiForras(id) {
+  async _helyiForras(id, kozvetlen = false) {
+    if (/^https?:\/\//i.test(id) && !kozvetlen && !this._nincsIntegracio && !String(id).startsWith(location.origin)) {
+      try {
+        const r = await this._hass.callWS({ type: "auth/sign_path", path: `/api/cantabile/stream?url=${encodeURIComponent(id)}`, expires: 86400 });
+        return r.path;
+      } catch (e) { return id; }
+    }
     if (!String(id).startsWith("media-source://")) return id;
     const r = await this._hass.callWS({ type: "media_source/resolve_media", media_content_id: id });
     return r.url;
@@ -1459,10 +1476,11 @@ class CantabileCard extends HTMLElement {
     await this._helyiIndit(l.szamok[l.i]);
   }
 
-  async _helyiIndit(id) {
-    const elore = this._helyiElore?.id === id && this._helyiElore.url ? this._helyiElore.url : null;
+  async _helyiIndit(id, kozvetlen = false) {
+    const elore = !kozvetlen && this._helyiElore?.id === id && this._helyiElore.url ? this._helyiElore.url : null;
     this._helyiElore = null;
-    const url = elore || await this._helyiForras(id);
+    const url = elore || await this._helyiForras(id, kozvetlen);
+    this._helyiTovabb = url.startsWith("/api/cantabile/stream") ? id : null;
     const elemzett = /^(blob:|\/)/.test(url) || url.startsWith(location.origin);
     const au = this._helyiAudio(elemzett), masik = elemzett ? this._audio : this._audioE;
     if (masik && masik !== au) { masik.pause(); masik.removeAttribute("src"); }
@@ -1677,9 +1695,17 @@ class CantabileCard extends HTMLElement {
   }
 
   // kimenetváltás: ami szól, átkerül az új kimenetre (mint egy igazi hangszóróválasztón); atvisz=false: csak választ
-  async _atvisz(regi, uj, s) {
-    const tagok = s.attributes?.group_members?.length ? s.attributes.group_members : [regi.entity];
-    if (regi.mod === "sonos" && uj.mod === "sonos") {
+  async _atviszHaKell(regi, uj) {
+    const s = this._allapot(regi);
+    const fb = this._atvitel && this._atvitel.hova === regi.entity && Date.now() - this._atvitel.ido < 15000 ? this._atvitel : null;
+    if (SZOL(s) || fb) return this._atvisz(regi, uj, s, fb);
+    return this._csoportAllit(uj);
+  }
+
+  async _atvisz(regi, uj, s, fb = null) {
+    const szol = SZOL(s);
+    const tagok = s?.attributes?.group_members?.length ? s.attributes.group_members : [regi.entity];
+    if (regi.mod === "sonos" && uj.mod === "sonos" && szol) {
       // Sonos → Sonos: az új hangszóró belép a szóló csoportba, a többiek kilépnek – a zene megszakítás nélkül megy tovább
       if (uj.tagok) return this._csoportAllit(uj);
       if (!tagok.includes(uj.entity)) await this._hiv("media_player", "join", { entity_id: tagok[0], group_members: [uj.entity] });
@@ -1689,12 +1715,18 @@ class CantabileCard extends HTMLElement {
     }
     // más rendszerek között (Sonos ↔ WiiM ↔ BT): a régi szünetel, az újon ugyanaz indul – rádión az adó, magnón a kazetta
     // az épp szóló számtól és ugyanattól a ponttól. A Sonost szüneteltetjük, nem állítjuk le: a STOP a sorát az elejére teszi.
-    const a = s.attributes || {}, ado = this._mod === "radio" ? this._adoIndex(regi) : -1, kaz = this._mod === "magno" ? this._kazetta() : null;
+    const a = s?.attributes || {};
+    // rádió: bármelyik nézetből átmegy (a rádióadónak nincs kizárólagos kimenete); ha a régi még csak töltött, az épp
+    // átvitt adó
+    let ado = szol ? this._adoIndex(regi) : -1;
+    if (ado === -1 && fb) ado = fb.ado;
+    const kaz = ado === -1 && this._mod === "magno" ? this._kazetta() : null;
     const kezdo = kaz ? Math.max(0, this._szamIndex(kaz, a)) : 0;
     const poz = a.media_position != null ? a.media_position + (a.media_position_updated_at ? (Date.now() - Date.parse(a.media_position_updated_at)) / 1000 : 0) : 0;
     if (regi.mod === "url") this._szkriptLeallit(regi);
     await this._hiv("media_player", regi.mod === "sonos" ? "media_pause" : "media_stop", { entity_id: regi.entity });
     if (uj.tagok) await this._csoportAllit(uj);
+    if (ado >= 0 || ado === KULSO) this._atvitel = { ado, hova: uj.entity, ido: Date.now() };
     if (ado >= 0) return this._hangol(ado);
     if (ado === KULSO) { const k = this._kulso(); if (k) return this._netIndit({ name: k.nev, url_resolved: k.url, favicon: k.ikon, countrycode: k.orszag, codec: k.kodek, bitrate: k.kbps }, false); }
     if (kaz && kaz.forras !== "tel") {
@@ -1709,8 +1741,14 @@ class CantabileCard extends HTMLElement {
     this._hangUtolso();
     const uj = this._kimenetek[this._hsz];
     TAR.ir("tablet-radio-hangszoro", uj.kulcs || uj.entity);
-    if (atvisz && regi && regi !== uj && regiAll?.state === "playing") this._atvisz(regi, uj, regiAll).catch((e) => this._uzen(T("Az átváltás nem sikerült: {h}", { h: e?.message || e })));
-    else this._csoportAllit(uj);
+    // a BT megjegyzi, kitől vette át a hangot – kikapcsoláskor annak adja vissza
+    if (uj.entity === HELYI && regi && regi.entity !== HELYI) this._btElotte = this._kimenetek.indexOf(regi);
+    // a választó csak irányít: ami szól (vagy épp átvitel alatt van), az megy át az új kimenetre. A váltások sorban
+    // futnak, így gyors kapcsolgatásnál sem indul el két helyen, és nem vész el az adó.
+    if (atvisz && regi && regi !== uj) {
+      this._valtSor = (this._valtSor || Promise.resolve()).then(() => this._atviszHaKell(regi, uj))
+        .catch((e) => this._uzen(T("Az átváltás nem sikerült: {h}", { h: e?.message || e })));
+    } else this._csoportAllit(uj);
     this._kezi = null; this._frissit(); this._jelFeliratkozas();
   }
 
@@ -1721,8 +1759,9 @@ class CantabileCard extends HTMLElement {
     TAR.ir("tablet-radio-ado", a.nev);
     this._szkriptLeallit();
     const cim = hsz.mod === "sonos" ? `x-rincon-mp3radio://${CIM(a.url)}` : a.url;
-    this._hiv("media_player", "play_media", { entity_id: hsz.entity, media_content_id: cim, media_content_type: "music" });
+    const p = this._hiv("media_player", "play_media", { entity_id: hsz.entity, media_content_id: cim, media_content_type: "music" });
     this._frissit();
+    return p;
   }
 
   // SIGNAL: a stream „térereje” – bitrátából (cantabile/signal, ffprobe), él-e az adás, pufferel-e; hangoláskor a legközelebbi adótól mért távolság

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.1 – unreleased
+
+- Radio routing: the speaker selector only redirects what is playing – the old output goes quiet and the same station starts on the new one, between any outputs (Sonos, WiiM, Cast, BT; Sonos ↔ Sonos still by grouping). Switches run one after another and remember the station being transferred, so fast switching no longer loses the station or leaves two outputs playing; a buffering output counts as playing.
+- Stations are also recognised from the URL in the title field (WiiM, Cast report it there), so the dial no longer says “TAPE DECK PLAYING” for a station on the WiiM.
+- BT returns the sound to the output it took it from.
+- BT plays web radio through the integration (`/api/cantabile/stream`, signed link only): http-only stations also play when Home Assistant is opened over https, and the VU meter shows the real signal on BT radio too. Falls back to the direct link if the integration does not answer.
+- Verified live: WiiM → Nappali → Háló → WiiM → Nest Hub → Nappali → Nest Hub → WiiM, fast switching (0.7 s), and Multiroom in and out.
+
 ## 1.3.0 – unreleased
 
 - Radio front panel redesigned. Station buttons are half as tall, with 12 places (6 × 2; 4 × 3 on phones): empty places show “+” and open the NET catalogue. Right column: POWER with the RADIO / TAPE switch below it top left, the volume knob, below it BT · NET · SLEEP as equal icon buttons (like the tape deck), and the SPEAKERS rotary selector instead of the slide switches. On phones: POWER and RADIO / TAPE left of the volume knob, NET · SLEEP · BT and the SPEAKERS selector to its right.
