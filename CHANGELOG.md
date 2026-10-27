@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0 – unreleased
+
+- Tape deck routing: the speaker selector only redirects. A playing music-folder tape moves to any output (Sonos ↔ Sonos by grouping, otherwise the old output stops and the new one continues from the same track and position), from any device: the track list comes from the player itself (Sonos queue, the integration's WiiM sequence via `cantabile/tracks`, the card's BT list), so order changes and shuffling are kept.
+- Deezer / Sonos-favourite tapes stay on Sonos: they move between the Sonos speakers (also Multiroom); selecting WiiM, Cast or BT snaps the selector back with a message and the music keeps playing. Music picked from the phone stays on BT the same way.
+- Paused tape: the selector only selects; the next PLAY on the new output continues from the same track and position.
+- The seek after a transfer waits until the new output really plays (Cast / WiiM load slower); the Sonos position is read from the speaker (`cantabile/sonos_position`), because Home Assistant does not always report it for music-folder tracks.
+- Sonos paused on a music-folder track is reported by Home Assistant as `idle`: the card now treats it as paused (PLAY resumes instead of restarting the tape, the display shows PAUSE).
+
 ## 1.3.2 – unreleased
 
 - Transferring to a single Sonos now splits a leftover Multiroom group first (awaited), so only the selected speaker plays – previously, after Multiroom, switching from WiiM / BT to Nappali also woke Háló.

@@ -229,6 +229,14 @@ def _athelyez_szinkron(soco: Any, honnan: int, hova: int) -> str:
     return f"folytatva: {uj + 1}. szám, {poz}"
 
 
+async def pozicio(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
+    """A szóló szám helye és pozíciója közvetlenül a hangszórótól (a HA zenemappás számnál nem mindig jelenti)."""
+    soco = _soco(hass, entity_id)
+    info = await hass.async_add_executor_job(soco.get_current_track_info)
+    ora, perc, mp = ([0, 0] + [int(x) for x in str(info.get("position") or "0:00:00").split(":")])[-3:]
+    return {"position": ora * 3600 + perc * 60 + mp, "track": int(info.get("playlist_position") or 0) - 1}
+
+
 async def athelyez(hass: HomeAssistant, entity_id: str, honnan: int, hova: int) -> None:
     """A sor `honnan`. elemét (0-tól) a `hova`. helyre teszi (a többi elcsúszik); a szóló zene nem áll le."""
     if honnan == hova:

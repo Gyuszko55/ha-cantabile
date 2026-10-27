@@ -155,6 +155,13 @@ class Cantabile:
         if (s := self._sorrend.get(entity_id)) is not None:
             s.atrendez(tracks)
 
+    def tracks_info(self, entity_id: str) -> dict[str, Any] | None:
+        """A szóló sorozat számai és a szóló szám helye (a kártya ebből viszi át a kazettát másik kimenetre)."""
+        s = self._sorrend.get(entity_id)
+        if s is None or not self.tracks_running(entity_id):
+            return None
+        return {"tracks": list(s.szamok), "current": s.szamok.index(s.utolso) if s.utolso in s.szamok else -1}
+
     def tracks_running(self, entity_id: str) -> bool:
         t = self._sorozat.get(entity_id)
         return bool(t and not t.done())

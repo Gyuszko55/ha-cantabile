@@ -217,6 +217,8 @@ const EN = {
   "— üres —": "— empty —",
   "EJECT: kazetta választás": "EJECT: choose a tape",
   "Dalszöveg": "Lyrics",
+  "A Deezer és a Sonos-kedvencek csak Sonoson szólnak – a(z) {h} szól tovább.": "Deezer and Sonos favourites only play on Sonos – {h} keeps playing.",
+  "A telefonról választott zene csak BT-n szól – ott marad.": "Music chosen from the phone only plays on BT – it stays there.",
   "Húzd az átrendezéshez": "Drag to reorder",
   "Újraindult a Home Assistant – a kazettát friss linkekkel töltöm újra.": "Home Assistant restarted – reloading the tape with fresh links.",
   "Nincs dalszöveg ehhez a dalhoz.": "No lyrics found for this song.",
@@ -235,6 +237,8 @@ const POZ = (f) => ((Math.min(MAX_F, Math.max(MIN_F, f)) - MIN_F) / (MAX_F - MIN
 const MHZ = (f) => f.toLocaleString(NYELV(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const CIM = (u) => String(u || "").replace(/^([a-z0-9+.-]+:\/\/)+/i, "").replace(/;$/, "");   // sémák és záró ; nélkül (a Sonos x-rincon-mp3radio://http://… alakban adja vissza)
 const SZOL = (s) => ["playing", "buffering"].includes(s?.state);
+// szünetel-e: a Sonos zenemappás számnál szünetben is „idle”-t jelent (nincs cím), de a sora és a helye megvan
+const SZUNETEL = (s) => s?.state === "paused" || (s?.state === "idle" && Number(s.attributes?.queue_size) > 0 && Number(s.attributes?.media_position) > 0);
 // a „BT” kimenet: a zene azon a készüléken szól, amelyiken a kártya nyitva van (telefon/tablet), így a hozzá párosított
 // Bluetooth fülhallgatóra vagy hangszóróra megy; a kártya saját <audio> lejátszóval játssza (Deezer-kazetta itt nem megy)
 const HELYI = "helyi:bt";
@@ -1503,6 +1507,7 @@ class CantabileCard extends HTMLElement {
     if (s === "media_pause") return au.pause();
     if (s === "media_play") return au.play().catch(() => {});
     if (s === "volume_set") { au.volume = Math.max(0, Math.min(1, adat.volume_level)); return; }
+    if (s === "media_seek") { try { au.currentTime = adat.seek_position; } catch (e) { /* még nem töltött be */ } return; }
     if (s === "media_next_track" || s === "media_previous_track") {
       if (this._helyiLista) return this._helyiSzam(this._helyiLista.i + (s === "media_next_track" ? 1 : -1));
       au.currentTime = 0; return;
@@ -1699,6 +1704,11 @@ class CantabileCard extends HTMLElement {
     const s = this._allapot(regi);
     const fb = this._atvitel && this._atvitel.hova === regi.entity && Date.now() - this._atvitel.ido < 15000 ? this._atvitel : null;
     if (SZOL(s) || fb) return this._atvisz(regi, uj, s, fb);
+    if (SZUNETEL(s)) {
+      // szünetelő kazetta: a választó csak választ; a következő PLAY az új kimeneten ugyanonnan folytatja
+      const f = await this._szoloForras(regi, s);
+      this._szunetAtvitel = f ? { ...f, hova: uj.entity } : null;
+    }
     return this._csoportAllit(uj);
   }
 
@@ -1720,9 +1730,9 @@ class CantabileCard extends HTMLElement {
     // átvitt adó
     let ado = szol ? this._adoIndex(regi) : -1;
     if (ado === -1 && fb) ado = fb.ado;
-    const kaz = ado === -1 && this._mod === "magno" ? this._kazetta() : null;
-    const kezdo = kaz ? Math.max(0, this._szamIndex(kaz, a)) : 0;
-    const poz = a.media_position != null ? a.media_position + (a.media_position_updated_at ? (Date.now() - Date.parse(a.media_position_updated_at)) / 1000 : 0) : 0;
+    // magnó: a szóló számsor és hely a lejátszótól (a leállítás előtt kell kiolvasni)
+    let forras = null;
+    if (ado === -1) forras = szol ? await this._szoloForras(regi, s) : fb?.forras || null;
     if (regi.mod === "url") this._szkriptLeallit(regi);
     await this._hiv("media_player", regi.mod === "sonos" ? "media_pause" : "media_stop", { entity_id: regi.entity });
     // Sonos célnál a csoport mindig a választás szerinti (egyedül, vagy mindkettő) – különben egy korábbi Multiroom-csoport
@@ -1731,14 +1741,77 @@ class CantabileCard extends HTMLElement {
     if (ado >= 0 || ado === KULSO) this._atvitel = { ado, hova: uj.entity, ido: Date.now() };
     if (ado >= 0) return this._hangol(ado);
     if (ado === KULSO) { const k = this._kulso(); if (k) return this._netIndit({ name: k.nev, url_resolved: k.url, favicon: k.ikon, countrycode: k.orszag, codec: k.kodek, bitrate: k.kbps }, false); }
-    if (kaz && kaz.forras !== "tel") {
-      await this._betolt(kaz, kezdo);
-      if (poz > 3 && kaz.forras !== "stream") setTimeout(() => this._hiv("media_player", "media_seek", { entity_id: uj.entity, seek_position: Math.round(poz) }).catch(() => {}), 2500);
+    if (forras) {
+      this._atvitel = { ado: -1, forras, hova: uj.entity, ido: Date.now() };
+      await this._kazettaFolytat(forras, uj);
     }
+  }
+
+  // a kazetta folytatása az új kimeneten: ugyanattól a számtól, ugyanonnan
+  async _kazettaFolytat(f, uj) {
+    await this._betolt(f.kaz, f.kezdo);
+    if (!(f.poz > 3)) return;
+    // a tekerés csak akkor hat, ha az új kimenet már ténylegesen játssza a számot (a Cast / WiiM lassabban tölt be)
+    for (let t = 0; t < 24 && this._allapot(uj)?.state !== "playing"; t++) await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 800));
+    this._hiv("media_player", "media_seek", { entity_id: uj.entity, seek_position: Math.round(f.poz) }).catch(() => {});
+  }
+
+  // a szóló (vagy szünetelő) kazetta számsora és helye, magától a lejátszótól: Sonosnál a sorából, WiiM-nél az integráció
+  // sorozatából, BT-n a kártya listájából. Csak zenemappás számsort ad (Deezer / kedvenc / telefonos zene: null).
+  async _szoloForras(hsz, s) {
+    const a = s?.attributes || {};
+    let poz = a.media_position != null ? a.media_position + (s.state === "playing" && a.media_position_updated_at ? (Date.now() - Date.parse(a.media_position_updated_at)) / 1000 : 0) : 0;
+    let szamok = null, kezdo = 0;
+    if (hsz.entity === HELYI) {
+      const l = this._helyiLista;
+      if (!l?.szamok?.length || l.tel) return null;
+      szamok = [...l.szamok]; kezdo = l.i; poz = this._aktAudio?.currentTime || 0;
+    } else if (hsz.mod === "sonos") {
+      const vez = a.group_members?.[0] || hsz.entity;
+      try {
+        const v = await this._hass.callWS({ type: "call_service", domain: "sonos", service: "get_queue", service_data: { entity_id: vez }, return_response: true });
+        const sor = (v?.response?.[vez] || []).map((x) => /\/media\/([^/?#]+)\/([^?#]+)/.exec(x.media_content_id || ""));
+        if (!sor.length || sor.some((m) => !m)) return null;
+        szamok = sor.map((m) => `media-source://media_source/${m[1]}/${decodeURIComponent(m[2])}`);
+      } catch (e) { return null; }
+      kezdo = Math.max(0, (Number(a.queue_position) || 1) - 1);
+      // a pozíció közvetlenül a hangszórótól (zenemappás számnál a HA nem mindig jelenti)
+      try { const ps = await this._hass.callWS({ type: "cantabile/sonos_position", entity_id: vez }); if (ps?.position >= 0) { poz = ps.position; if (ps.track >= 0) kezdo = ps.track; } } catch (e) { /* régebbi integráció */ }
+    } else {
+      try {
+        const t = await this._hass.callWS({ type: "cantabile/tracks", entity_id: hsz.entity });
+        if (t?.tracks?.length) { szamok = t.tracks; kezdo = Math.max(0, t.current); }
+      } catch (e) { /* régebbi integráció: a kártya emlékezete */ }
+      const k = TAR.json("tablet-magno-kazetta");
+      if (!szamok && k?.forras === "nas" && k.szamok?.length && k.entity === hsz.entity) { szamok = k.szamok; kezdo = Math.max(0, this._szamIndex(k, a)); }
+      if (!szamok) return null;
+    }
+    const k = TAR.json("tablet-magno-kazetta"), ugyanaz = k?.forras === "nas" && k.szamok?.length === szamok.length;
+    const kaz = { forras: "nas", szamok, cim: ugyanaz ? k.cim : a.media_album_name || FAJLNEV(szamok[0]), alcim: ugyanaz ? k.alcim : a.media_artist || "" };
+    if (ugyanaz && k.id) kaz.id = k.id;
+    return { kaz, kezdo: Math.min(kezdo, szamok.length - 1), poz };
+  }
+
+  // a szóló forrás csak ezen a fajta kimeneten szólhat: Deezer / Sonos-kedvenc a Sonoson, a telefon saját zenéje BT-n
+  _kizarolagos(hsz, s) {
+    if (!hsz || !SZOL(s) || this._adoIndex(hsz) !== -1) return null;
+    const cid = String(s.attributes?.media_content_id || "");
+    if (hsz.mod === "sonos" && cid && !/\/media\//.test(cid) && !/^x-rincon-mp3radio:/i.test(cid)) return "sonos";
+    if (hsz.entity === HELYI && this._helyiLista?.tel) return "bt";
+    return null;
   }
 
   _kimenetValt(i, atvisz = true) {
     const n = this._kimenetek.length, regi = this._hangszoro(), regiAll = this._allapot(regi);
+    const cel = this._kimenetek[((i % n) + n) % n], kiz = atvisz ? this._kizarolagos(regi, regiAll) : null;
+    if ((kiz === "sonos" && cel?.mod !== "sonos") || (kiz === "bt" && cel?.entity !== HELYI)) {
+      // a Deezer / Sonos-kedvenc csak Sonoson, a telefonos zene csak BT-n szól: a választó marad, a zene szól tovább
+      this._uzen(kiz === "sonos" ? T("A Deezer és a Sonos-kedvencek csak Sonoson szólnak – a(z) {h} szól tovább.", { h: regi.nev })
+        : T("A telefonról választott zene csak BT-n szól – ott marad."));
+      this._frissit();
+      return;
+    }
     this._hsz = ((i % n) + n) % n;
     this._hangUtolso();
     const uj = this._kimenetek[this._hsz];
@@ -2091,13 +2164,15 @@ class CantabileCard extends HTMLElement {
     const e = { entity_id: hsz.entity };
     if (k === "eject") return this._polcNyit();
     if (k === "stop") { this._szkriptLeallit(); return this._hiv("media_player", "media_stop", e); }
-    if (k === "pause") return this._hiv("media_player", s?.state === "paused" ? "media_play" : "media_pause", e);
+    if (k === "pause") return this._hiv("media_player", SZUNETEL(s) ? "media_play" : "media_pause", e);
     const sorHely = (Number(a.queue_position) || 1) - 1;
-    if ((k === "play" && s?.state === "paused") || k === "ff" || k === "rew") {
+    if ((k === "play" && SZUNETEL(s)) || k === "ff" || k === "rew") {
       if (await this._ujratoltElavult(hsz, k === "ff" ? sorHely + 1 : k === "rew" ? sorHely - 1 : sorHely)) return;
     }
     if (k === "play") {
-      if (s?.state === "paused") return this._hiv("media_player", "media_play", e);
+      if (SZUNETEL(s)) return this._hiv("media_player", "media_play", e);
+      const sz = this._szunetAtvitel;
+      if (sz && sz.hova === hsz.entity && !SZOL(s)) { this._szunetAtvitel = null; return this._kazettaFolytat(sz, hsz); }
       if (SZOL(s) && this._adoIndex(hsz) < 0) return;
       if (kaz) return this._betolt(kaz);
       return this._polcNyit();
@@ -2132,7 +2207,7 @@ class CantabileCard extends HTMLElement {
         if (!kaz.szamok?.length) { this._polc = { ful: "tel", ut: [] }; this._polcRajz(); return; }
         if (hsz.entity !== HELYI) { this._kimenetValt(this._kimenetek.findIndex((x) => x.entity === HELYI), false); this._uzen(T("A telefonról választott zene a BT kimeneten szól – átváltottam.")); }
         this._telKaz = kaz;
-        this._helyiLista = { szamok: kaz.szamok, i: 0 };
+        this._helyiLista = { szamok: kaz.szamok, i: 0, tel: true };
         await this._helyiSzam(0);
         TAR.ir("tablet-magno-kazetta", JSON.stringify({ cim: kaz.cim, alcim: kaz.alcim, forras: "tel", id: kaz.id, entity: HELYI }));
         return this._frissit();
@@ -3057,7 +3132,7 @@ class CantabileCard extends HTMLElement {
 
     // magnó
     const kaz = this._kazetta();
-    const szalagSzol = SZOL(s) && i === -1, szunet = s?.state === "paused" && i === -1;
+    const szalagSzol = SZOL(s) && i === -1, szunet = SZUNETEL(s) && i === -1;
     this._magnoAllapot = { szol: szalagSzol, szunet, s, kaz };
     magno.classList.toggle("fut", szalagSzol);
     magno.classList.toggle("szun", szunet);

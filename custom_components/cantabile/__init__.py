@@ -73,6 +73,27 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         connection.send_result(msg["id"], {"version": VERSION, "configured": bool(entries), "entities": ent, "started": indult})
 
     websocket_api.async_register_command(hass, ws_info)
+
+    @websocket_api.websocket_command({vol.Required("type"): "cantabile/tracks", vol.Required("entity_id"): str})
+    @callback
+    def ws_tracks(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        """A sor nélküli lejátszón (WiiM) futó sorozat számai és a szóló szám helye – a kimenetváltáshoz."""
+        entries = hass.config_entries.async_loaded_entries(DOMAIN)
+        info = entries[0].runtime_data.tracks_info(msg["entity_id"]) if entries else None
+        connection.send_result(msg["id"], info or {"tracks": None, "current": -1})
+
+    websocket_api.async_register_command(hass, ws_tracks)
+
+    @websocket_api.websocket_command({vol.Required("type"): "cantabile/sonos_position", vol.Required("entity_id"): str})
+    @websocket_api.async_response
+    async def ws_sonos_pozicio(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        """A Sonos szóló számának helye és pozíciója (kimenetváltáskor innen folytatja a kazettát)."""
+        try:
+            connection.send_result(msg["id"], await sonossor.pozicio(hass, msg["entity_id"]))
+        except Exception as err:  # noqa: BLE001
+            connection.send_error(msg["id"], "nem_elerheto", str(err))
+
+    websocket_api.async_register_command(hass, ws_sonos_pozicio)
     return True
 
 
