@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1 – unreleased
+
+- Queue reorder on Sonos keeps the music going: the playing track and its position are noted before the move; if the speaker stops or jumps afterwards, the playing track is resumed at its new place from the same position (verified live in all five move directions – in these the Sonos kept playing anyway, so the guard is a safety net).
+
 ## 1.2.0 – unreleased
 
 - **Automatic resume after a Home Assistant restart**: when a Sonos is playing a music-folder queue whose signed links were issued before the restart, the queue is rebuilt with fresh links at the end of the current track and playback continues with the next one (at the end of the tape with REPEAT 1 it is only rebuilt; a pause mid-track is left to the card's reload on the next button press).

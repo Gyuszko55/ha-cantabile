@@ -7,7 +7,8 @@
   folytatjuk. A sor végén (REPEAT 1) csak újraépítjük, nem indítjuk el. Szünetelő vagy álló Sonosnál nem nyúlunk
   hozzá – ott a kártya a következő gombnyomásnál tölt újra.
 - Áthelyezés: a HA Sonos-integrációjának nincs sor-átrendező szolgáltatása; a hangszóró SoCo-objektumán át az
-  AVTransport ReorderTracksInQueue műveletét hívjuk.
+  AVTransport ReorderTracksInQueue műveletét hívjuk. Ha ez a szóló zenét megállítja (a szóló számot érintő
+  átrendezésnél a Sonos ezt teszi), a szóló számot az új helyén, ugyanonnan folytatjuk.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import base64
 import json
 import logging
 import re
+import time
 from typing import Any
 from urllib.parse import unquote
 
@@ -185,15 +187,52 @@ def _soco(hass: HomeAssistant, entity_id: str) -> Any:
     raise HomeAssistantError(f"{entity_id}: a Sonos-hangszóró nem érhető el")
 
 
+def uj_hely(c: int, honnan: int, hova: int) -> int:
+    """A `c`. elem (0-tól) új helye, ha a `honnan`. elemet a `hova`. helyre tesszük."""
+    if c == honnan:
+        return hova
+    if honnan < c <= hova:
+        return c - 1
+    if hova <= c < honnan:
+        return c + 1
+    return c
+
+
+def _athelyez_szinkron(soco: Any, honnan: int, hova: int) -> str:
+    """Áthelyezés; ha közben szólt a zene, és a Sonos az átrendezéstől megállt vagy máshová ugrott (a szóló számot
+    érintő átrendezésnél ezt teszi), a szóló számot az új helyén, ugyanonnan folytatja."""
+    info = soco.get_current_track_info()
+    szolt = soco.get_current_transport_info().get("current_transport_state") == "PLAYING"
+    c = int(info.get("playlist_position") or 0) - 1
+    poz = info.get("position") or "0:00:00"
+    # ReorderTracksInQueue: 1-től számozott, InsertBefore az eredeti számozásban értendő
+    ele = hova + 1 if hova < honnan else hova + 2
+    soco.avTransport.ReorderTracksInQueue(
+        [("InstanceID", 0), ("StartingIndex", honnan + 1), ("NumberOfTracks", 1), ("InsertBefore", ele), ("UpdateID", 0)]
+    )
+    if not szolt or c < 0:
+        return "nem szólt"
+    uj = uj_hely(c, honnan, hova)
+    for _ in range(6):
+        time.sleep(0.5)
+        allapot = soco.get_current_transport_info().get("current_transport_state")
+        hely = int(soco.get_current_track_info().get("playlist_position") or 0) - 1
+        if allapot == "PLAYING" and hely == uj:
+            return "szól tovább"
+        if allapot != "TRANSITIONING":
+            break
+    soco.play_from_queue(uj)
+    try:
+        soco.seek(poz)
+    except Exception:  # noqa: BLE001
+        _LOGGER.debug("Cantabile: a tekerés nem sikerült (%s)", poz, exc_info=True)
+    return f"folytatva: {uj + 1}. szám, {poz}"
+
+
 async def athelyez(hass: HomeAssistant, entity_id: str, honnan: int, hova: int) -> None:
-    """A sor `honnan`. elemét (0-tól) a `hova`. helyre teszi (a többi elcsúszik)."""
+    """A sor `honnan`. elemét (0-tól) a `hova`. helyre teszi (a többi elcsúszik); a szóló zene nem áll le."""
     if honnan == hova:
         return
     soco = _soco(hass, entity_id)
-    # ReorderTracksInQueue: 1-től számozott, InsertBefore az eredeti számozásban értendő
-    ele = hova + 1 if hova < honnan else hova + 2
-    await hass.async_add_executor_job(
-        lambda: soco.avTransport.ReorderTracksInQueue(
-            [("InstanceID", 0), ("StartingIndex", honnan + 1), ("NumberOfTracks", 1), ("InsertBefore", ele), ("UpdateID", 0)]
-        )
-    )
+    eredmeny = await hass.async_add_executor_job(_athelyez_szinkron, soco, honnan, hova)
+    _LOGGER.debug("Cantabile: %s sorában %d → %d (%s)", entity_id, honnan + 1, hova + 1, eredmeny)
