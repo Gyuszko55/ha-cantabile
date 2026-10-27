@@ -23,6 +23,8 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
   - **NAS** – your music folder (artist → album), with instant search;
   - **PHONE** – play music from the phone/tablet on its own Bluetooth output, or upload it to the music folder;
   - **QUEUE** – the current queue: jump, remove, play next, add to end (Sonos).
+- **LYRICS**: tap the song title on the cassette (or the radio's now-playing line when it shows a song) – the lyrics
+  come from [LRCLIB](https://lrclib.net); on the tape the current line is highlighted and follows the music.
 
 **Speakers**
 - Sonos (full feature set, including grouping as “Both”), and any other media player that can play a URL
@@ -117,7 +119,8 @@ The earlier Hungarian keys (`hangszorok`, `adok`, `magno`, `nas` …) are accept
 - Sonos decodes at most 48 kHz: with `hires_folder` set, Cantabile plays the 48 kHz copy of a hi-res album on Sonos
   automatically, and the original on other players.
 - File names containing `..` can't be played by Home Assistant's media source; Cantabile skips them.
-- Radio Browser and Deezer are public directories; Cantabile sends them only your search terms.
+- Radio Browser, Deezer and LRCLIB are public directories; Cantabile sends them only your search terms (for lyrics:
+  artist, title, album and length of the song). Lyrics are cached in memory only.
 
 ## Licence
 

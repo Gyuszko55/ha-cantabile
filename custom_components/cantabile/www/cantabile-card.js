@@ -215,7 +215,13 @@ const EN = {
   "VU · UTÁNZAT": "VU · SIMULATED",
   "Lejátszási sor": "Queue",
   "— üres —": "— empty —",
-  "EJECT: kazetta választás": "EJECT: choose a tape"
+  "EJECT: kazetta választás": "EJECT: choose a tape",
+  "Dalszöveg": "Lyrics",
+  "Nincs dalszöveg ehhez a dalhoz.": "No lyrics found for this song.",
+  "Instrumentális szám – nincs szövege.": "Instrumental – no lyrics.",
+  "A dalszöveg-szolgáltatás nem érhető el.": "The lyrics service is unavailable.",
+  "A Cantabile integráció nincs telepítve.": "The Cantabile integration is not installed.",
+  "Rádióadásnál a pontos hely nem ismert, a szöveg kiemelés nélkül látszik.": "On radio the exact position is unknown, so no line is highlighted."
 };
 // felirat a Home Assistant nyelvén: a forrásszöveg magyar, angolul az EN szótárból ({x} = behelyettesítés)
 const MAGYAR = () => /^hu/i.test(document.documentElement.lang || navigator.language || "");
@@ -1092,6 +1098,18 @@ class CantabileCard extends HTMLElement {
         .polc { position: absolute; inset: 0; z-index: 5; border-radius: 6px; display: flex; flex-direction: column; padding: 10px 12px; gap: 8px;
           background: linear-gradient(180deg, #4a2c17, #2f1b0d); box-shadow: inset 0 0 0 1px #1d1008; }
         .polc[hidden] { display: none; }
+        .kcim.dalos, #cim.dalos { cursor: pointer; }
+        #cim.dalos { text-decoration: underline dotted rgba(185,217,255,.55); text-underline-offset: 3px; }
+        .dalpolc { z-index: 6; }
+        .dalpolc .dlista { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #8a6a45 transparent;
+          text-align: center; padding: 10px 4px; mask-image: linear-gradient(180deg, transparent, #000 14%, #000 86%, transparent); }
+        .dalpolc .dlista p { margin: 0; padding: 5px 0; color: #cdb995; font: 600 17px/1.35 "Helvetica Neue", Arial, sans-serif; transition: color .3s, transform .3s; }
+        .dalpolc .dlista.szinkron p { opacity: .55; }
+        .dalpolc .dlista.szinkron p.most { opacity: 1; color: #ffd892; transform: scale(1.06); text-shadow: 0 0 10px rgba(255,190,90,.35); }
+        .dalpolc .dlista p.szunet { font-size: 13px; letter-spacing: .3em; }
+        .dalpolc .duzenet { margin: auto; color: #cdb995; font: 500 14px/1.4 "Helvetica Neue", Arial, sans-serif; text-align: center; }
+        .dalpolc .dlab { display: flex; justify-content: space-between; gap: 10px; color: #8f7a58; font: 500 10.5px/1.2 Arial, sans-serif; letter-spacing: .04em; }
+        :host([keskeny]) .dalpolc .dlista p { font-size: 15px; }
         .pfej { display: flex; align-items: center; gap: 8px; }
         .pful { border: 0; border-radius: 3px; padding: 6px 12px; cursor: pointer; font: 700 11px/1 Arial, sans-serif; letter-spacing: .12em;
           color: #e9dcc4; background: rgba(255,255,255,.08); }
@@ -1240,6 +1258,7 @@ class CantabileCard extends HTMLElement {
             <div class="kap">${valto}<div class="pwsor"><button class="power" id="power">POWER</button><button class="power netgomb" id="netgomb" title="${T("Internetes rádióadók (Radio Browser)")}">NET</button></div>${alvasGomb}</div>
           </div>
           <div class="polc" id="netpolc" hidden></div>
+          <div class="polc dalpolc" id="dalpolc_r" hidden></div>
         </div>
         <div class="elo magno rejt${c.magno?.vu_kijelzo === "fluor" ? " vfdmod" : ""}" id="magno">
           <div class="bal">
@@ -1259,6 +1278,7 @@ class CantabileCard extends HTMLElement {
             <div class="kap">${valto}<div class="mfelirat"><span id="vufajta">TAPE · NORMAL</span><b id="mallapot"></b></div></div>
           </div>
           <div class="polc" id="polc" hidden></div>
+          <div class="polc dalpolc" id="dalpolc_m" hidden></div>
         </div>
         <div class="beall" id="beall" hidden></div>
       </ha-card>`;
@@ -1275,9 +1295,11 @@ class CantabileCard extends HTMLElement {
     sr.querySelectorAll(".btv").forEach((b) => b.addEventListener("click", () => btAllit(b.dataset.b === "1")));
     sr.querySelectorAll(".tbt .sin").forEach((g) => g.addEventListener("click", () => btAllit(this._hsz !== this._btIdx)));
     sr.querySelectorAll(".valto").forEach((b) => b.addEventListener("click", () => {
-      this._mod = this._mod === "magno" ? "radio" : "magno"; TAR.ir("tablet-radio-mod", this._mod); this._polcZar(); this._netZar(); this._frissit(); this._igazitKesobb();
+      this._mod = this._mod === "magno" ? "radio" : "magno"; TAR.ir("tablet-radio-mod", this._mod); this._polcZar(); this._netZar(); this._dalZar(); this._frissit(); this._igazitKesobb();
     }));
     sr.getElementById("power").addEventListener("click", () => this._bekapcs());
+    sr.getElementById("kcim").addEventListener("click", (e) => { if (this._kazDal) { e.stopPropagation(); this._dalNyit("m"); } });
+    sr.getElementById("cim").addEventListener("click", (e) => { if (this._radioDal) { e.stopPropagation(); this._dalNyit("r"); } });
     sr.getElementById("netgomb").addEventListener("click", () => (this._net ? this._netZar() : this._netNyit()));
     this._giroKezel(sr.getElementById("giro"));
     sr.querySelectorAll(".sleep").forEach((b) => b.addEventListener("click", () => this._alvasLep()));
@@ -2061,6 +2083,83 @@ class CantabileCard extends HTMLElement {
   // a STREAMING (Sonos-kedvencek) és a DEEZER fül csak Sonos hangszóró mellett van
   _vanSonos() { return this._config.hangszorok.some((x) => x.mod === "sonos"); }
 
+  // ---- dalszöveg (cantabile/lyrics → LRCLIB): a kazetta címére vagy a rádió dalt mutató műsorinfójára koppintva ----
+  // a magnón az időzített szövegből a lejátszással együtt kiemeli és középre görgeti az épp szóló sort; a rádiónál
+  // (élő adás, nincs pozíció) kiemelés nélkül; ha közben másik dal jön, magától újra lekéri
+  async _dalNyit(hol) {
+    const d = hol === "r" ? this._radioDal : this._kazDal;
+    if (!d) return;
+    this._polcZar(); if (this._net) this._netZar();
+    const kulcs = `${d.artist}|${d.title}`;
+    this._dal = { hol, d, kulcs, v: null, most: -1, kezi: 0 };
+    this._dalRajz(T("Betöltés…"));
+    if (!this._dalOra) this._dalOra = setInterval(() => this._dalLep(), 300);
+    let v;
+    try {
+      v = await this._hass.callWS({ type: "cantabile/lyrics", artist: d.artist, title: d.title, album: d.album || null, duration: d.duration || null });
+    } catch (e) {
+      if (this._dal?.kulcs === kulcs) this._dalRajz(T(e?.code === "unknown_command" ? "A Cantabile integráció nincs telepítve." : "A dalszöveg-szolgáltatás nem érhető el."));
+      return;
+    }
+    if (this._dal?.kulcs !== kulcs) return;
+    this._dal.v = v;
+    this._dalRajz(!v.found ? T("Nincs dalszöveg ehhez a dalhoz.") : v.instrumental && !v.synced && !v.plain ? T("Instrumentális szám – nincs szövege.") : null);
+  }
+
+  _dalRajz(uzenet) {
+    const dl = this._dal, sr = this.shadowRoot;
+    if (!dl) return;
+    const p = sr.getElementById(dl.hol === "r" ? "dalpolc_r" : "dalpolc_m");
+    p.hidden = false;
+    const v = dl.v, szinkron = dl.hol === "m" && v?.synced?.length;
+    let test = `<div class="duzenet">${ESC(uzenet || "")}</div>`;
+    if (!uzenet && v) {
+      const sorok = szinkron ? v.synced.map(([t, x]) => [t, x]) : (v.plain || (v.synced || []).map((x) => x[1]).join("\n")).split("\n").map((x) => [null, x]);
+      test = `<div class="dlista${szinkron ? " szinkron" : ""}">${sorok.map(([t, x]) => `<p${t != null ? ` data-t="${t}"` : ""}${x.trim() ? "" : ' class="szunet"'}>${x.trim() ? ESC(x) : "♪ ♪ ♪"}</p>`).join("")}</div>`;
+    }
+    p.innerHTML = `
+      <div class="pfej"><span class="pful akt">LYRICS</span><div class="put">${ESC(dl.d.artist)} – ${ESC(dl.d.title)}</div><button class="pzar" title="${T("Bezár")}">×</button></div>
+      ${test}
+      <div class="dlab"><span>${dl.hol === "r" && v?.found ? ESC(T("Rádióadásnál a pontos hely nem ismert, a szöveg kiemelés nélkül látszik.")) : ""}</span><span>lrclib.net</span></div>`;
+    p.querySelector(".pzar").addEventListener("click", () => this._dalZar());
+    const l = p.querySelector(".dlista");
+    if (l) ["wheel", "touchstart", "mousedown"].forEach((e) => l.addEventListener(e, () => { dl.kezi = Date.now(); }, { passive: true }));
+    // időzített szövegnél fent-lent fél doboznyi hely, hogy az első és az utolsó sor is középre görgethető legyen
+    if (l && szinkron) l.style.paddingBlock = `${Math.round(l.clientHeight * 0.42)}px`;
+    dl.most = -1;
+    this._dalLep();
+  }
+
+  _dalLep() {
+    const dl = this._dal;
+    if (!dl || !this.isConnected) return this._dalZar();
+    // másik dal szól → új szöveg (ha épp semmi, a régi marad)
+    const uj = dl.hol === "r" ? this._radioDal : this._kazDal;
+    if (uj && `${uj.artist}|${uj.title}` !== dl.kulcs) return this._dalNyit(dl.hol);
+    if (dl.hol !== "m" || !dl.v?.synced?.length) return;
+    const a = this._magnoAllapot?.s?.attributes || {}, fut = this._magnoAllapot?.szol;
+    if (a.media_position == null) return;
+    const poz = a.media_position + (fut && a.media_position_updated_at ? (Date.now() - Date.parse(a.media_position_updated_at)) / 1000 : 0);
+    const s = dl.v.synced;
+    let i = -1;
+    for (let k = 0; k < s.length && s[k][0] <= poz + 0.25; k++) i = k;
+    if (i === dl.most) return;
+    dl.most = i;
+    const l = this.shadowRoot.querySelector("#dalpolc_m .dlista");
+    if (!l) return;
+    l.querySelectorAll("p.most").forEach((x) => x.classList.remove("most"));
+    const el = i >= 0 ? l.children[i] : null;
+    if (!el) return;
+    el.classList.add("most");
+    if (Date.now() - dl.kezi > 4000) l.scrollTo({ top: el.offsetTop - l.clientHeight / 2 + el.clientHeight / 2, behavior: "smooth" });
+  }
+
+  _dalZar() {
+    this._dal = null;
+    if (this._dalOra) { clearInterval(this._dalOra); this._dalOra = null; }
+    this.shadowRoot?.querySelectorAll(".dalpolc").forEach((p) => { p.hidden = true; p.innerHTML = ""; });
+  }
+
   _polcZar() {
     this._polc = null;
     const p = this.shadowRoot.getElementById("polc");
@@ -2736,6 +2835,13 @@ class CantabileCard extends HTMLElement {
       : radioSzol ? `<b>${ESC(c.adok[i].nev)}</b> · ${MHZ(c.adok[i].frekvencia)} MHz`
       : SZOL(s) ? `<b>TAPE DECK PLAYING</b>` : "OFF";
     sr.getElementById("cim").textContent = radioSzol ? dal : "";
+    {
+      // dalszöveghez előadó + cím kell: külön mezőben, vagy „Előadó - Cím” alakban a címben
+      let ea = a.media_artist && a.media_artist !== adoNev && !URLSZERU(a.media_artist) ? a.media_artist : "", dc = a.media_title && a.media_title !== adoNev && !URLSZERU(a.media_title) ? a.media_title : "";
+      if (!ea && / [-–] /.test(dc)) [ea, dc] = dc.split(/ [-–] /, 2);
+      this._radioDal = radioSzol && ea && dc ? { artist: ea.trim(), title: dc.trim() } : null;
+      sr.getElementById("cim").classList.toggle("dalos", !!this._radioDal);
+    }
     if (!this._forgat && a.volume_level != null) { this._hangero = a.volume_level; this._rajzHangero(a.volume_level); }
     this._radioAll = { szol: radioSzol, keres: !!this._kezi, s, i };
     this._alvasRajz();
@@ -2841,6 +2947,8 @@ class CantabileCard extends HTMLElement {
     if (kcimHtml !== this._kcimHtml) { this._kcimHtml = kcimHtml; sr.getElementById("kcim").innerHTML = kcimHtml; this._gorgo(sr.getElementById("kcim")); }
     if (ksorHtml !== this._ksorHtml) { this._ksorHtml = ksorHtml; sr.getElementById("ksor").innerHTML = ksorHtml; this._gorgo(sr.querySelector("#ksor .kea")); }
     sr.getElementById("sav").setAttribute("fill", cim ? SZIN(kaz?.cim || album || cim) : "#888");
+    this._kazDal = megy && cim && eloado ? { artist: eloado, title: cim, album: album || null, duration: Number(a.media_duration) || null } : null;
+    sr.getElementById("kcim").classList.toggle("dalos", !!this._kazDal);
     // formátum-sor: MP3 | 44.1kHz | 16bit | 320kbps + SQ/HQ jel + szív (Sonos-kedvenc)
     let form = "";
     if (megy && f) {

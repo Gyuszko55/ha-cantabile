@@ -23,6 +23,8 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
   - **NAS** – a zenemappa (előadó → album), azonnali kereséssel;
   - **TELEFON** – a telefon/tablet zenéje a saját Bluetooth-kimenetén, vagy feltöltve a zenemappába;
   - **SOR** – a lejátszási sor: ugrás, törlés, következőnek, sor végére (Sonos).
+- **DALSZÖVEG**: koppints a kazettán a dal címére (vagy a rádió műsorinfójára, ha dalt mutat) – a szöveg az
+  [LRCLIB](https://lrclib.net)-ről jön; a magnón az épp szóló sor kiemelve, a zenével együtt halad.
 
 **Hangszórók**
 - Sonos (minden funkció, „Mindkettő” csoporttal együtt), és bármely más lejátszó, ami URL-t tud lejátszani
@@ -118,7 +120,8 @@ A korábbi magyar kulcsok (`hangszorok`, `adok`, `magno`, `nas` …) is működn
 - A Sonos legfeljebb 48 kHz-et dekódol: ha a `hires` mappa be van állítva, a hi-res album 48 kHz-es másolata szól
   a Sonoson, a többi lejátszón az eredeti.
 - A `..`-ot tartalmazó fájlneveket a Home Assistant média-forrása nem játssza le; a Cantabile kihagyja őket.
-- A Radio Browser és a Deezer nyilvános adatbázis; a Cantabile csak a keresett szöveget küldi nekik.
+- A Radio Browser, a Deezer és az LRCLIB nyilvános adatbázis; a Cantabile csak a keresett szöveget küldi nekik
+  (dalszövegnél: előadó, cím, album, hossz). A dalszövegeket csak a memóriában tárolja.
 
 ## Licenc
 

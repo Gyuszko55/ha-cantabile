@@ -3,7 +3,8 @@
 Az integráció hozza a `custom:cantabile-card` kártyát (és az írott márkanév betűkészletét), és mindazt, ami a
 kártyához a szerveren kell:
   - `cantabile/signal`: a valódi zenei jel szintje a VU-mérőkhöz (ffmpeg), `cantabile/nas_list`: a zenemappa
-    listája a keresőhöz, `cantabile/deezer`: a Deezer nyilvános API-ja, `cantabile/info`: az entitások nevei;
+    listája a keresőhöz, `cantabile/deezer`: a Deezer nyilvános API-ja, `cantabile/lyrics`: dalszöveg (LRCLIB),
+    `cantabile/info`: az entitások nevei;
   - ismétlésszám (number), alvásidőzítő és NET-adó (sensor) – a kártyák között közös állapot;
   - szolgáltatások: `cantabile.play` (zene / rádió név alapján), `cantabile.play_tracks` és `cantabile.stop_tracks`
     (sorozatlejátszás a sor nélküli lejátszókon), `cantabile.sleep_timer`;
@@ -28,7 +29,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
-from . import library, llm, music, vu
+from . import library, llm, lyrics, music, vu
 from .const import CARD_URL, CONF_LLM_API, DOMAIN, STATIC_URL, UID_NET, UID_ROUNDS, UID_SLEEP, VERSION
 from .runtime import Cantabile
 
@@ -46,6 +47,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         [StaticPathConfig(STATIC_URL, str(Path(__file__).parent / "www"), cache_headers=False)]
     )
     library.regisztral(hass)
+    lyrics.regisztral(hass)
     vu.regisztral(hass)
 
     @websocket_api.websocket_command({vol.Required("type"): "cantabile/info"})
