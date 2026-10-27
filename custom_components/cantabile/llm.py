@@ -14,7 +14,6 @@ import voluptuous as vol
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import llm
-from homeassistant.util.json import JsonObjectType
 
 from .const import DOMAIN, LLM_API_ID
 from .music import KIND, SOURCE, HibaUzenet, Zene, kartya
@@ -45,8 +44,9 @@ class Lejatszas(llm.Tool):
     def __init__(self, zene: Zene) -> None:
         self._zene = zene
 
-    async def async_call(self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext) -> JsonObjectType:
-        return await self._zene.play(dict(tool_input.tool_args))
+    async def async_call(self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext) -> llm.ToolResult:
+        valasz = await self._zene.play(dict(tool_input.tool_args))
+        return llm.ToolResult(data=valasz, error=not valasz.get("success"))
 
 
 class CantabileAPI(llm.API):
