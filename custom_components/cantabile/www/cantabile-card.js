@@ -1042,10 +1042,10 @@ class CantabileCard extends HTMLElement {
         .fgomb.tiltva { opacity: .4; pointer-events: none; }
         .magno .kap .fgomb { display: none; }
         :host([keskeny]) .mkij .mfunk { display: none; }
-        /* mobil: a hangerőgomb mellett az öt gomb, alattuk a forgó választó, legalul a RÁDIÓ / TAPE kapcsoló */
-        :host([keskeny]) .magno .mjobb { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "hang otg" "hang kim" "kap kap"; justify-content: stretch; align-items: center; gap: 4px 8px; row-gap: 6px; }
-        :host([keskeny]) .magno .mjobb > .kap { margin-top: 8px; }
-        :host([keskeny]) .magno .mjobb > .otg { display: grid; grid-area: otg; align-self: end; }
+        /* mobil: felül az öt gomb teljes szélességben, alattuk a hangerőgomb és a RÁDIÓ / TAPE kapcsoló, legalul a forgó választó – így a szélső hangszórónevek sem lógnak le */
+        :host([keskeny]) .magno .mjobb { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "otg otg" "hang kap" "kim kim"; justify-content: stretch; align-items: center; gap: 4px 8px; row-gap: 6px; }
+        :host([keskeny]) .magno .mjobb > .kap { margin-top: 0; }
+        :host([keskeny]) .magno .mjobb > .otg { display: grid; grid-area: otg; align-self: end; margin-top: 4px; }
         :host([keskeny]) .magno .mjobb > .forgo { justify-self: center; align-self: start; }
         :host([keskeny]) .magno .kap .fgomb { display: flex; min-width: 0; letter-spacing: .1em; }
         .magno .kap .sleep { display: none; }

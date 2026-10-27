@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.2 – 2026-10-27
+
+- Phone layout of the cassette deck: the five function buttons get their own full-width row, the volume knob sits next to the RADIO / TAPE switch, and the speaker selector has a row of its own – the outer speaker names no longer run off the card, and the button labels no longer overlap on narrow phones (360 px).
+
 ## 1.9.1 – 2026-10-27
 
 - Own icon and logo (cassette with two reels and an amber “on” lamp; light and dark logo), shipped in the integration's `brand/` folder – Home Assistant 2026.3+ shows them automatically in Settings → Devices & services.
