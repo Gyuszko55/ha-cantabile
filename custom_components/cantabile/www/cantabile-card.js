@@ -650,6 +650,9 @@ class CantabileCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; height: 100%; }
+        /* széles (tablet) elrendezés ott is, ahol a környezet nem ad magasságot (pl. szekciós nézet laptopon): a fali tablet
+           arányában; a lapozóban a kapott magasság érvényes, ott ez nem hat */
+        :host(:not([keskeny])) ha-card { aspect-ratio: 734 / 318; min-height: 300px; }
         ha-card { height: 100%; box-sizing: border-box; overflow: hidden; border-radius: 14px; padding: 0 12px; position: relative;
           background: linear-gradient(90deg, #4a2a17, #6b3d20 40%, #4a2a17) ; border: 0; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
         .elo { position: absolute; inset: 6px 12px; border-radius: 6px; display: grid; grid-template-columns: minmax(0, 1fr) 236px; gap: 12px; padding: 12px 14px;
