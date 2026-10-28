@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.12.9 – unreleased
+## 1.12.9 – 2026-10-28
 
 - When the chosen player is unavailable (e.g. a TV stick that went to sleep or dropped off the network), volume, next / previous and the other controls no longer do nothing silently: the card says “… is not available right now – turn it on or pick another speaker” (at most every 4 s while turning the knob), and the SPEAKERS selector shows unavailable positions dimmed, with a red lamp when one is selected.
 - Cantabile TV page (Cast): while music plays it asks the TV to keep the screen on (Screen Wake Lock), so Android TV sticks shouldn't drop into the screensaver and then sleep after ~15 minutes (the page only plays audio, which the TV doesn't count as watched video); the result is reported once in a `cantabile_tv_diag` event.
