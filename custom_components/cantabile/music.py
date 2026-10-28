@@ -648,7 +648,19 @@ class Zene:
                 return None
             _, tip, x = max(jeloltek, key=lambda j: j[0])
             if tip == "eloado":
-                top = (await streaming.spotify(self.hass, f"/artists/{x['id']}/top-tracks?market={orszag}")).get("tracks") or []
+                # fejlesztői módban a top-tracks nem érhető el (403): az előadóra szűrt számkeresés, ha kevés, az első albuma
+                szuro = quote('artist:"' + x["name"] + '"')
+                ker = await streaming.spotify(self.hass, f"/search?q={szuro}&type=track&limit=10&market={orszag}")
+                top, latott = [], set()
+                for t in (ker.get("tracks") or {}).get("items") or []:
+                    if t and any(a.get("id") == x["id"] for a in t.get("artists") or []) and t.get("name") not in latott:
+                        latott.add(t.get("name"))
+                        top.append(t)
+                if len(top) < 5:
+                    alb = (await streaming.spotify(self.hass, f"/artists/{x['id']}/albums?include_groups=album&limit=10&market={orszag}")).get("items") or []
+                    if alb:
+                        szamok = (await streaming.spotify(self.hass, f"/albums/{alb[0]['id']}/tracks?limit=50&market={orszag}")).get("items") or []
+                        top += [t for t in szamok if t and t.get("name") not in latott]
                 return {"tipus": "eloado", "ids": [f"https://open.spotify.com/track/{t['id']}" for t in top], "poz": None, "nev": x["name"]} if top else None
             if tip == "album":
                 return {"tipus": "album", "ids": [f"https://open.spotify.com/album/{x['id']}"], "poz": 0, "nev": x["name"]}

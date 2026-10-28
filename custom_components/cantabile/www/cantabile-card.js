@@ -226,6 +226,7 @@ const EN = {
   "Keresés: {s}…": "Search {s}…",
   "{s}: kísérleti funkció – élő fiókkal még nincs visszaigazolva.": "{s}: experimental – not yet confirmed with a live account.",
   "Írd be, mit keresel: előadó, album, szám vagy lista.": "Type what you're looking for: artist, album, track or playlist.",
+  "az előadó oldala nem tölthető be": "the artist page could not be loaded",
   "A(z) {s} most nem érhető el: {h}": "{s} is not available right now: {h}",
   "Nincs találat ({s}): „{q}”.": "No results on {s} for “{q}”.",
   "A(z) {s} Sonoson szól – válts Sonos hangszóróra.": "{s} plays on Sonos – switch to a Sonos speaker.",
@@ -2891,7 +2892,15 @@ class CantabileCard extends HTMLElement {
     try {
       // a Spotify saját könyvtára (HA Spotify-integráció): mappák a HA médiaböngészőjéből
       if (hely?.konyvtar || (!hely && KERES_NORM(kerdes).length < 2 && connect)) {
-        const r = await this._hass.callWS({ type: "media_player/browse_media", entity_id: this._stream.spotify_entity, ...(hely?.konyvtar ? { media_content_id: hely.id, media_content_type: hely.mtype } : {}) });
+        let r;
+        try {
+          r = await this._hass.callWS({ type: "media_player/browse_media", entity_id: this._stream.spotify_entity, ...(hely?.konyvtar ? { media_content_id: hely.id, media_content_type: hely.mtype } : {}) });
+        } catch (err) {
+          // a HA Spotify-lejátszója csak akkor böngészhető, ha épp szól rajta valami: üres keresőnél ilyenkor a keresés a teendő
+          if (hely || err?.code !== "not_supported") throw err;
+          if (friss()) lista.innerHTML = figy + `<div class="puzenet">${T("Írd be, mit keresel: előadó, album, szám vagy lista.")}</div>`;
+          return;
+        }
         if (!friss()) return;
         const elemek = r.children || [], mappak = elemek.filter((x) => x.can_expand && !x.can_play), jatszhato = elemek.filter((x) => x.can_play);
         lista.innerHTML = figy + (mappak.length ? `<div class="eloadok">${mappak.map((x, i) => `<button data-k="${i}">${ESC(x.title)}</button>`).join("")}</div>` : "")
@@ -2909,10 +2918,14 @@ class CantabileCard extends HTMLElement {
         // előadó-oldal: népszerű számai egy kazettán (Spotify), alatta az albumai
         const lap = [];
         if (szolg === "spotify") {
-          const [top, alb] = await Promise.all([api(`/artists/${hely.id}/top-tracks?market=${orszag}`), api(`/artists/${hely.id}/albums?include_groups=album,single,compilation&limit=50&market=${orszag}`)]);
+          // fejlesztői módban a top-tracks nem érhető el (403), és legfeljebb 10 elem kérhető egyszerre: a népszerű számok
+          // egy előadóra szűrt keresésből jönnek, az albumok 10-esével lapozva; egy hibás rész nem viszi el a többit
+          const [ker, ...albLap] = await Promise.all([api(`/search?q=${encodeURIComponent(`artist:"${hely.cim}"`)}&type=track&limit=10&market=${orszag}`), ...[0, 10, 20].map((o) => api(`/artists/${hely.id}/albums?include_groups=album,single,compilation&limit=10&offset=${o}&market=${orszag}`))].map((p) => p.catch(() => null)));
           if (!friss()) return;
-          if (top.tracks?.length) lap.push({ cim: T("{e} – népszerű számok", { e: hely.cim }), alcim: T("{n} szám", { n: top.tracks.length }), forras: "stream", tipus: "spotify", id: link("track", top.tracks[0].id), szamok: top.tracks.map((t) => link("track", t.id)), uri: `spotify:artist:${hely.id}`, mtype: "artist", kep: top.tracks[0].album?.images?.[1]?.url || null });
-          for (const x of alb.items || []) lap.push(kaz(x.name, `${x.album_type || "album"} · ${String(x.release_date || "").slice(0, 4)}`, "album", x.id, x.images?.[1]?.url || x.images?.[0]?.url));
+          const latott = new Set(), top = (ker?.tracks?.items || []).filter((t) => t && (t.artists || []).some((a) => a.id === hely.id) && !latott.has(t.name) && latott.add(t.name));
+          if (top.length) lap.push({ cim: T("{e} – népszerű számok", { e: hely.cim }), alcim: T("{n} szám", { n: top.length }), forras: "stream", tipus: "spotify", id: link("track", top[0].id), szamok: top.map((t) => link("track", t.id)), uri: `spotify:artist:${hely.id}`, mtype: "artist", kep: top[0].album?.images?.[1]?.url || null });
+          for (const x of albLap.flatMap((a) => a?.items || [])) lap.push(kaz(x.name, `${x.album_type || "album"} · ${String(x.release_date || "").slice(0, 4)}`, "album", x.id, x.images?.[1]?.url || x.images?.[0]?.url));
+          if (!lap.length && !ker && !albLap.some(Boolean)) throw new Error(T("az előadó oldala nem tölthető be"));
         } else {
           const alb = await api(`/artists/${hely.id}/relationships/albums?countryCode=${orszag}&include=albums`);
           if (!friss()) return;
@@ -2924,7 +2937,7 @@ class CantabileCard extends HTMLElement {
       if (KERES_NORM(kerdes).length < 2) { lista.innerHTML = figy + `<div class="puzenet">${T("Írd be, mit keresel: előadó, album, szám vagy lista.")}</div>`; return; }
       let eloadok = [], albumok = [], szamok = [], listak = [];
       if (szolg === "spotify") {
-        const r = await api(`/search?q=${encodeURIComponent(kerdes.trim())}&type=artist,album,track,playlist&limit=15&market=${orszag}`);
+        const r = await api(`/search?q=${encodeURIComponent(kerdes.trim())}&type=artist,album,track,playlist&limit=10&market=${orszag}`);
         if (!friss()) return;
         eloadok = (r.artists?.items || []).filter(Boolean).sort((x, y) => (y.popularity || 0) - (x.popularity || 0)).map((x) => ({ id: x.id, nev: x.name }));
         albumok = (r.albums?.items || []).filter(Boolean).map((x) => kaz(x.name, (x.artists || []).map((a) => a.name).join(", "), "album", x.id, x.images?.[1]?.url || x.images?.[0]?.url));

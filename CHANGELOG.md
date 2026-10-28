@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.4 – 2026-10-28
+
+- Spotify, adapted to the stricter limits of Spotify developer apps (first test with a live Premium account):
+  - Search asks for 10 results per type (more is refused with error 400).
+  - Artist page: the "popular tracks" cassette comes from a search filtered to the artist (the top-tracks call is no longer available, 403), albums load 10 at a time (up to 30); one failing part no longer blanks the whole page.
+  - Voice: "play <artist> from Spotify" uses the same filtered search, topped up with the artist's first album.
+  - With an empty search field and nothing playing on Spotify (the Spotify player can then not be browsed), the tab asks what to search for instead of showing an error.
+
 ## 1.9.3 – 2026-10-27
 
 - When a station starts on the selected speaker while the card shows the cassette deck (by voice, from another card or the speaker's own app), the card switches to the radio by itself. Flipping back to TAPE by hand is respected while the same station plays; changing speakers never flips the view.
