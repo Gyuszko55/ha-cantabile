@@ -145,7 +145,11 @@ class TvKozpont:
         if not lj.dlna and st.attributes.get("app_name") == "Home Assistant Lovelace":
             # a TV-n még a HA fut, de nincs bejelentkezett TV-oldal (pl. HA-újraindítás után a régi munkamenet nem kapcsolódott
             # vissza): előbb bezárjuk, különben a Cast-vevő nem tölti be újra az oldalt
-            await self.hass.services.async_call("media_player", "turn_off", {"entity_id": lj.cast}, blocking=True)
+            try:
+                await self.hass.services.async_call("media_player", "turn_off", {"entity_id": lj.cast}, blocking=True)
+            except HomeAssistantError as err:
+                # pl. ébredő TV-bot: „Failed to execute quit app” – az oldal kiküldése ettől még sikerülhet
+                _LOGGER.debug("Cantabile TV: a régi oldal bezárása nem sikerült (%s): %s", lj.cast, err)
             await asyncio.sleep(3)
         await self.hass.services.async_call("cast", "show_lovelace_view", {
             "entity_id": lj.cast, "dashboard_path": lj.dashboard, "view_path": lj.view}, blocking=True)
