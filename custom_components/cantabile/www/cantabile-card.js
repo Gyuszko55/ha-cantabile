@@ -130,6 +130,7 @@ const EN = {
   "Legalább egy hangszóró kell.": "At least one speaker is required.",
   "nem találom a kártyát ezen a vezérlőpulton": "the card was not found on this dashboard",
   "Áttekintés": "Overview",
+  "A(z) {h} most nem érhető el – kapcsold be, vagy válassz másik hangszórót.": "{h} is not available right now – turn it on or pick another speaker.",
   "Ez a lejátszó nem tud keverni.": "This player can't shuffle.",
   "Beállítások elmentve: {n}.": "Settings saved: {n}.",
   "Nem sikerült: {h}.": "Failed: {h}.",
@@ -560,6 +561,14 @@ class CantabileCard extends HTMLElement {
 
   // a telefon / HA-alkalmazás szövegnagyítása (Android WebView textZoom; a text-size-adjust nem hat rá): egy 100 px-es betű
   // és egy 100 px-es doboz aránya adja; a kártya betűméretei ennyivel kisebbek (--bk), így a kép a tervezett marad
+  // „A(z) Háló TV most nem érhető el” – hangerő-tekerésnél ne ismétlődjön folyton (4 mp-enként legfeljebb egyszer)
+  _nemElerheto(e) {
+    if (Date.now() - (this._nemElIdo || 0) < 4000) return;
+    this._nemElIdo = Date.now();
+    const h = (this._kimenetek || []).find((x) => x.entity === e);
+    this._uzen(T("A(z) {h} most nem érhető el – kapcsold be, vagy válassz másik hangszórót.", { h: h ? KN(h) : this._hass.states[e]?.attributes?.friendly_name || e }));
+  }
+
   _betuKorr() {
     const sr = this.shadowRoot; if (!sr) return;
     const p = document.createElement("div");
@@ -1159,6 +1168,8 @@ class CantabileCard extends HTMLElement {
         .valaszto .flamp { position: absolute; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; pointer-events: none;
           background: #9a9fa6; box-shadow: inset 0 1px 1px rgba(0,0,0,.4); }
         .valaszto .flamp.akt { background: #ffb020; box-shadow: 0 0 5px #ffb020; }
+        .valaszto .fhsz.nincs .fn, .hszv.nincs { opacity: .45; }
+        .valaszto .flamp.nincs.akt { background: #e0452f; box-shadow: 0 0 5px #e0452f; }
         .magno .mjobb > .forgo .valaszto { zoom: .92; }
         :host([keskeny]) .magno .mjobb > .forgo .valaszto { zoom: .84; }
         .magno .mjobb .mfelirat { max-width: 66px; font-size: calc(7.5px * var(--bk, 1)); letter-spacing: .04em; }
@@ -1669,6 +1680,11 @@ class CantabileCard extends HTMLElement {
   _allapot(h) { return h?.entity === HELYI ? this._helyiAllapot() : this._hass?.states[h?.entity]; }
   _hiv(d, s, adat) {
     if (adat?.entity_id === HELYI || adat?.variables?.entity_id === HELYI) return this._helyi(d, s, adat);
+    // elérhetetlen lejátszó (pl. kikapcsolt / alvó TV-bot): a parancs úgysem menne át – a kártya szól, nem hallgat
+    if ((d === "media_player" || d === "cantabile") && adat?.entity_id) {
+      const ids = [].concat(adat.entity_id);
+      if (ids.every((e) => this._hass.states[e]?.state === "unavailable")) { this._nemElerheto(ids[0]); return Promise.resolve(); }
+    }
     // amit a lejátszó nem tud (pl. egyes DLNA- vagy Cast-vevők), azt nem hívjuk – különben csendben hibát dobna
     if (d === "media_player" && KEPESSEG[s] && adat?.entity_id) {
       const ids = [].concat(adat.entity_id).filter((e) => { const f = this._hass.states[e]?.attributes?.supported_features; return f == null || (f & KEPESSEG[s]); });
@@ -3810,6 +3826,9 @@ class CantabileCard extends HTMLElement {
     const hu = this._hangUtolso(), L = this._hszIdx, bton = this._hsz === this._btIdx;
     sr.querySelectorAll(".hszv").forEach((b) => b.classList.toggle("akt", Number(b.dataset.i) === hu));
     sr.querySelectorAll(".fhsz, .flamp").forEach((b) => b.classList.toggle("akt", Number(b.dataset.i) === hu));
+    // az elérhetetlen lejátszó állása halvány, kiválasztva piros lámpával
+    const nincs = (i) => this._hass?.states[this._kimenetek[i]?.entity]?.state === "unavailable";
+    sr.querySelectorAll(".fhsz, .flamp, .hszv").forEach((b) => b.classList.toggle("nincs", b.dataset.i != null && nincs(Number(b.dataset.i))));
     sr.querySelectorAll(".forgo").forEach((x) => x.classList.toggle("bton", bton));
     sr.querySelectorAll(".forgo .vsapka").forEach((x) => { x.style.transform = `rotate(${this._forgoSzog(hu)}deg)`; });
     sr.querySelectorAll(".thsz .tfog").forEach((x) => x.style.setProperty("--p", L.length > 1 ? L.indexOf(hu) / (L.length - 1) : 0));

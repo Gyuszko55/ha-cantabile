@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.12.9 – unreleased
+
+- When the chosen player is unavailable (e.g. a TV stick that went to sleep or dropped off the network), volume, next / previous and the other controls no longer do nothing silently: the card says “… is not available right now – turn it on or pick another speaker” (at most every 4 s while turning the knob), and the SPEAKERS selector shows unavailable positions dimmed, with a red lamp when one is selected.
+
 ## 1.12.8 – 2026-10-28
 
 - Manifest: `network` listed under `after_dependencies` (the stream relay reads Home Assistant's own networks); 1.12.7 failed the hassfest check because of it. No functional change.
