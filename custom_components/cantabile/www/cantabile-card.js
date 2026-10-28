@@ -538,7 +538,7 @@ class CantabileCard extends HTMLElement {
     if (!this._meret && "ResizeObserver" in window) {
       this._meret = new ResizeObserver((e) => {
         const sz = e[0]?.contentRect.width;
-        if (sz) this.toggleAttribute("keskeny", sz < 600);
+        if (sz) { this.toggleAttribute("keskeny", sz < 600); this.toggleAttribute("szuk", sz < 390); }
         if (sz && !this._bkMert) this._betuKorr();
         // panel nézet / magas kártyahely: az előlap a saját magasságában, függőlegesen középen (nem nyúlik szét)
         const mag = e[0]?.contentRect.height;
@@ -1461,17 +1461,22 @@ class CantabileCard extends HTMLElement {
         :host([keskeny]) .elo:not(.magno) .adosor { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 39px; height: auto; gap: 9px 6px; order: 3; padding-bottom: 4px; }
         :host([keskeny]) .elo:not(.magno) .adosor .bill { height: 39px; flex-direction: column; align-items: center; gap: 2px; padding: 9px 2px 2px; }
         :host([keskeny]) .elo:not(.magno) .adosor .bill b { font-size: calc(12px * var(--bk, 1)); }
-        :host([keskeny]) .jobb.rjobb { order: 4; grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "rbal hang otg" "rbal hang kim"; justify-content: stretch; align-content: center; gap: 2px 4px; }
-        /* telefonos rádió, kétoldalas választó (ötnél több hangszóró): a választó külön sorba, teljes szélességben */
-        :host([keskeny]) .jobb.rjobb:has(> .forgo.ket) { grid-template-areas: "rbal hang otg" "kim kim kim"; }
-        :host([keskeny]) .rjobb > .forgo.ket { justify-self: center; }
-        :host([keskeny]) .rjobb > .forgo.ket .valaszto { zoom: .95; }
+        /* telefonos rádió, a magnóhoz hasonlóan: fent NET · SLEEP · BT, alatta hangerő + SPEAKERS, legalul balra POWER,
+           középen a vízszintes RADIO / TAPE kapcsoló */
+        :host([keskeny]) .jobb.rjobb { order: 4; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "otg otg" "hang kim" "rbal rbal"; justify-content: stretch; align-content: center; align-items: center; gap: 4px 8px; row-gap: 6px; }
         :host([keskeny]) .magno .mjobb > .forgo.ket .valaszto { zoom: .8; }
-        :host([keskeny]) .rjobb > .rbal { align-self: center; padding-top: 0; }
-        :host([keskeny]) .rjobb > .hangero { transform: scale(.68); margin: -28px; }
-        :host([keskeny]) .rjobb > .rotg { align-self: end; }
-        :host([keskeny]) .rjobb > .forgo { align-self: start; }
-        :host([keskeny]) .rjobb > .forgo .valaszto { zoom: .78; }
+        :host([keskeny]) .rjobb > .forgo { justify-self: center; align-self: center; }
+        :host([keskeny]) .rjobb > .forgo .valaszto { zoom: .84; }
+        :host([keskeny]) .rjobb > .forgo.ket .valaszto { zoom: .8; }
+        :host([keskeny]) .rjobb > .hangero { transform: scale(.72); margin: -25px -25px -25px -22px; }
+        :host([keskeny]) .rjobb > .rotg { align-self: end; margin-top: 4px; }
+        /* nagyon keskeny telefonon (390 px alatt) a kétoldalas választó kisebb, hogy a nevek ne érjenek a hangerőgombhoz */
+        :host([szuk]) .rjobb > .forgo.ket .valaszto, :host([szuk]) .magno .mjobb > .forgo.ket .valaszto { zoom: .7; }
+        :host([keskeny]) .rjobb > .rbal { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0; padding: 2px 0 0; align-self: center; }
+        :host([keskeny]) .rbal .power { justify-self: start; }
+        :host([keskeny]) .rbal .valto { flex-direction: row; gap: 6px; justify-self: center; }
+        :host([keskeny]) .rbal .kapcs { width: 40px; height: 18px; }
+        :host([keskeny]) .rbal .kapcs::after { left: 2px; top: 2px; width: 18px; height: 14px; transition: left .2s; }
         :host([keskeny]) .rotg .og-net { order: 1; } :host([keskeny]) .rotg .og-sleep { order: 2; } :host([keskeny]) .rotg .og-bt { order: 3; }
         :host([magas]) ha-card { grid-template-rows: auto; align-content: center; }
         :host([magas]) .elo { height: auto; aspect-ratio: 2.3; max-height: 100%; }

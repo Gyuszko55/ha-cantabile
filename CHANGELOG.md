@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.6 – unreleased
+
+- Phone radio laid out like the phone tape deck: NET · SLEEP · BT right under the station buttons, then the volume knob with the SPEAKERS selector beside it, and at the bottom POWER in the left corner with the horizontal RADIO / TAPE switch in the middle.
+- Very narrow phones (card under 390 px): the two-sided speaker selector is drawn a little smaller on the radio and the tape deck, so the names don't touch the volume knob.
+
 ## 1.12.5 – 2026-10-28
 
 - Visual card editor: in the dashboard's card editor the speakers (picked from the media players), brand, front panel, display, music folder and FM band can be set without YAML; it keeps the card's key language (English or Hungarian) and the existing speakers' names. Stations and names stay on the card's ⚙.
