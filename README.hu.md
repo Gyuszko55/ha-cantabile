@@ -90,6 +90,9 @@ Az előlapok feliratai mindig angolok, mint egy igazi régi hi-fin; a beállít�
 - Elhagyható: `ffmpeg` a gazdagépen a valódi VU-jelhez (a Home Assistant OS-ben és a konténerben benne van; nélküle a
   mérők élethű utánzatot mutatnak).
 - A Deezer lejátszásához a Sonos appban be kell kötni a Deezert. A Deezer-kereséshez nem kell fiók.
+- Böngésző: friss Chrome / Edge, Safari vagy Firefox – legalább Chrome 105, Safari / iOS 16 vagy Firefox 110 (a régebbiek,
+  pl. egy régi fali tablet WebView-ja, elcsúsztathatják a kazetta és a kijelző feliratait). A kártyának saját megjelenése
+  van, a Home Assistant témáit nem követi.
 
 ## Mit kell telepíteni – és mit hoz magával a Cantabile
 
@@ -113,7 +116,7 @@ Az előlapok feliratai mindig angolok, mint egy igazi régi hi-fin; a beállít�
 | `ffmpeg` a gazdagépen | valódi VU-jel (elhagyható) | A Home Assistant OS-ben és a konténer-képben benne van. Python-venv-es (Core) telepítésnél a rendszer csomagkezelőjével tedd fel. Nélküle a mérők utánoznak. |
 | Zenemappa | NAS / PHONE fül (elhagyható) | Lásd lent: *Zenetár (NAS) csatolása*. |
 | **Cast-os TV** (Cantabile TV, elhagyható) | az élő TV-oldal | Képernyős Cast-eszköz (Chromecast / Google TV, Android TV-doboz vagy -stick, Nest Hub) a **Google Cast** integrációval; a Home Assistant a TV felől **https**-en elérhető (Home Assistant Cloud, vagy saját külső cím tanúsítvánnyal); a `cantabile-tv` irányítópult (lásd *TV-lejátszók*). |
-| **DLNA-s TV** (Cantabile TV, elhagyható) | az álló adatlap | DLNA-lejátszós TV a **DLNA Digital Media Renderer** integrációval; a Home Assistant **belső címe** a TV felől elérhető a helyi hálózaton; `ffmpeg` a gazdagépen (ez készíti az adatlap-videókat); kb. 1,5 GB lemezhely a videótárnak. |
+| **DLNA-s TV** (Cantabile TV, elhagyható) | az álló adatlap | DLNA-lejátszós TV a **DLNA Digital Media Renderer** integrációval; a Home Assistant **belső címe** a TV felől elérhető a helyi hálózaton; `ffmpeg` a gazdagépen (ez készíti az adatlap-videókat – nélküle a TV csak a zenét és a borítót kapja); kb. 1,5 GB lemezhely a videótárnak. |
 | Beszélgetőügynök | hangvezérlés (elhagyható) | Pl. *Google Gemini*, *OpenAI*, *Anthropic*, *Ollama*; utána a beállításaiban kapcsold be a **Cantabile**-t (lásd *Hangvezérlés*). |
 | Streaming-fiókok / kulcsok | DEEZER, SPOTIFY, TIDAL (elhagyható) | Lásd a következő részt. |
 
@@ -198,6 +201,8 @@ Az integráció beállítása után nyisd meg a beszélgetőügynök beállítá
   Assistanthoz – Home Assistant Cloud (távoli elérés) vagy saját külső cím érvényes tanúsítvánnyal. Sima `http://` helyi cím
   nem elég.
 - Ha magad állítottad be a `http: cors_allowed_origins:` listát, maradjon benne a `https://cast.home-assistant.io` (alapból benne van).
+- Ha a vezérlőpult-erőforrásaid YAML-módban vannak, vedd fel a `/cantabile_static/cantabile-card.js`-t *module*
+  erőforrásként: a Cast-vevő csak a vezérlőpult erőforrásait tölti be, enélkül a TV-n „Custom element doesn't exist” jelenik meg.
 - Android TV / Google TV: a képernyővédőt (és az alvást) állítsd *Soha* értékre, különben a TV kb. 15 perc után elhagyja az oldalt.
 - Lejátszás közben más automatizálás ne castoljon ugyanarra a TV-re (az lecserélné az oldalt).
 - Ha a TV-n még a Home Assistant fut, de elvesztette a kapcsolatot (pl. újraindítás után), a Cantabile bezárja és újra kiküldi.

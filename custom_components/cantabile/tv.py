@@ -525,6 +525,22 @@ def _mappakep(fajl: str) -> str | None:
     return os.path.join(mappa, sorted(kepek)[0]) if kepek else None
 
 
+class TvBetu(HomeAssistantView):
+    """A kártya betűi (woff2) a TV-oldalnak: a Cast-vevő oldala más címről fut, ezért CORS-szal (a /cantabile_static nem
+    küld ilyet). Nyilvános, mint a /cantabile_static."""
+
+    url = "/api/cantabile/font/{nev}"
+    name = "api:cantabile:font"
+    requires_auth = False
+    cors_allowed = True
+
+    async def get(self, request: web.Request, nev: str) -> web.StreamResponse:
+        ut = os.path.join(os.path.dirname(__file__), "www", nev)
+        if not re.fullmatch(r"[A-Za-z0-9-]+\.woff2", nev) or not os.path.isfile(ut):
+            return web.Response(status=404)
+        return web.FileResponse(ut, headers={"Cache-Control": "max-age=604800", "Content-Type": "font/woff2"})
+
+
 class TvKep(HomeAssistantView):
     """Borító a TV-oldalnak: a zenemappa egy képe (`f`) vagy egy zenefájlba ágyazott kép (`e`); aláírt címmel."""
 
@@ -674,6 +690,7 @@ def ws_report(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: di
 def regisztral(hass: HomeAssistant) -> None:
     hass.data[DOMAIN]["tv"] = TvKozpont(hass)
     hass.http.register_view(TvKep(hass))
+    hass.http.register_view(TvBetu())
     hass.http.register_view(TvVideo(hass))
     hass.http.register_view(TvElo(hass))
     websocket_api.async_register_command(hass, ws_subscribe)

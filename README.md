@@ -90,6 +90,9 @@ Front-panel labels are always English, like on a real old hi-fi; settings, messa
 - Optional: `ffmpeg` on the host for the real VU signal (included in Home Assistant OS and the container image;
   without it the meters show a realistic simulation).
 - Deezer playback needs the Deezer service added to your Sonos app. Searching Deezer needs no account.
+- Browsers: a current Chrome / Edge, Safari or Firefox – at least Chrome 105, Safari / iOS 16 or Firefox 110 (older
+  ones, e.g. an old wall-tablet WebView, may misplace the cassette and display labels). The card has its own look and
+  doesn't follow Home Assistant themes.
 
 ## What to install – and what Cantabile brings
 
@@ -113,7 +116,7 @@ Front-panel labels are always English, like on a real old hi-fi; settings, messa
 | `ffmpeg` on the host | the real VU signal (optional) | Included in Home Assistant OS and the container image. On a Python-venv (Core) install, install it with the system package manager. Without it the meters simulate. |
 | A music folder | NAS / PHONE tabs (optional) | See *Connecting a music library (NAS)* below. |
 | **Cast TV** (Cantabile TV, optional) | the live TV page | A Cast device with a screen (Chromecast / Google TV, Android TV box or stick, Nest Hub) set up with the **Google Cast** integration; Home Assistant reachable from the TV over **https** (Home Assistant Cloud, or your own external URL with a certificate); the `cantabile-tv` dashboard (see *TV players*). |
-| **DLNA TV** (Cantabile TV, optional) | the still track card | A TV with a DLNA renderer, set up with the **DLNA Digital Media Renderer** integration; Home Assistant's **internal URL** reachable from the TV over the LAN; `ffmpeg` on the host (it makes the track-card videos); about 1.5 GB of disk for the video cache. |
+| **DLNA TV** (Cantabile TV, optional) | the still track card | A TV with a DLNA renderer, set up with the **DLNA Digital Media Renderer** integration; Home Assistant's **internal URL** reachable from the TV over the LAN; `ffmpeg` on the host (it makes the track-card videos – without it the TV gets the music and the cover only); about 1.5 GB of disk for the video cache. |
 | A conversation agent | voice control (optional) | E.g. *Google Gemini*, *OpenAI*, *Anthropic*, *Ollama*; then turn on **Cantabile** in its options (see *Voice control*). |
 | Streaming accounts / keys | DEEZER, SPOTIFY, TIDAL (optional) | See the next section. |
 
@@ -197,6 +200,8 @@ After setting up the integration, open your conversation agent's options (e.g. *
   over **https** – Home Assistant Cloud (remote UI) or your own external URL with a valid certificate. A plain `http://`
   LAN address is not enough.
 - If you set `http: cors_allowed_origins:` yourself, keep `https://cast.home-assistant.io` in the list (it is there by default).
+- If your dashboard resources are in YAML mode, add `/cantabile_static/cantabile-card.js` as a *module* resource: the Cast
+  receiver loads only dashboard resources, so without it the TV shows “Custom element doesn't exist”.
 - Android TV / Google TV: set the screensaver (and sleep) to *Never*, otherwise the TV leaves the page after ~15 minutes.
 - Don't let other automations cast to the same TV while it plays (they would replace the page).
 - If the Home Assistant app still runs on the TV but lost its connection (e.g. after a restart), Cantabile closes it and casts again.

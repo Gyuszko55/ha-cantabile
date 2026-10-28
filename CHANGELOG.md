@@ -14,6 +14,17 @@
 - Uploads into the temporary music folder accept audio files only; a read-only media folder gives a clear message instead of a server error.
 - Music-folder checks that touch the disk (folder exists, mount point, cover file) run off Home Assistant's main loop, so a stalled NAS share can no longer freeze Home Assistant.
 - Covers extracted from music files for Cantabile TV are cleaned up (the newest 200 stay), like the track-card videos.
+- Cantabile TV page on Cast: the fonts (Michroma, Exo 2, Great Vibes) now load on the Cast receiver too, through a CORS-enabled route; before, the TV fell back to a default font when no Cantabile card had loaded them.
+- Cantabile TV page: a page instance that is replaced or left stops its clock, progress and drawing timers, and the equaliser stops redrawing once the bars have settled in silence – lighter on TV sticks left on for days. Coming back to the view starts them again.
+- Radio Browser: the mirror list is fetched from `all.api.radio-browser.info` (mirrors get retired; `fi1` is gone), with the known mirrors as fallback, on the card and the server. The ⚙ station search uses the same fallback.
+- NET tab, home country: without a country set in Home Assistant the region of the browser language is used (e.g. en-GB → GB) instead of Hungary.
+- Sleep timer message shows the time in 12 or 24 hours like the TV clock (your profile, else the country).
+- ⚙: clearing a station's frequency field no longer blocks saving with a range error.
+- Sonos queue reload after a restart works with any media folder name, not only `local`.
+- Volume, shuffle, repeat and grouping are only sent to players that support them (some DLNA / Cast receivers don't); shuffle says so.
+- Voice control uses saved ⚙ settings right away (it kept the old ones for up to 5 minutes).
+- Removing the integration also removes the card's dashboard resource; reloading it no longer injects the card twice in YAML resource mode.
+- README: minimum browser versions; for Cast TVs with YAML-mode resources, add the card resource by hand.
 
 ## 1.12.2 – 2026-10-28
 

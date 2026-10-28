@@ -17,6 +17,7 @@ ugyanazt írja). Válaszként visszaadja, mi szól és hol, vagy a hibát.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import math
 import os
@@ -39,7 +40,9 @@ from .runtime import Cantabile
 
 _LOGGER = logging.getLogger(__name__)
 
-RB_SZERVEREK = [f"https://{x}.api.radio-browser.info" for x in ("de1", "de2", "fi1")]
+# Radio Browser: a tükörszerverek listáját a szolgáltatótól kéri (a szerverek cserélődnek), tartaléknak az ismertek
+RB_ALAP = [f"https://{x}.api.radio-browser.info" for x in ("de1", "de2")]
+_rb_lista: list[str] = []
 KARTYAK = ("custom:cantabile-card", "custom:tablet-radio")
 FELTOLTES_ALAP = "Cantabile"                 # a kártya TELEFON fülének feltöltő mappája, ha nincs megadva
 ALBUM_MAX, ELOADO_MAX = 80, 60               # ennyi szám kerül a sorba (a kártya is 80-at tölt be albumból)
@@ -195,6 +198,19 @@ async def osszes_hangszoro(hass: HomeAssistant) -> set[str]:
             continue
     _hangszoro_tar.update(ido=time.monotonic(), h=talalt, a=adok)
     return talalt
+
+
+@callback
+def figyel(hass: HomeAssistant) -> None:
+    """Vezérlőpult mentésekor (pl. a kártya ⚙ Mentés gombja) a tárolt kártya-beállítás azonnal elavul, így a hang-
+    vezérlés már az újat használja."""
+
+    @callback
+    def torol(_e: Event) -> None:
+        _kartya_tar.clear()
+        _hangszoro_tar.clear()
+
+    hass.bus.async_listen("lovelace_updated", torol)
 
 
 async def osszes_ado(hass: HomeAssistant) -> set[str]:
@@ -411,7 +427,12 @@ class Zene:
     async def rb(self, ut: str) -> Any:
         sess = async_get_clientsession(self.hass)
         hiba: Exception | None = None
-        for sz in RB_SZERVEREK:
+        if not _rb_lista:
+            with contextlib.suppress(Exception):
+                async with asyncio.timeout(5):
+                    r = await sess.get("https://all.api.radio-browser.info/json/servers", headers={"User-Agent": "Cantabile/1.0 (Home Assistant)"})
+                    _rb_lista.extend(dict.fromkeys([f"https://{x['name']}" for x in await r.json()] + RB_ALAP))
+        for sz in _rb_lista or RB_ALAP:
             try:
                 async with asyncio.timeout(8):
                     r = await sess.get(f"{sz}{ut}", headers={"User-Agent": "Cantabile/1.0 (Home Assistant)"})

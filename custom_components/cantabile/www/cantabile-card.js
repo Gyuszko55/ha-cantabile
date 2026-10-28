@@ -127,6 +127,7 @@ const EN = {
   "Legalább egy hangszóró kell.": "At least one speaker is required.",
   "nem találom a kártyát ezen a vezérlőpulton": "the card was not found on this dashboard",
   "Áttekintés": "Overview",
+  "Ez a lejátszó nem tud keverni.": "This player can't shuffle.",
   "Beállítások elmentve: {n}.": "Settings saved: {n}.",
   "Nem sikerült: {h}.": "Failed: {h}.",
   "A mentéshez rendszergazdai felhasználó kell.": "Saving requires an administrator user.",
@@ -304,7 +305,16 @@ const OI = {
 };
 // NET-adó: a Radio Browserből választott, gombra nem tett adó (az _adoIndex ezt adja vissza)
 const KULSO = -2;
-const RB_SZERVEREK =["de1", "de2", "fi1"].map((x) => `https://${x}.api.radio-browser.info`);
+// Radio Browser: a tükörszerverek listáját a szolgáltatótól kéri (a szerverek cserélődnek), tartaléknak az ismertek
+const RB_ALAP = ["de1", "de2"].map((x) => `https://${x}.api.radio-browser.info`);
+let RB_LISTA = null;
+const RB_SZERVEREK = () => (RB_LISTA ||= (async () => {
+  const ctl = new AbortController(), ido = setTimeout(() => ctl.abort(), 5000);
+  try {
+    const l = await (await fetch("https://all.api.radio-browser.info/json/servers", { signal: ctl.signal })).json();
+    return [...new Set([...l.map((x) => `https://${x.name}`), ...RB_ALAP])];
+  } catch (e) { RB_LISTA = null; return RB_ALAP; } finally { clearTimeout(ido); }
+})());
 // kereséshez: kisbetű, ékezet nélkül
 const KERES_NORM = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const SAFE_DECODE = (t) => { try { return decodeURIComponent(t); } catch (e) { return t; } };
@@ -319,6 +329,8 @@ const VISSZA = Object.fromEntries(Object.entries(KULCS).map(([a, b]) => [b, a]))
 const ATKULCS = (o, t) => Array.isArray(o) ? o.map((x) => ATKULCS(x, t)) : o && typeof o === "object" ? Object.fromEntries(Object.entries(o).map(([k, v]) => [t[k] || k, ATKULCS(v, t)])) : o;
 const KIJELZO_BE = { vu: "deprez", vfd: "fluor" }, KIJELZO_KI = { deprez: "vu", fluor: "vfd" };
 const KARTYAK = ["custom:cantabile-card", "custom:tablet-radio"];
+// media_player-szolgáltatások és a hozzájuk kellő képesség-bit (supported_features)
+const KEPESSEG = { volume_set: 4, shuffle_set: 32768, repeat_set: 262144, join: 524288 };
 // a kártya beállításának „személyazonossága” a mentéshez: a hangszórók és az adók sora (a nevek, rövid nevek nem számítanak)
 const LENYOMAT = (y) => { const c = ATKULCS(y || {}, KULCS); return JSON.stringify([(c.hangszorok || []).map((h) => h?.entity), (c.adok || []).map((a) => a?.url)]); };
 const URLSZERU = (x) => /^[a-z0-9+.-]+:\/\//i.test(String(x || ""));
@@ -405,16 +417,17 @@ const DBPOZ = (db) => {
   }
   return Math.min(1.06, 1 + (db - 3) * 0.02);
 };
-// az írott márkanév betűkészlete – a dokumentumba kell bejegyezni (árnyék-DOM-ban a @font-face nem mindig hat)
-const BETU = () => {
+// az írott márkanév betűkészlete – a dokumentumba kell bejegyezni (árnyék-DOM-ban a @font-face nem mindig hat).
+// `alap`: a TV-oldalnak a HA teljes címe – a Cast-vevő oldala más címről fut, ott a betűket CORS-os útvonalon kéri
+const BETU = (alap = "/cantabile_static/") => {
   if (document.getElementById("tablet-radio-betu")) return;
   const st = document.createElement("style");
   st.id = "tablet-radio-betu";
   // az üzenetablak betűi (Michroma: fejléc, Exo 2: szöveg; OFL, helyben, magyar ékezetekkel)
-  const ff = (n, f, r, w = "400") => `@font-face{font-family:'${n}';src:url('/cantabile_static/${f}') format('woff2');font-weight:${w};font-display:swap;unicode-range:${r}}`;
+  const ff = (n, f, r, w = "400") => `@font-face{font-family:'${n}';src:url('${alap}${f}') format('woff2');font-weight:${w};font-display:swap;unicode-range:${r}}`;
   const LAT = "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD";
   const EXT = "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF";
-  st.textContent = "@font-face{font-family:'Great Vibes';src:url('/cantabile_static/GreatVibes-latin.woff2') format('woff2');font-display:swap}"
+  st.textContent = "@font-face{font-family:'Great Vibes';src:url('" + alap + "GreatVibes-latin.woff2') format('woff2');font-display:swap}"
     + ff("Michroma", "Michroma-latin.woff2", LAT) + ff("Michroma", "Michroma-latin-ext.woff2", EXT)
     + ff("Exo 2", "Exo2-latin.woff2", LAT, "100 900") + ff("Exo 2", "Exo2-latin-ext.woff2", EXT, "100 900");
   document.head.appendChild(st);
@@ -515,6 +528,7 @@ class CantabileCard extends HTMLElement {
   }
 
   disconnectedCallback() {
+    if (HELYI_KOZOS.kartya === this) HELYI_KOZOS.kartya = null;   // a BT-hang eseményei ne egy lekerült kártyára menjenek
     this._lato?.disconnect(); this._lato = null;
     this._meret?.disconnect(); this._meret = null;
     cancelAnimationFrame(this._anim); this._anim = null;
@@ -1590,6 +1604,12 @@ class CantabileCard extends HTMLElement {
   _allapot(h) { return h?.entity === HELYI ? this._helyiAllapot() : this._hass?.states[h?.entity]; }
   _hiv(d, s, adat) {
     if (adat?.entity_id === HELYI || adat?.variables?.entity_id === HELYI) return this._helyi(d, s, adat);
+    // amit a lejátszó nem tud (pl. egyes DLNA- vagy Cast-vevők), azt nem hívjuk – különben csendben hibát dobna
+    if (d === "media_player" && KEPESSEG[s] && adat?.entity_id) {
+      const ids = [].concat(adat.entity_id).filter((e) => { const f = this._hass.states[e]?.attributes?.supported_features; return f == null || (f & KEPESSEG[s]); });
+      if (!ids.length) { if (s === "shuffle_set") this._uzen(T("Ez a lejátszó nem tud keverni.")); return Promise.resolve(); }
+      adat = { ...adat, entity_id: Array.isArray(adat.entity_id) ? ids : ids[0] };
+    }
     return this._hass.callService(d, s, adat);
   }
 
@@ -1850,7 +1870,7 @@ class CantabileCard extends HTMLElement {
         if (!this._ent?.sleep) throw new Error(T("A Cantabile integráció nincs beállítva (Beállítások → Eszközök és szolgáltatások)."));
         await this._hass.callService("cantabile", "sleep_timer", { entity_id: hsz.entity, minutes: iso ? kov : 0 });
       }
-      this._uzen(iso ? T("Kikapcsol {p} perc múlva ({t}).", { p: kov, t: ujVege.toLocaleTimeString(NYELV(), { hour: "2-digit", minute: "2-digit" }) }) : T("Időzített kikapcsolás törölve."));
+      this._uzen(iso ? T("Kikapcsol {p} perc múlva ({t}).", { p: kov, t: ujVege.toLocaleTimeString(NYELV(), { hour: "2-digit", minute: "2-digit", ...ORA_OPC(this._hass) }) }) : T("Időzített kikapcsolás törölve."));
     } catch (e) { this._uzen(T("Időzítő: {h}", { h: e?.message || e })); }
     this._alvasRajz();
   }
@@ -2332,8 +2352,8 @@ class CantabileCard extends HTMLElement {
     this._keresett = mit;
     if (mit.length < 2) return this._beallRajz(T("Írj be legalább két betűt."));
     try {
-      const v = await fetch(`https://de1.api.radio-browser.info/json/stations/search?name=${encodeURIComponent(mit)}&limit=12&hidebroken=true&order=clickcount&reverse=true`);
-      this._talalatok = (await v.json()).filter((t) => t.url_resolved || t.url);
+      const v = await this._rb(`/json/stations/search?name=${encodeURIComponent(mit)}&limit=12&hidebroken=true&order=clickcount&reverse=true`);
+      this._talalatok = v.filter((t) => t.url_resolved || t.url);
       this._beallRajz(this._talalatok.length ? "" : T("Nincs találat – próbáld másképp írva (ékezet nélkül is)."));
     } catch (err) { this._talalatok = []; this._beallRajz(T("A keresés nem sikerült: {h}", { h: err?.message || err })); }
   }
@@ -2341,7 +2361,7 @@ class CantabileCard extends HTMLElement {
   // ellenőrzés, majd a vezérlőpult konfigurációjában ennek a kártyának a helyére írja (lovelace/config/save; rendszergazda kell)
   async _beallMent() {
     const sz = this._szerk, hibak = [];
-    const adok = sz.adok.map((a) => ({ ...a, nev: String(a.nev || "").trim(), rovid: String(a.rovid || "").trim(), url: String(a.url || "").trim(), frekvencia: Number(String(a.frekvencia).replace(",", ".")) }));
+    const adok = sz.adok.map((a) => ({ ...a, nev: String(a.nev || "").trim(), rovid: String(a.rovid || "").trim(), url: String(a.url || "").trim(), frekvencia: String(a.frekvencia ?? "").trim() === "" ? NaN : Number(String(a.frekvencia).replace(",", ".")) }));
     adok.forEach((a, i) => {
       if (!a.nev) hibak.push(T("{n}. adó: hiányzik a név", { n: i + 1 }));
       if (Number.isFinite(a.frekvencia) && !(a.frekvencia >= 87.5 && a.frekvencia <= 108)) hibak.push(T("{n}: a frekvencia 87,5 és 108 közé essen (vagy hagyd üresen)", { n: a.nev || T("{n}. adó", { n: i + 1 }) }));
@@ -2455,17 +2475,17 @@ class CantabileCard extends HTMLElement {
   }
 
   // elavult linkek esetén a kazetta újratöltése friss linkekkel, a kért számnál. A számlista a Sonos saját sorából jön
-  // (/media/local/… → media-source://media_source/local/…), így akkor is megy, ha másik készülékről töltötték be
+  // (/media/<mappa>/… → media-source://media_source/<mappa>/…), így akkor is megy, ha másik készülékről töltötték be
   async _ujratoltElavult(hsz, hova) {
     if (!this._elavultSor(hsz)) return false;
     const vez = this._hass.states[hsz.entity]?.attributes?.group_members?.[0] || hsz.entity;
     let sor;
     try {
       const v = await this._hass.callWS({ type: "call_service", domain: "sonos", service: "get_queue", service_data: { entity_id: vez }, return_response: true });
-      sor = (v?.response?.[vez] || []).map((x) => /\/media\/local\/([^?#]+)/.exec(x.media_content_id || "")?.[1]);
+      sor = (v?.response?.[vez] || []).map((x) => /\/media\/([^/?#]+\/[^?#]+)/.exec(x.media_content_id || "")?.[1]);
     } catch (e) { return false; }
     if (!sor.length || sor.some((x) => !x)) return false;
-    const szamok = sor.map((x) => { try { return `media-source://media_source/local/${decodeURIComponent(x)}`; } catch (e) { return null; } });
+    const szamok = sor.map((x) => { try { return `media-source://media_source/${decodeURIComponent(x)}`; } catch (e) { return null; } });
     if (szamok.some((x) => !x)) return false;
     const regi = this._kazetta(), a = this._hass.states[vez]?.attributes || {};
     const kaz = { ...(regi?.forras === "nas" ? regi : {}), forras: "nas", szamok,
@@ -2821,7 +2841,7 @@ class CantabileCard extends HTMLElement {
   // ---- NET: internetes rádióadók a Radio Browserből (népszerű magyar / világ / műfaj / név szerint), gombra mentés nélkül ----
   async _rb(ut) {
     let hiba;
-    for (const sz of RB_SZERVEREK) {
+    for (const sz of await RB_SZERVEREK()) {
       const ctl = new AbortController(), ido = setTimeout(() => ctl.abort(), 8000);
       try {
         const v = await fetch(sz + ut, { signal: ctl.signal });
@@ -2833,7 +2853,11 @@ class CantabileCard extends HTMLElement {
   }
 
   // a „hazai” fül: a Home Assistant beállított országa (Beállítások → Rendszer → Általános)
-  _orszag() { return String(this._hass?.config?.country || "HU").toUpperCase(); }
+  // (ha nincs megadva: a böngésző nyelvének régiója, pl. en-GB → GB; végül a magyar)
+  _orszag() {
+    const r = /^[a-z]{2,3}-([A-Z]{2})\b/i.exec(navigator.language || "");
+    return String(this._hass?.config?.country || r?.[1] || "HU").toUpperCase();
+  }
 
   _netNyit() {
     const ful = TAR.olvas("tablet-radio-netful");
@@ -4075,6 +4099,12 @@ const TV_SVG_LEMEZ = `<svg viewBox="0 0 200 200"><defs><radialGradient id="tvl" 
 
 // országok, ahol a 12 órás kijelzés a szokás (a többiben 24 órás)
 const ORA12 = ["US", "CA", "AU", "NZ", "IN", "PH", "PK", "BD", "EG", "SA", "MY", "CO", "MX", "JO", "OM", "QA", "KW", "AE", "SV", "HN", "NI"];
+// 12 / 24 órás: a HA-profil beállítása, különben a HA-ban megadott ország szokása (pl. HU → 24, US → 12)
+const ORA_OPC = (h) => {
+  const tf = h?.locale?.time_format, orszag = String(h?.config?.country || "").toUpperCase();
+  const h12 = tf === "12" ? true : tf === "24" ? false : orszag ? ORA12.includes(orszag) : undefined;
+  return h12 !== undefined ? { hour12: h12 } : {};
+};
 
 class CantabileTv extends HTMLElement {
   setConfig(c) { this._c = { visual: "both", ...(c || {}) }; }
@@ -4086,7 +4116,7 @@ class CantabileTv extends HTMLElement {
     // hibakeresés a Cast-vevőn (oda nem látunk be): a hibák és az állapot `cantabile_tv_diag` eseményként jönnek vissza
     window.addEventListener("error", (e) => this._diag({ hiba: `${e.message} @${e.lineno}:${e.colno}` }));
     window.addEventListener("unhandledrejection", (e) => this._diag({ hiba: `promise: ${e.reason}` }));
-    BETU();
+    BETU(this._abs("/api/cantabile/font/"));
     this._epit();
     this._feliratkozik();
   }
@@ -4095,14 +4125,26 @@ class CantabileTv extends HTMLElement {
 
   // a Cast-vevő a kártyát kétszer is létrehozhatja: csak a lejátszóhoz kapcsolódott példány látszik (felül), a többi
   // elrejti magát és nem kapcsolódik újra; a lekerült példány elengedi a kapcsolatot
-  connectedCallback() { clearTimeout(this._levesz); }
+  connectedCallback() {
+    clearTimeout(this._levesz);
+    if (this._le) { this._indit(); this._feliratkozik(); }   // visszakerült (pl. visszanavigáltak a nézetre)
+  }
   disconnectedCallback() {
     this._levesz = setTimeout(() => this._elenged(), 3000);
+  }
+
+  // óra, haladásjelző, rajzolás – a lekerült példányban leállnak (_elenged), visszakerüléskor újraindulnak
+  _indit() {
+    this._le = false;
+    this._orak = [setInterval(this._ora, 10000), setInterval(() => this._halad(), 500)];
+    this._rajzol();
   }
 
   // a lekerült példány elengedi a lejátszót; a hang (közös, az oldalhoz tartozik) szól tovább, az új példány átveszi
   _elenged() {
     if (this.isConnected) return;
+    this._le = true;
+    (this._orak || []).forEach(clearInterval); this._orak = null;
     if (this._leir) { this._leir(); this._leir = null; }
     if (window._cantabileTv === this) window._cantabileTv = null;
   }
@@ -4195,17 +4237,14 @@ class CantabileTv extends HTMLElement {
     window.addEventListener("resize", meret);
     if (window.ResizeObserver) new ResizeObserver(meret).observe(this);
     const ora = () => {
-      const d = new Date(), nyelv = this._h?.locale?.language || "en", tf = this._h?.locale?.time_format;
-      // 12 / 24 órás: a HA-profil beállítása, különben a HA-ban megadott ország szokása (pl. HU → 24, US → 12)
-      const orszag = String(this._h?.config?.country || "").toUpperCase();
-      const h12 = tf === "12" ? true : tf === "24" ? false : orszag ? ORA12.includes(orszag) : undefined;
-      const o = d.toLocaleTimeString(nyelv, { hour: "2-digit", minute: "2-digit", ...(h12 !== undefined ? { hour12: h12 } : {}) });
+      const d = new Date(), nyelv = this._h?.locale?.language || "en";
+      const o = d.toLocaleTimeString(nyelv, { hour: "2-digit", minute: "2-digit", ...ORA_OPC(this._h) });
       sr.querySelector(".o").textContent = o; sr.querySelector(".o2").textContent = o;
       sr.querySelector(".d").textContent = d.toLocaleDateString(nyelv, { weekday: "long", month: "long", day: "numeric" }).toUpperCase();
     };
-    ora(); setInterval(ora, 10000);
-    this._rajzol();
-    setInterval(() => this._halad(), 500);
+    ora();
+    this._ora = ora;
+    this._indit();
   }
 
   // ---- hang ----
@@ -4355,12 +4394,22 @@ class CantabileTv extends HTMLElement {
   // equalizer (logaritmikus sávok, eső csúcsjelzővel és tükörképpel) + hullámforma-vonal
   _rajzol() {
     const g = this._cv.getContext("2d"), N = 56, csucs = new Array(N).fill(0), simit = new Array(N).fill(0);
+    let nyugszik = "";
     const kor = () => {
+      if (this._le) return;                        // a lekerült példány rajzolása leáll (az új példány rajzol)
       requestAnimationFrame(kor);
       const W = this._cv.width, H = this._cv.height, alap = H * 0.72;
-      g.clearRect(0, 0, W, H);
-      if (!this._an || this._allapot !== "playing") { for (let i = 0; i < N; i++) { simit[i] *= 0.9; csucs[i] *= 0.95; } }
-      else {
+      if (!this._an || this._allapot !== "playing") {
+        for (let i = 0; i < N; i++) { simit[i] *= 0.9; csucs[i] *= 0.95; }
+        // csendben, a sávok lecsengése után a kép nem változik: nem rajzol újra (kíméli a TV-botot)
+        // (a méret is a kulcsban: átméretezéskor a vászon kiürül, akkor újra kell rajzolni)
+        const csend = csucs.every((v) => v < 0.002) ? `${W}x${H}` : "";
+        if (csend && nyugszik === csend) return;
+        nyugszik = csend;
+        g.clearRect(0, 0, W, H);
+      } else {
+        nyugszik = "";
+        g.clearRect(0, 0, W, H);
         this._an.getByteFrequencyData(this._frek);
         const n = this._frek.length, minB = 2, maxB = Math.floor(n * 0.72);
         for (let i = 0; i < N; i++) {

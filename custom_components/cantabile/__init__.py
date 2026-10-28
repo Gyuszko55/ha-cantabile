@@ -59,6 +59,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     library.regisztral(hass)
     lyrics.regisztral(hass)
     hass.http.register_view(tovabbito.Tovabbito(hass))
+    music.figyel(hass)
     atmeneti.regisztral(hass)
     streaming.regisztral(hass)
     vu.regisztral(hass)
@@ -114,7 +115,9 @@ async def _kartya_bejegyzes(hass: HomeAssistant) -> None:
     ll = hass.data.get("lovelace")
     res = getattr(ll, "resources", None)
     if res is None or getattr(ll, "resource_mode", "storage") != "storage" or not hasattr(res, "async_create_item"):
-        add_extra_js_url(hass, url)
+        if not hass.data[DOMAIN].get("js_be"):        # újratöltéskor ne kerüljön be még egyszer
+            add_extra_js_url(hass, url)
+            hass.data[DOMAIN]["js_be"] = True
         return
     await res.async_get_info()          # betölti a tárat
     for elem in res.async_items():
@@ -123,6 +126,17 @@ async def _kartya_bejegyzes(hass: HomeAssistant) -> None:
                 await res.async_update_item(elem["id"], {"res_type": "module", "url": url})
             return
     await res.async_create_item({"res_type": "module", "url": url})
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Az integráció törlésekor a kártya Lovelace-erőforrása is kikerül (a tárolós módban felvett bejegyzés)."""
+    res = getattr(hass.data.get("lovelace"), "resources", None)
+    if res is None or not hasattr(res, "async_delete_item"):
+        return
+    await res.async_get_info()
+    for elem in list(res.async_items()):
+        if str(elem.get("url", "")).split("?")[0] == CARD_URL:
+            await res.async_delete_item(elem["id"])
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: CantabileConfigEntry) -> bool:
