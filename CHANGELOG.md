@@ -10,6 +10,10 @@
 - Starting music on a second Sonos speaker no longer stops the first one's queue from filling up in the background (it used to stop after the first few tracks).
 - Without ffmpeg (some Core / venv installs) DLNA TVs fall back to the music and the cover instead of failing, and a single warning in the log says why; the VU meters are simulated as before. If ffmpeg lacks libx264, live radio on DLNA TVs uses the mpeg4 encoder.
 - Error messages from the server (music folder, lyrics, Spotify / Tidal, Sonos, Cantabile TV, uploads) follow Home Assistant's language – English unless it is Hungarian – instead of always being Hungarian.
+- Stream relay (`/api/cantabile/stream`, used by the BT output and Cantabile TV): users who are not administrators can only relay public addresses, or local-network stations that are set up on a Cantabile card; redirects are checked hop by hop. Administrators and Home Assistant's own system users (e.g. the TV page's signed links) are not limited.
+- Uploads into the temporary music folder accept audio files only; a read-only media folder gives a clear message instead of a server error.
+- Music-folder checks that touch the disk (folder exists, mount point, cover file) run off Home Assistant's main loop, so a stalled NAS share can no longer freeze Home Assistant.
+- Covers extracted from music files for Cantabile TV are cleaned up (the newest 200 stay), like the track-card videos.
 
 ## 1.12.2 – 2026-10-28
 

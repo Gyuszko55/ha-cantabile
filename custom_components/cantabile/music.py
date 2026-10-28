@@ -171,6 +171,7 @@ async def osszes_hangszoro(hass: HomeAssistant) -> set[str]:
     if dashboards is None and isinstance(ll, dict):
         dashboards = ll.get("dashboards")
     talalt: set[str] = set()
+    adok: set[str] = set()
 
     def bejar(o: Any) -> None:
         if isinstance(o, dict):
@@ -178,6 +179,9 @@ async def osszes_hangszoro(hass: HomeAssistant) -> set[str]:
                 for h in o.get("speakers") or o.get("hangszorok") or []:
                     if isinstance(h, dict) and h.get("entity"):
                         talalt.add(h["entity"])
+                for a in o.get("stations") or o.get("adok") or []:
+                    if isinstance(a, dict) and a.get("url"):
+                        adok.add(cim(a["url"]))
             for v in o.values():
                 bejar(v)
         elif isinstance(o, list):
@@ -189,8 +193,14 @@ async def osszes_hangszoro(hass: HomeAssistant) -> set[str]:
             bejar(await d.async_load(False))
         except Exception:  # noqa: BLE001 – üres vagy YAML-hibás vezérlőpult
             continue
-    _hangszoro_tar.update(ido=time.monotonic(), h=talalt)
+    _hangszoro_tar.update(ido=time.monotonic(), h=talalt, a=adok)
     return talalt
+
+
+async def osszes_ado(hass: HomeAssistant) -> set[str]:
+    """Az összes Cantabile kártyán felvett adók címe (séma nélkül, mint a cim())."""
+    await osszes_hangszoro(hass)
+    return _hangszoro_tar["a"]
 
 
 class HibaUzenet(Exception):

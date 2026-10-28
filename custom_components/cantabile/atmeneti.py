@@ -26,6 +26,9 @@ from homeassistant.helpers.event import async_track_time_interval
 
 from .const import szoveg
 
+# csak hangfájl kerülhet a médiamappába (a kártya fájlválasztója is audio/*)
+HANGFAJL = (".mp3", ".flac", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".wav", ".wma", ".aif", ".aiff", ".alac", ".ape", ".wv")
+
 _LOGGER = logging.getLogger(__name__)
 
 MAPPA = ".cantabile_atmeneti"
@@ -107,10 +110,16 @@ class Feltolto(HomeAssistantView):
         if mezo is None or not mezo.filename:
             return web.json_response({"error": szoveg(self.hass, "upload_no_file")}, status=400)
         nev = _NEM_JO.sub("_", os.path.basename(mezo.filename)).strip(" ._") or "zene"
+        if not nev.lower().endswith(HANGFAJL):
+            return web.json_response({"error": szoveg(self.hass, "upload_not_audio")}, status=415)
         cel = mappa / f"{int(time.time() * 1000)}_{nev}"
-        await self.hass.async_add_executor_job(lambda: mappa.mkdir(parents=True, exist_ok=True))
-        await self.hass.async_add_executor_job(_helyet, mappa, int(request.content_length or 0))
-        fajl = await self.hass.async_add_executor_job(cel.open, "wb")
+        try:
+            await self.hass.async_add_executor_job(lambda: mappa.mkdir(parents=True, exist_ok=True))
+            await self.hass.async_add_executor_job(_helyet, mappa, int(request.content_length or 0))
+            fajl = await self.hass.async_add_executor_job(cel.open, "wb")
+        except OSError as err:                  # pl. csak olvasható médiamappa
+            _LOGGER.warning("Cantabile: upload folder not writable (%s): %s", mappa, err)
+            return web.json_response({"error": szoveg(self.hass, "upload_not_writable")}, status=507)
         meret = 0
         try:
             while darab := await mezo.read_chunk(1024 * 1024):

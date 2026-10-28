@@ -85,7 +85,7 @@ def regisztral(hass: HomeAssistant) -> None:
         if tarolt and not msg["frissit"] and time.monotonic() - tarolt[0] < ERVENYES:
             connection.send_result(msg["id"], tarolt[1])
             return
-        if not os.path.isdir(gyoker):
+        if not await hass.async_add_executor_job(os.path.isdir, gyoker):   # egy megakadt NAS ne állítsa meg a HA-t
             connection.send_error(msg["id"], "nincs_mappa", szoveg(hass, "folder_unavailable"))
             return
         eredmeny = await hass.async_add_executor_job(_bejar, gyoker)

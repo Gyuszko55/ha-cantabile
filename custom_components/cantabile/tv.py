@@ -243,7 +243,7 @@ class TvKozpont:
         nev = re.sub(r"\s*\(\d+\)$", "", os.path.splitext(os.path.basename(fajl))[0]).replace("_", " ")
         eloado_cim = re.match(r"^\s*(?:\d+[\s.\-]+)?(.+?)\s+-\s+(.+)$", nev)
         szep = lambda x: x.title() if x and x == x.lower() else x  # noqa: E731
-        mappak = self._mappak(fajl)
+        mappak = await self.hass.async_add_executor_job(self._mappak, fajl)   # ismount: a NAS-on lassú lehet
         meta: dict[str, Any] = {
             "title": cimke.get("title") or szep(eloado_cim.group(2) if eloado_cim else re.sub(r"^\d+[\s.\-]+", "", nev)),
             "artist": cimke.get("artist") or cimke.get("album_artist") or szep(eloado_cim.group(1) if eloado_cim else (mappak[-2] if len(mappak) >= 2 else "")),
@@ -414,8 +414,11 @@ class TvKozpont:
 
 
 def _takarit(tar: str) -> None:
-    """A tárban legfeljebb ~1,5 GB DLNA-videó marad (a legrégebbiek törlődnek)."""
+    """A tárban legfeljebb ~1,5 GB DLNA-videó és 200 kibontott (beágyazott) borító marad (a legrégebbiek törlődnek)."""
     try:
+        boritok = sorted((os.path.join(tar, n) for n in os.listdir(tar) if re.fullmatch(r"[0-9a-f]{40}\.jpg", n)), key=os.path.getmtime)
+        for b in boritok[:-200]:
+            os.remove(b)
         videok = sorted((os.path.join(tar, n) for n in os.listdir(tar) if n.startswith("video_") and n.endswith(".mp4")), key=os.path.getmtime)
         osszes = sum(os.path.getsize(v) for v in videok)
         for v in videok:
@@ -504,6 +507,7 @@ async def beagyazott(hass: HomeAssistant, ut: str) -> str | None:
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(p.wait(), 20)
+        await hass.async_add_executor_job(_takarit, tar)
     return cel if os.path.exists(cel) else None
 
 
@@ -544,7 +548,7 @@ class TvKep(HomeAssistantView):
 
     async def get(self, request: web.Request) -> web.StreamResponse:
         if f := request.query.get("f"):
-            ut = self._engedett(f)
+            ut = await self.hass.async_add_executor_job(self._engedett, f)
             if not ut or not ut.lower().endswith(KEPKITERJ):
                 return web.Response(status=404)
             return web.FileResponse(ut, headers={"Cache-Control": "max-age=86400"})
@@ -555,7 +559,7 @@ class TvKep(HomeAssistantView):
             if not await self.hass.async_add_executor_job(os.path.isfile, ut):
                 return web.Response(status=404)
             return web.FileResponse(ut, headers={"Cache-Control": "max-age=86400"})
-        ut = self._engedett(request.query.get("e", ""))
+        ut = await self.hass.async_add_executor_job(self._engedett, request.query.get("e", ""))
         if not ut:
             return web.Response(status=404)
         cel = await beagyazott(self.hass, ut)

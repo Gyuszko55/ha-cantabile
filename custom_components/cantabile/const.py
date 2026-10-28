@@ -89,6 +89,8 @@ _TEXT: dict[str, dict[str, str]] = {
     "upload_no_folder": {"hu": "nincs médiamappa", "en": "no media folder"},
     "upload_bad_request": {"hu": "hibás kérés", "en": "bad request"},
     "upload_no_file": {"hu": "nincs fájl", "en": "no file"},
+    "upload_not_audio": {"hu": "csak hangfájl tölthető fel", "en": "only audio files can be uploaded"},
+    "upload_not_writable": {"hu": "a médiamappa nem írható", "en": "the media folder is not writable"},
     "upload_too_big": {"hu": "a fájl túl nagy (legfeljebb 300 MB)", "en": "the file is too large (300 MB at most)"},
     "no_tv": {"hu": "Nincs ehhez az oldalhoz rendelhető Cantabile TV-lejátszó", "en": "There is no Cantabile TV player for this page"},
 }
