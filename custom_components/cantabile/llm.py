@@ -65,7 +65,11 @@ class CantabileAPI(llm.API):
         except HibaUzenet:
             pass
         prompt = (
-            "When the user wants music or radio, use the cantabile_play tool. "
+            # a tool neve: önállóan cantabile_play, több API mellett cantabile__cantabile_play – a rövid névre
+            # a modell néha maga talál ki előtagot (cantabile:cantabile_play), és azt a HA nem ismeri fel
+            "When the user wants music or radio, call the play tool of this API, using its name exactly as listed. "
+            "Source: 'spotify' or 'tidal' when they ask for that service (Sonos speakers only), 'deezer' for Deezer, "
+            "'local' for their own music, otherwise leave it out. "
             + (f"Speakers: {nevek}; 'all' plays on every Sonos speaker together. " if nevek else "")
             + "After the tool runs, say briefly what is playing and where; if it failed, explain why and ask what they meant."
         )

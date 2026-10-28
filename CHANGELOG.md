@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.9.7 – 2026-10-28
+
+- Voice: the Cantabile instructions given to the assistant no longer name the tool by its short name. With more than one LLM API enabled, Home Assistant lists it as `cantabile__cantabile_play`; a model told to use "cantabile_play" sometimes invented its own prefix (`cantabile:cantabile_play`), which Home Assistant rejects as an unknown tool, and the request fell back to the built-in media search.
+- Voice: the instructions now say when to pick the Spotify, Tidal, Deezer or local source, so "play … on Spotify" reaches Spotify instead of the music folder and Deezer.
+
 ## 1.9.6 – 2026-10-28
 
 - Spotify on Sonos is recognised on the tape display: Sonos marks Spotify with service id 9 (only 12 was known), so the quality field and the format line now read "Spotify" / "Spotify | stream".
