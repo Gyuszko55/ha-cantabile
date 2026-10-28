@@ -599,7 +599,7 @@ class CantabileCard extends HTMLElement {
     this._forgoSzog = (i) => (nL > 1 ? -82 + (164 * L0.indexOf(i)) / (nL - 1) : 0);
     const fPont = (i, r) => { const a = (this._forgoSzog(i) * Math.PI) / 180; return [100 + r * Math.sin(a), 64 - r * Math.cos(a)]; };
     const forgo = `<div class="kimenet forgo"><div class="valaszto${nL > 5 ? " suru" : ""}">
-      ${L0.map((i, j) => { /* ötnél több állásnál minden második név kijjebb, hogy a szomszédok ne csússzanak egymásra */ const [x, y] = fPont(i, nL > 5 && j % 2 ? 67 : 56); const szg = this._forgoSzog(i), old = szg < -60 ? " fbal" : szg > 60 ? " fjobb" : ""; const [lx, ly] = fPont(i, 38); return `<i class="vt" style="transform:rotate(${this._forgoSzog(i)}deg)"></i><span class="flamp" data-i="${i}" style="left:${lx.toFixed(1)}px;top:${ly.toFixed(1)}px"></span><button class="fhsz${old}" data-i="${i}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><span class="fn">${ESC(KN(kim[i]))}</span></button>`; }).join("")}
+      ${L0.map((i) => { /* a nevek kifelé igazodnak (mint egy hi-fi választón): bal oldalt jobbra zárva, jobb oldalt balra – így sok állásnál sem érnek egymásba */ const [x, y] = fPont(i, 56); const szg = this._forgoSzog(i), old = szg < -60 ? " fbal" : szg > 60 ? " fjobb" : szg < -8 ? " fbk" : szg > 8 ? " fjk" : ""; const [lx, ly] = fPont(i, 38); return `<i class="vt" style="transform:rotate(${this._forgoSzog(i)}deg)"></i><span class="flamp" data-i="${i}" style="left:${lx.toFixed(1)}px;top:${ly.toFixed(1)}px"></span><button class="fhsz${old}" data-i="${i}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><span class="fn">${ESC(KN(kim[i]))}</span></button>`; }).join("")}
       <div class="vgomb" title="${T("Hangszóró váltása")}"><div class="vsapka"></div></div><small>SPEAKERS</small></div></div>`;
     const valto = `<button class="valto" title="${T("Rádió / tape")}"><span class="vr">RADIO</span><span class="kapcs"></span><span class="vm">TAPE</span></button>`;
     let beosztas = "";
@@ -1037,11 +1037,6 @@ class CantabileCard extends HTMLElement {
         .mjobb > .otg { display: none; }
         /* forgó hangszóró-választó (magnó) */
         .valaszto { position: relative; width: 200px; height: 104px; }
-        /* ötnél több állás: a kijjebb tett nevek ne érjenek a fölötte lévő feliratba – telefonon lejjebb, a széles
-           elrendezésben (ott a választó a kártya aljához szorul) kisebb */
-        :host([keskeny]) .valaszto.suru { margin-top: 12px; }
-        :host(:not([keskeny])) .magno .mjobb > .forgo .valaszto.suru { zoom: .82; }
-        :host(:not([keskeny])) .rjobb > .forgo .valaszto.suru { zoom: .78; }
         .valaszto .vt { position: absolute; left: 99px; top: 64px; width: 2px; height: 5px; margin-top: -33px; transform-origin: 1px 33px; background: #3d4148; }
         .vgomb { position: absolute; left: 100px; top: 64px; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; cursor: pointer;
           background: repeating-conic-gradient(#d8dbdf 0 5deg, #7d828a 5deg 10deg); box-shadow: 0 4px 8px rgba(0,0,0,.4), 0 0 0 1.5px #50545a; -webkit-tap-highlight-color: transparent; }
@@ -1057,6 +1052,11 @@ class CantabileCard extends HTMLElement {
         /* oldalsó állások: a név kifelé nyúlik, a lámpa a gomb felőli oldalon – hosszú név sem csúszik a gomb alá */
         .valaszto .fhsz.fbal { transform: translate(calc(-100% + 6px), -50%); }
         .valaszto .fhsz.fjobb { transform: translate(-6px, -50%); }
+        .valaszto .fhsz.fbk { transform: translate(-100%, -50%); }
+        /* hatnál több állás a széles elrendezésben: kisebb választó, hogy a felső nevek ne érjenek a fölötte lévő feliratokba */
+        :host(:not([keskeny])) .magno .mjobb > .forgo .valaszto.suru { zoom: .8; }
+        :host(:not([keskeny])) .rjobb > .forgo .valaszto.suru { zoom: .72; margin-top: 10px; }
+        .valaszto .fhsz.fjk { transform: translate(0, -50%); }
         /* a lámpa a jelzővonal külső végén ül (nem a felirat mellett) */
         .valaszto .flamp { position: absolute; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; pointer-events: none;
           background: #9a9fa6; box-shadow: inset 0 1px 1px rgba(0,0,0,.4); }
