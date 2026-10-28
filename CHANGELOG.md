@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.12.4 – unreleased
+## 1.12.4 – 2026-10-28
 
 - The card uses its own fonts everywhere: a bundled Arial-compatible sans (Arimo, OFL) for all labels next to Michroma, Exo 2 and Great Vibes, so a phone with a replaced system font no longer changes the look; the phone's enlarged text size no longer pushes the layout apart (`text-size-adjust: none`).
 - Speaker selector: names 30 % larger (with room for them, and accents no longer clipped); the SPEAKERS label is the same size and colour as VOLUME.
