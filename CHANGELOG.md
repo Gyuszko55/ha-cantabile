@@ -25,6 +25,8 @@
 - Voice control uses saved ⚙ settings right away (it kept the old ones for up to 5 minutes).
 - Removing the integration also removes the card's dashboard resource; reloading it no longer injects the card twice in YAML resource mode.
 - README: minimum browser versions; for Cast TVs with YAML-mode resources, add the card resource by hand.
+- Track-by-track playback (players without a queue) also follows players that don't show the file name – e.g. Music Assistant or Squeezebox report their own track ID and the tagged title: the cassette moved on only when the file name appeared, so it stopped after the first track. Now the player's own track ID, taken a moment after the start, tells a new track from “something else is playing”.
+- The card only redraws when something it shows changes (players, switches, Cantabile's own entities, language) – not on every sensor update in the house; smoother on wall tablets in large installs.
 
 ## 1.12.2 – 2026-10-28
 

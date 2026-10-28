@@ -218,13 +218,29 @@ class Cantabile:
                 )
                 if not await var(self.hass, entity_id, lambda st: bool(st and st.state == "playing"), 30):
                     return
-                # addig vár, amíg ez a szám szól vagy szünetel (a WiiM a címbe a fájl URL-jét írja)
+                # addig vár, amíg ez a szám szól vagy szünetel. A WiiM a címbe a fájl URL-jét írja; más lejátszó (pl. Music
+                # Assistant, Squeezebox) saját azonosítót és a címkéből vett címet ad – ott a kezdés után kicsit később
+                # kialakuló azonosító + cím a „lenyomat”, és ha az változik, más szól.
+                def sajat(st: State) -> bool:
+                    most = f"{st.attributes.get('media_title') or ''} {st.attributes.get('media_content_id') or ''}"
+                    return any(v in most for v in valtozatok)
+
+                def lenyomat(st: State | None) -> str:
+                    return str(st.attributes.get("media_content_id") or "") if st else ""
+
+                st = self.hass.states.get(entity_id)
+                alap = None
+                if st and not sajat(st):
+                    await asyncio.sleep(3)           # a cím / azonosító néha csak a kezdés után frissül
+                    st = self.hass.states.get(entity_id)
+                    alap = lenyomat(st) if st and st.state in AKTIV and not sajat(st) else None
 
                 def masik(st: State | None) -> bool:
                     if not st or st.state not in AKTIV:
                         return True
-                    most = f"{st.attributes.get('media_title') or ''} {st.attributes.get('media_content_id') or ''}"
-                    return not any(v in most for v in valtozatok)
+                    if sajat(st):
+                        return False
+                    return alap is None or lenyomat(st) != alap
 
                 await var(self.hass, entity_id, masik)
                 st = self.hass.states.get(entity_id)

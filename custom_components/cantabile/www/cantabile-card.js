@@ -484,7 +484,20 @@ class CantabileCard extends HTMLElement {
     if (elso) this._infoKer();
     if (this._hsz == null) this._hsz = this._kezdoHangszoro();
     if (this._mod == null) this._mod = this._kezdoMod();
+    // a HA minden állapotváltozáskor (bármely szenzor) új hass-t ad: csak akkor rajzol újra, ha a kártyát érintő
+    // állapot változott (lejátszók, kapcsolók, az integráció entitásai, nyelv) – nagy telepítésen gyenge tableten is sima;
+    // biztonságból 10 mp-enként akkor is
+    const ujNy = this._lenyomat(hass), regiNy = this._utolsoNy;
+    if (!elso && regiNy && Date.now() - this._utolsoFr < 10000 && ujNy.length === regiNy.length && ujNy.every((x, i) => x === regiNy[i])) return;
+    this._utolsoNy = ujNy; this._utolsoFr = Date.now();
     this._frissit();
+  }
+
+  _lenyomat(h) {
+    const ki = [h.locale, h.language, h.entities, h.connected];
+    for (const e of Object.values(this._ent || {})) ki.push(h.states[e]);
+    for (const e in h.states) if (e.startsWith("media_player.") || e.startsWith("switch.")) ki.push(h.states[e]);
+    return ki;
   }
 
   // az integráció entitásai (ismétlésszám, alvásidőzítő, NET-adó) a cantabile/info parancsból
