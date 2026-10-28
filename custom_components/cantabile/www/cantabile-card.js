@@ -101,6 +101,9 @@ const EN = {
   "Saját lejátszó-szkript": "Custom player script",
   "(beépített)": "(built-in)",
   "Kijelző": "Display",
+  "Előlap": "Front panel",
+  "Ezüst (húzott alumínium)": "Silver (brushed aluminium)",
+  "Fekete (90-es évek)": "Black (nineties)",
   "Deprez-műszer (mutatós VU)": "Moving-coil VU meters",
   "Fluoreszcens kijelző (VFD)": "Fluorescent display (VFD)",
   "VU-késleltetés (mp)": "VU delay (s)",
@@ -300,7 +303,7 @@ const TEL_ALAP = "Cantabile", FEL_MAX = 20 * 1024 * 1024;
 const ALVAS_LEPES = [15, 30, 45, 60, 90];
 // a kártya angol kulcsai → a belső (magyar) kulcsok; a ⚙ Mentés abban a nyelvben ír vissza, amiben a beállítás volt
 const KULCS = { speakers: "hangszorok", stations: "adok", name: "nev", short: "rovid", frequency: "frekvencia", mode: "mod", tape: "magno",
-  media_folder: "nas", brand: "marka", hires_folder: "hires", upload_folder: "feltoltes", player_script: "szkript", display: "vu_kijelzo", vu_delay: "vu_kesleltetes_mp" };
+  media_folder: "nas", brand: "marka", hires_folder: "hires", upload_folder: "feltoltes", player_script: "szkript", display: "vu_kijelzo", vu_delay: "vu_kesleltetes_mp", finish: "felulet" };
 const VISSZA = Object.fromEntries(Object.entries(KULCS).map(([a, b]) => [b, a]));
 const ATKULCS = (o, t) => Array.isArray(o) ? o.map((x) => ATKULCS(x, t)) : o && typeof o === "object" ? Object.fromEntries(Object.entries(o).map(([k, v]) => [t[k] || k, ATKULCS(v, t)])) : o;
 const KIJELZO_BE = { vu: "deprez", vfd: "fluor" }, KIJELZO_KI = { deprez: "vu", fluor: "vfd" };
@@ -415,6 +418,8 @@ class CantabileCard extends HTMLElement {
     });
     this._autoMod = !this._hass && (config.hangszorok || []).some((h) => h?.automod);
     if (config.magno?.vu_kijelzo in KIJELZO_BE) config.magno.vu_kijelzo = KIJELZO_BE[config.magno.vu_kijelzo];
+    // előlap: ezüst (alap) vagy fekete húzott felület (90-es évek)
+    this.toggleAttribute("fekete", config.felulet === "black");
     if (!Array.isArray(config.hangszorok) || !config.hangszorok.length) throw new Error(T("Adj meg legalább egy hangszórót (speakers)."));
     // frekvencia nélküli (csak internetes) adók: a skálán egyenletesen elosztva, a gombon WEB felirattal
     const adok = [...(config.adok || [])].filter((a) => a && a.url).map((a) => ({ ...a }));
@@ -1345,6 +1350,48 @@ class CantabileCard extends HTMLElement {
         :host([keskeny]) .rotg .og-net { order: 1; } :host([keskeny]) .rotg .og-sleep { order: 2; } :host([keskeny]) .rotg .og-bt { order: 3; }
         :host([magas]) ha-card { grid-template-rows: auto; align-content: center; }
         :host([magas]) .elo { height: auto; aspect-ratio: 2.3; max-height: 100%; }
+        /* fekete előlap (finish: black): a 90-es évek fekete, finoman húzott alumínium előlapja – világos feliratok, sötét gombok és tárcsák;
+           a kijelzők, a kazetta és a lámpák színe nem változik */
+        :host([fekete]) .elo {
+          background:
+            repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, rgba(0,0,0,.22) 1px 2px, transparent 2px 3px),
+            linear-gradient(180deg, #2c2e32, #1a1b1e 55%, #111214);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -2px 0 rgba(0,0,0,.6), 0 0 0 1px #050506; }
+        :host([fekete]) .fej, :host([fekete]) .fej .tipus { color: #c9ccd1; text-shadow: none; }
+        :host([fekete]) .fej .marka { color: #eceef1; text-shadow: 0 1px 0 rgba(0,0,0,.8); }
+        :host([fekete]) .fej .hszfej, :host([fekete]) .hcim span, :host([fekete]) .tnevek button, :host([fekete]) .mjobb .mfelirat { color: #9a9ea5; }
+        :host([fekete]) .giro small, :host([fekete]) .toloo small, :host([fekete]) .valaszto small, :host([fekete]) .valaszto .fhsz { color: #8d9198; }
+        :host([fekete]) .bsz, :host([fekete]) .hcim, :host([fekete]) .og small, :host([fekete]) .be .tap .stereo,
+        :host([fekete]) .valaszto .fhsz.akt, :host([fekete]) .mjobb .mfelirat b, :host([fekete]) .elo:not(.magno) .vr, :host([fekete]) .magno .vm { color: #e4e6ea; }
+        :host([fekete]) .forgo.bton .fhsz.akt, :host([fekete]) .bton .thsz .tnevek button.akt { color: #9a9ea5; }
+        :host([fekete]) .bj { background: #9a9ea5; }
+        :host([fekete]) .skala { box-shadow: inset 0 2px 6px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.08), 0 0 0 2px #000; }
+        :host([fekete]) .nincsado { border-color: #5a5e65; color: #9a9ea5; }
+        /* nyomógombok: fekete, enyhén domború billentyűk világos felirattal */
+        :host([fekete]) .bill, :host([fekete]) .sleep, :host([fekete]) .fgomb, :host([fekete]) .power, :host([fekete]) .ogomb, :host([fekete]) .hsz {
+          color: #dfe2e6; border-color: #050506; background: linear-gradient(180deg, #45484e, #2a2c30 55%, #1d1f22); }
+        :host([fekete]) .bill { box-shadow: 0 5px 0 #08090a, 0 6px 6px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.12); }
+        :host([fekete]) .sleep, :host([fekete]) .fgomb, :host([fekete]) .ogomb { box-shadow: 0 2px 0 #08090a, inset 0 1px 0 rgba(255,255,255,.12); }
+        :host([fekete]) .power { box-shadow: 0 3px 0 #08090a, inset 0 1px 0 rgba(255,255,255,.12); }
+        :host([fekete]) .hsz { border-right-color: #0b0c0d; }
+        :host([fekete]) .ogomb .oszam { color: #dfe2e6; }
+        :host([fekete]) .mbill { background: linear-gradient(180deg, #3e4146 0%, #26282c 55%, #18191c 100%);
+          box-shadow: 0 0 0 1px #050506, 0 3px 0 #08090a, 0 4px 5px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.12); }
+        :host([fekete]) .mg small { color: #c9ccd1; } :host([fekete]) .mg small svg { fill: #c9ccd1; }
+        :host([fekete]) .msor { background: linear-gradient(180deg, #0c0d0f, #1a1b1e); box-shadow: inset 0 2px 4px rgba(0,0,0,.8), 0 1px 0 rgba(255,255,255,.08); }
+        :host([fekete]) .bill small { color: #9a9ea5; }
+        :host([fekete]) .mg.akt .mbill, :host([fekete]) .mg:active .mbill, :host([fekete]) .mg.lenyomva .mbill { box-shadow: 0 0 0 1px #050506, 0 1px 2px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.1); }
+        :host([fekete]) .bill.akt, :host([fekete]) .bill:active { box-shadow: 0 1px 0 #08090a, 0 2px 3px rgba(0,0,0,.5); background: linear-gradient(180deg, #34373c, #1c1e21); }
+        :host([fekete]) .sleep:active, :host([fekete]) .fgomb:active, :host([fekete]) .ogomb:active { box-shadow: 0 1px 0 #08090a; }
+        /* tárcsák: fekete recézés, sötét eloxált sapka, fehér jelölő */
+        :host([fekete]) .gomb { background: repeating-conic-gradient(#3a3d42 0 2.5deg, #0e0f11 2.5deg 5deg); box-shadow: 0 6px 12px rgba(0,0,0,.6), 0 0 0 2px #000; }
+        :host([fekete]) .vgomb { background: repeating-conic-gradient(#3a3d42 0 5deg, #0e0f11 5deg 10deg); box-shadow: 0 4px 8px rgba(0,0,0,.6), 0 0 0 1.5px #000; }
+        :host([fekete]) .sapka, :host([fekete]) .vsapka {
+          background: conic-gradient(from 20deg, #4a4d53, #1f2124 12%, #44474c 25%, #1b1d20 38%, #4d5056 50%, #1d1f22 62%, #45484d 75%, #1c1e21 88%, #4a4d53);
+          box-shadow: inset 0 2px 2px rgba(255,255,255,.18), inset 0 -3px 5px rgba(0,0,0,.6); }
+        :host([fekete]) .sapka::after, :host([fekete]) .vsapka::after { background: #e8eaed; }
+        :host([fekete]) .tfog { background: linear-gradient(180deg, #4a4d52, #222427 45%, #3a3d42 55%, #17181b); box-shadow: 0 0 0 1px #000, 0 2px 3px rgba(0,0,0,.6); }
+        :host([fekete]) .tfog::after { background: #c9ccd1; }
       </style>
       <ha-card>
         <div class="elo" id="elo">
@@ -2075,7 +2122,7 @@ class CantabileCard extends HTMLElement {
 
   _beallNyit() {
     const c = this._config;
-    this._szerk = JSON.parse(JSON.stringify({ marka: c.marka || "Cantabile", deezer: c.deezer !== false,
+    this._szerk = JSON.parse(JSON.stringify({ marka: c.marka || "Cantabile", deezer: c.deezer !== false, felulet: c.felulet === "black" ? "black" : "silver",
       hangszorok: c.hangszorok.map(({ automod, ...h }) => h),
       adok: c.adok.map(({ virt, ...a }) => (virt ? { ...a, frekvencia: "" } : a)), magno: c.magno || {} }));
     this._talalatok = [];
@@ -2105,6 +2152,7 @@ class CantabileCard extends HTMLElement {
         <div class="bhiba">${ESC(uzenet)}</div>
         <section class="bresz"><h3>${T("Általános")}</h3>
           <div class="bsor ket"><label>${T("Márkanév")}</label>${be("_", 0, "marka", sz.marka)}</div>
+          <div class="bsor ket"><label>${T("Előlap")}</label><select data-l="_" data-i="0" data-m="felulet"><option value="silver" ${sz.felulet !== "black" ? "selected" : ""}>${T("Ezüst (húzott alumínium)")}</option><option value="black" ${sz.felulet === "black" ? "selected" : ""}>${T("Fekete (90-es évek)")}</option></select></div>
           ${sz.hangszorok.some((h) => h.mod === "sonos") ? `<div class="bsor ket"><label>${T("DEEZER fül")}</label><select data-l="_" data-i="0" data-m="deezer"><option value="1" ${sz.deezer !== false ? "selected" : ""}>${T("Látszik (a Sonos appban bekötött Deezer-fiókkal szól)")}</option><option value="0" ${sz.deezer === false ? "selected" : ""}>${T("Rejtve (nincs Deezer)")}</option></select></div>` : ""}
         </section>
         <section class="bresz"><h3>${T("Rádióadók")} <button class="bgomb" data-a="ujado">${T("+ Új adó")}</button></h3>
@@ -2203,6 +2251,7 @@ class CantabileCard extends HTMLElement {
     const uj = { marka: String(sz.marka || "").trim() || "Cantabile", hangszorok: hsz, magno,
       adok: adok.map((a) => { const o = { nev: a.nev, url: a.url }; if (Number.isFinite(a.frekvencia)) o.frekvencia = a.frekvencia; if (a.rovid) o.rovid = a.rovid; return o; }) };
     if (sz.deezer === false) uj.deezer = false;
+    if (sz.felulet === "black") uj.felulet = "black";
     try {
       // minden (UI-ban tárolt) vezérlőpult minden rádió-kártyája megkapja: a tablet és a Mobil „Zene” oldala azonos marad
       const itt = decodeURIComponent(location.pathname.split("/")[1] || "");

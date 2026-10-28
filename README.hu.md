@@ -138,6 +138,7 @@ Az integráció beállítása után nyisd meg a beszélgetőügynök beállítá
 ```yaml
 type: custom:cantabile-card
 brand: Cantabile                 # elhagyható
+finish: silver                   # silver (ezüst húzott alumínium) | black (90-es évek fekete húzott előlap)
 bt: true                         # BT-kimenet ezen a készüléken; false = nincs
 speakers:
   - name: Nappali

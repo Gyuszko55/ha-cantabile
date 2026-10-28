@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.9 – 2026-10-28
+
+- New front panel option: `finish: black` gives both decks a nineties-style black brushed front – light lettering, black keys, black knurled knobs with dark anodised caps. The displays, the cassette and the lamps keep their colours. Also selectable in ⚙ (Front panel: Silver / Black); `silver` stays the default.
+
 ## 1.9.8 – 2026-10-28
 
 - Phone layout of the tape deck: the SPEAKERS selector is back beside the volume knob (under the five function buttons), the RADIO / TAPE switch moves below them; the selector and the knob are a little smaller so the outermost names fit on a 360 px wide phone.

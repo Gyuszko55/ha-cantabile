@@ -137,6 +137,7 @@ After setting up the integration, open your conversation agent's options (e.g. *
 ```yaml
 type: custom:cantabile-card
 brand: Cantabile                 # optional
+finish: silver                   # silver (brushed aluminium) | black (nineties black brushed front)
 bt: true                         # BT output on this device; false = hidden
 speakers:
   - name: Living room
