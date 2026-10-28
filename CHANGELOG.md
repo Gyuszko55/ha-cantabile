@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.10.1 – 2026-10-28
+
+- Black front: a clearly brushed surface (three layers of hairlines of different spacing instead of one faint one); the cassette door's side strips and the edge of the cassette window and the VFD are black instead of chrome and white.
+- SPEAKERS selector: the lamps sit at the outer end of the dial's tick marks instead of beside the names.
+
 ## 1.10.0 – 2026-10-28
 
 - Speaker card names: each speaker has a name shown on the card (`short`, ⚙ column "On card", max. 8 characters) – used on the dial, the radio speaker switch, the header, the cassette info line, the queue and the messages. The full `name` stays for voice control and the Spotify device lookup. ⚙ refuses a longer card name, and asks for one when the full name is longer than 8 characters; a longer YAML name is cut to 8 on the card. The built-in Multiroom position keeps its label.

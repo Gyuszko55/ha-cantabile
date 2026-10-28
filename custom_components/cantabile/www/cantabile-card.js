@@ -592,7 +592,7 @@ class CantabileCard extends HTMLElement {
     this._forgoSzog = (i) => (nL > 1 ? -82 + (164 * L0.indexOf(i)) / (nL - 1) : 0);
     const fPont = (i, r) => { const a = (this._forgoSzog(i) * Math.PI) / 180; return [100 + r * Math.sin(a), 64 - r * Math.cos(a)]; };
     const forgo = `<div class="kimenet forgo"><div class="valaszto">
-      ${L0.map((i) => { const [x, y] = fPont(i, 56); const szg = this._forgoSzog(i), old = szg < -60 ? " fbal" : szg > 60 ? " fjobb" : ""; return `<i class="vt" style="transform:rotate(${this._forgoSzog(i)}deg)"></i><button class="fhsz${old}" data-i="${i}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><span class="lamp"></span><span class="fn">${ESC(KN(kim[i]))}</span></button>`; }).join("")}
+      ${L0.map((i) => { const [x, y] = fPont(i, 56); const szg = this._forgoSzog(i), old = szg < -60 ? " fbal" : szg > 60 ? " fjobb" : ""; const [lx, ly] = fPont(i, 38); return `<i class="vt" style="transform:rotate(${this._forgoSzog(i)}deg)"></i><span class="flamp" data-i="${i}" style="left:${lx.toFixed(1)}px;top:${ly.toFixed(1)}px"></span><button class="fhsz${old}" data-i="${i}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><span class="fn">${ESC(KN(kim[i]))}</span></button>`; }).join("")}
       <div class="vgomb" title="${T("Hangszóró váltása")}"><div class="vsapka"></div></div><small>SPEAKERS</small></div></div>`;
     const valto = `<button class="valto" title="${T("Rádió / tape")}"><span class="vr">RADIO</span><span class="kapcs"></span><span class="vm">TAPE</span></button>`;
     let beosztas = "";
@@ -1043,14 +1043,17 @@ class CantabileCard extends HTMLElement {
         .valaszto .fhsz.akt { color: #23262b; }
         .valaszto .fhsz .fn { max-width: 78px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
         /* oldalsó állások: a név kifelé nyúlik, a lámpa a gomb felőli oldalon – hosszú név sem csúszik a gomb alá */
-        .valaszto .fhsz.fbal { transform: translate(calc(-100% + 6px), -50%); flex-direction: row-reverse; }
+        .valaszto .fhsz.fbal { transform: translate(calc(-100% + 6px), -50%); }
         .valaszto .fhsz.fjobb { transform: translate(-6px, -50%); }
-        .valaszto .fhsz.akt .lamp { background: #ffb020; box-shadow: 0 0 5px #ffb020; }
+        /* a lámpa a jelzővonal külső végén ül (nem a felirat mellett) */
+        .valaszto .flamp { position: absolute; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; pointer-events: none;
+          background: #9a9fa6; box-shadow: inset 0 1px 1px rgba(0,0,0,.4); }
+        .valaszto .flamp.akt { background: #ffb020; box-shadow: 0 0 5px #ffb020; }
         .magno .mjobb > .forgo .valaszto { zoom: .92; }
         :host([keskeny]) .magno .mjobb > .forgo .valaszto { zoom: .9; }
         .magno .mjobb .mfelirat { max-width: 66px; font-size: 7.5px; letter-spacing: .04em; }
         :host([keskeny]) .magno .mjobb .mfelirat { font-size: 8px; letter-spacing: .08em; }
-        .forgo.bton .fhsz.akt { color: #8a8e94; } .forgo.bton .fhsz.akt .lamp { background: #c9a14a; box-shadow: none; }
+        .forgo.bton .fhsz.akt { color: #8a8e94; } .forgo.bton .flamp.akt { background: #c9a14a; box-shadow: none; }
         .valaszto small { position: absolute; left: 0; right: 0; bottom: -4px; text-align: center; font: 700 7px/1 Arial, sans-serif; letter-spacing: .22em; color: #6d7179; }
         .mfunk > button { min-width: 0; padding-inline: 2px; letter-spacing: .08em; }
         .fgomb.tiltva { opacity: .4; pointer-events: none; }
@@ -1359,9 +1362,12 @@ class CantabileCard extends HTMLElement {
         /* fekete előlap (finish: black): a 90-es évek fekete, finoman húzott alumínium előlapja – világos feliratok, sötét gombok és tárcsák;
            a kijelzők, a kazetta és a lámpák színe nem változik */
         :host([fekete]) .elo {
+          /* húzott fekete: három, eltérő periódusú hajszálcsík-réteg (szabálytalan húzásnyom) + enyhe függőleges fényátmenet */
           background:
-            repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, rgba(0,0,0,.22) 1px 2px, transparent 2px 3px),
-            linear-gradient(180deg, #2c2e32, #1a1b1e 55%, #111214);
+            repeating-linear-gradient(90deg, rgba(255,255,255,.075) 0 1px, transparent 1px 3px, rgba(0,0,0,.35) 3px 4px, transparent 4px 5px),
+            repeating-linear-gradient(90deg, transparent 0 7px, rgba(255,255,255,.04) 7px 8px, transparent 8px 13px, rgba(0,0,0,.22) 13px 14px, transparent 14px 23px),
+            repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.025) 31px 33px, transparent 33px 57px, rgba(0,0,0,.15) 57px 59px, transparent 59px 89px),
+            linear-gradient(180deg, #34363b, #1d1e21 50%, #141517);
           box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -2px 0 rgba(0,0,0,.6), 0 0 0 1px #050506; }
         :host([fekete]) .fej, :host([fekete]) .fej .tipus { color: #c9ccd1; text-shadow: none; }
         :host([fekete]) .fej .marka { color: #eceef1; text-shadow: 0 1px 0 rgba(0,0,0,.8); }
@@ -1370,7 +1376,12 @@ class CantabileCard extends HTMLElement {
         :host([fekete]) .bsz, :host([fekete]) .hcim, :host([fekete]) .og small, :host([fekete]) .be .tap .stereo,
         :host([fekete]) .valaszto .fhsz.akt, :host([fekete]) .mjobb .mfelirat b, :host([fekete]) .elo:not(.magno) .vr, :host([fekete]) .magno .vm { color: #e4e6ea; }
         :host([fekete]) .forgo.bton .fhsz.akt, :host([fekete]) .bton .thsz .tnevek button.akt { color: #9a9ea5; }
-        :host([fekete]) .bj { background: #9a9ea5; }
+        :host([fekete]) .bj, :host([fekete]) .valaszto .vt { background: #9a9ea5; }
+        :host([fekete]) .valaszto .flamp:not(.akt) { background: #44474d; box-shadow: inset 0 1px 1px rgba(0,0,0,.7); }
+        /* a kazettaajtó két széle és a kijelzők pereme is fekete (az ezüst krómléc és a fehér él helyett) */
+        :host([fekete]) .ajto .krom { background: linear-gradient(90deg, #050506, #3a3d42 35%, #16171a 55%, #44474c 75%, #050506); box-shadow: 0 0 2px rgba(0,0,0,.9); }
+        :host([fekete]) .ablak { box-shadow: inset 0 0 0 1px #000, inset 0 6px 14px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.07), 0 0 0 2px #050506; }
+        :host([fekete]) .vfd { box-shadow: inset 0 0 0 2px #0b0c0d, inset 0 0 18px rgba(0,0,0,.95), 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px #000; }
         :host([fekete]) .skala { box-shadow: inset 0 2px 6px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.08), 0 0 0 2px #000; }
         :host([fekete]) .nincsado { border-color: #5a5e65; color: #9a9ea5; }
         /* nyomógombok: fekete, enyhén domború billentyűk világos felirattal */
@@ -3581,7 +3592,7 @@ class CantabileCard extends HTMLElement {
     sr.querySelectorAll(".hsz").forEach((b) => b.classList.toggle("akt", Number(b.dataset.i) === this._hsz));
     const hu = this._hangUtolso(), L = this._hszIdx, bton = this._hsz === this._btIdx;
     sr.querySelectorAll(".hszv").forEach((b) => b.classList.toggle("akt", Number(b.dataset.i) === hu));
-    sr.querySelectorAll(".fhsz").forEach((b) => b.classList.toggle("akt", Number(b.dataset.i) === hu));
+    sr.querySelectorAll(".fhsz, .flamp").forEach((b) => b.classList.toggle("akt", Number(b.dataset.i) === hu));
     sr.querySelectorAll(".forgo").forEach((x) => x.classList.toggle("bton", bton));
     sr.querySelectorAll(".forgo .vsapka").forEach((x) => { x.style.transform = `rotate(${this._forgoSzog(hu)}deg)`; });
     sr.querySelectorAll(".thsz .tfog").forEach((x) => x.style.setProperty("--p", L.length > 1 ? L.indexOf(hu) / (L.length - 1) : 0));
