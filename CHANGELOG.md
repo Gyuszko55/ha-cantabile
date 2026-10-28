@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.12.10 – unreleased
+## 1.12.10 – 2026-10-29
 
 - No silent failures any more:
   - every failed command shows a message (“Sonos 2: the command failed – …”);
