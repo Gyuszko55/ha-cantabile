@@ -319,6 +319,8 @@ const VISSZA = Object.fromEntries(Object.entries(KULCS).map(([a, b]) => [b, a]))
 const ATKULCS = (o, t) => Array.isArray(o) ? o.map((x) => ATKULCS(x, t)) : o && typeof o === "object" ? Object.fromEntries(Object.entries(o).map(([k, v]) => [t[k] || k, ATKULCS(v, t)])) : o;
 const KIJELZO_BE = { vu: "deprez", vfd: "fluor" }, KIJELZO_KI = { deprez: "vu", fluor: "vfd" };
 const KARTYAK = ["custom:cantabile-card", "custom:tablet-radio"];
+// a kártya beállításának „személyazonossága” a mentéshez: a hangszórók és az adók sora (a nevek, rövid nevek nem számítanak)
+const LENYOMAT = (y) => { const c = ATKULCS(y || {}, KULCS); return JSON.stringify([(c.hangszorok || []).map((h) => h?.entity), (c.adok || []).map((a) => a?.url)]); };
 const URLSZERU = (x) => /^[a-z0-9+.-]+:\/\//i.test(String(x || ""));
 const HANGFAJL = /\.(mp3|flac|m4a|aac|ogg|wav|wma)$/i;
 // lejátszható zeneszám-e egy médiaböngésző-elem: helyi fájlnál a kiterjesztés, más zenetárnál (Jellyfin, DLNA-médiaszerver…)
@@ -2364,10 +2366,15 @@ class CantabileCard extends HTMLElement {
     if (sz.deezer === false) uj.deezer = false;
     if (sz.felulet === "black") uj.felulet = "black";
     try {
-      // minden (UI-ban tárolt) vezérlőpult minden rádió-kártyája megkapja: a tablet és a Mobil „Zene” oldala azonos marad
-      const itt = decodeURIComponent(location.pathname.split("/")[1] || "");
+      // minden (UI-ban tárolt) vezérlőpult azon kártyái kapják meg, amelyeken eddig ugyanazok a hangszórók és adók voltak
+      // (pl. a tablet és a Mobil „Zene” oldala azonos marad); a másképp beállított (pl. szobánkénti) kártyák nem változnak
+      const elso = decodeURIComponent(location.pathname.split("/")[1] || "");
       const lista = await this._hass.callWS({ type: "lovelace/dashboards/list" });
-      const pultok = [...new Set([itt, ...lista.filter((d) => d.mode === "storage").map((d) => d.url_path)])];
+      // az alap (Áttekintés) vezérlőpult 2026.2-től „lovelace” néven a listában van, előtte nincs benne, és url_path-ja null
+      const alap = lista.some((d) => d.url_path === "lovelace") ? "lovelace" : null;
+      const itt = lista.some((d) => d.url_path === elso) ? elso : alap;
+      const pultok = [...new Set([itt, alap, ...lista.filter((d) => d.mode === "storage").map((d) => d.url_path)])];
+      const sajat = LENYOMAT(this._eredetiCfg);
       const csere = (o) => {
         let db = 0;
         // a beállítás abban a nyelvben (magyar vagy angol kulcsok) kerül vissza, amiben a kártyán volt
@@ -2378,8 +2385,9 @@ class CantabileCard extends HTMLElement {
           return { ...regi, ...ki };
         };
         const bejar = (x) => {
-          if (Array.isArray(x)) x.forEach((y, k) => { if (KARTYAK.includes(y?.type)) { x[k] = ir(y); db++; } else bejar(y); });
-          else if (x && typeof x === "object") for (const k of Object.keys(x)) { if (KARTYAK.includes(x[k]?.type)) { x[k] = ir(x[k]); db++; } else bejar(x[k]); }
+          const egyezik = (y) => KARTYAK.includes(y?.type) && LENYOMAT(y) === sajat;
+          if (Array.isArray(x)) x.forEach((y, k) => { if (egyezik(y)) { x[k] = ir(y); db++; } else bejar(y); });
+          else if (x && typeof x === "object") for (const k of Object.keys(x)) { if (egyezik(x[k])) { x[k] = ir(x[k]); db++; } else bejar(x[k]); }
         };
         bejar(o);
         return db;

@@ -3,6 +3,10 @@
 ## 1.12.3 – unreleased
 
 - Speaker selector: at most 4 names per side; a 9th name sits centred above the knob, with a 10th the two top names sit side by side above it. Each line now leaves the knob radially (from its evenly spaced position on the ~270° arc) and turns horizontal at the height of its name.
+- ⚙ Save works on the default Overview dashboard on Home Assistant versions before 2026.2 too (it failed with “Unknown config specified: lovelace”).
+- ⚙ Save only updates the cards that had the same speakers and stations as this one (e.g. the same radio on a tablet and a phone dashboard); cards set up differently – say, one per room – are left alone instead of being overwritten.
+- Voice and `cantabile.play` find artists, albums, tracks, stations and speakers written in non-Latin scripts (Cyrillic, Greek, CJK…); before, these names were ignored.
+- Music folders reached through a symbolic link inside the media folder (e.g. `/media/Music` → a mounted NAS share) work for the tape search, the real VU signal and Cantabile TV; before they were refused as “outside the media folder”. Linked subfolders are followed, loops are skipped.
 
 ## 1.12.2 – 2026-10-28
 

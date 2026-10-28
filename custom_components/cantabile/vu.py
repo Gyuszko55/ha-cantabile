@@ -35,6 +35,8 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import dt as dt_util
 
+from .library import media_ut
+
 _LOGGER = logging.getLogger(__name__)
 
 MINTA = 11025                      # Hz – a szintméréshez bőven elég
@@ -63,9 +65,8 @@ def forras(state: State | None, media_dirs: dict[str, str] | None = None) -> tup
         # a HA saját média-forrása (/media/<mappa-azonosító>/<útvonal>): a fájlt közvetlenül olvassuk
         helyi = re.match(r"^https?://[^/]+/media/([^/?#]+)/([^?#]+)", u)
         if helyi and helyi.group(1) in (media_dirs or {}):
-            alap = os.path.realpath(media_dirs[helyi.group(1)])
-            fajl = os.path.realpath(os.path.join(alap, unquote(helyi.group(2))))
-            if fajl.startswith(alap + os.sep):
+            fajl = media_ut(media_dirs[helyi.group(1)], unquote(helyi.group(2)))
+            if fajl:
                 return ("fajl", fajl)
             continue
         return ("stream", u)

@@ -24,10 +24,31 @@ ERVENYES = 30 * 60
 _tar: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
+def media_ut(alap: str, rel: str) -> str | None:
+    """A média-mappán belüli útvonal, vagy None, ha kilépne belőle (pl. "..").
+
+    Szöveges ellenőrzés, mint a HA saját média-forrásánál: a mappán belüli szimbolikus link (pl. a /media/Zene → NAS)
+    így használható, és nem kell a lemezhez fordulni.
+    """
+    a = os.path.normpath(os.path.abspath(alap))
+    ut = os.path.normpath(os.path.join(a, rel))
+    return ut if ut == a or ut.startswith(a + os.sep) else None
+
+
 def _bejar(gyoker: str) -> dict[str, Any]:
     mappak: list[str] = []
     fajlok: list[str] = []
-    for hol, almappak, nevek in os.walk(gyoker):
+    latott: set[tuple[int, int]] = set()
+    for hol, almappak, nevek in os.walk(gyoker, followlinks=True):
+        try:
+            st = os.stat(hol)
+        except OSError:
+            almappak.clear()
+            continue
+        if (st.st_dev, st.st_ino) in latott:          # körbe mutató link
+            almappak.clear()
+            continue
+        latott.add((st.st_dev, st.st_ino))
         almappak.sort()
         rel = os.path.relpath(hol, gyoker)
         if rel != ".":
@@ -54,9 +75,8 @@ def regisztral(hass: HomeAssistant) -> None:
         if not alap:
             connection.send_error(msg["id"], "rossz_mappa", f"Ismeretlen média-forrás: {forras}")
             return
-        alap_valos = os.path.realpath(alap)
-        gyoker = os.path.realpath(os.path.join(alap, rel))
-        if gyoker != alap_valos and not gyoker.startswith(alap_valos + os.sep):
+        gyoker = media_ut(alap, rel)
+        if gyoker is None:
             connection.send_error(msg["id"], "rossz_mappa", "A mappa a média-mappán kívül van.")
             return
         tarolt = _tar.get(gyoker)

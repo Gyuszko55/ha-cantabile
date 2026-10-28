@@ -41,6 +41,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import DOMAIN
+from .library import media_ut
 
 if TYPE_CHECKING:
     from .media_player import CantabileTv
@@ -130,9 +131,7 @@ class TvKozpont:
                 return async_sign_path(self.hass, f"/api/cantabile/stream?url={quote(mcid, safe='')}", ALAIRAS), None
         m = re.match(r"^/media/([^/?#]+)/([^?#]+)", ut)
         if m and m.group(1) in self.hass.config.media_dirs:
-            alap = os.path.realpath(self.hass.config.media_dirs[m.group(1)])
-            f = os.path.realpath(os.path.join(alap, unquote(m.group(2))))
-            fajl = f if f.startswith(alap + os.sep) else None
+            fajl = media_ut(self.hass.config.media_dirs[m.group(1)], unquote(m.group(2)))
         if "authSig=" not in ut:
             ut = async_sign_path(self.hass, ut.split("?")[0], ALAIRAS)
         return ut, fajl
@@ -231,7 +230,7 @@ class TvKozpont:
     def _mappak(self, fajl: str) -> list[str]:
         """A fájl mappái a médiamappa gyökere alatt (pl. ["NAS310", "Queen", "A Kind of Magic"] → a gyökér nélkül)."""
         for alap in self.hass.config.media_dirs.values():
-            a = os.path.realpath(alap)
+            a = os.path.normpath(os.path.abspath(alap))
             if fajl.startswith(a + os.sep):
                 resz = [x for x in os.path.relpath(os.path.dirname(fajl), a).split(os.sep) if x and x != "."]
                 if resz and os.path.ismount(os.path.join(a, resz[0])):
@@ -494,11 +493,10 @@ class TvKep(HomeAssistantView):
         self.hass = hass
 
     def _engedett(self, ut: str) -> str | None:
-        valodi = os.path.realpath(ut)
+        f = os.path.normpath(ut)
         for alap in self.hass.config.media_dirs.values():
-            a = os.path.realpath(alap)
-            if valodi.startswith(a + os.sep) and os.path.isfile(valodi):
-                return valodi
+            if f.startswith(os.path.normpath(os.path.abspath(alap)) + os.sep) and os.path.isfile(f):
+                return f
         return None
 
     async def head(self, request: web.Request) -> web.StreamResponse:

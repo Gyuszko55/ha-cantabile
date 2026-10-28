@@ -34,7 +34,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 
 from .const import szoveg
-from .library import ELOTAG, _bejar
+from .library import ELOTAG, _bejar, media_ut
 from .runtime import Cantabile
 
 _LOGGER = logging.getLogger(__name__)
@@ -67,9 +67,9 @@ _nas_tar: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
 def norm(t: str) -> str:
-    """Kisbetű, ékezet és írásjel nélkül, egy szóközzel."""
-    t = unicodedata.normalize("NFD", str(t or "")).encode("ascii", "ignore").decode().lower()
-    return " ".join(re.sub(r"[^a-z0-9]+", " ", t).split())
+    """Kisbetű, ékezet és írásjel nélkül, egy szóközzel (nem latin írású nevek betűi megmaradnak)."""
+    t = "".join(c for c in unicodedata.normalize("NFD", str(t or "")) if unicodedata.category(c) != "Mn").casefold()
+    return " ".join(re.sub(r"[\W_]+", " ", t).split())
 
 
 def tiszta(nev: str) -> str:
@@ -215,7 +215,9 @@ def nas_lista(hass: HomeAssistant, nas: str) -> dict[str, Any]:
     alap = hass.config.media_dirs.get(forras)
     if not alap:
         raise HibaUzenet("nas_unavailable")
-    gyoker = os.path.realpath(os.path.join(alap, rel))
+    gyoker = media_ut(alap, rel)
+    if gyoker is None:
+        raise HibaUzenet("nas_unavailable")
     tarolt = _nas_tar.get(gyoker)
     if tarolt and time.monotonic() - tarolt[0] < 1800:
         return tarolt[1]
