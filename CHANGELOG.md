@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.12.3 – unreleased
+## 1.12.3 – 2026-10-28
 
 - Speaker selector: at most 4 names per side; a 9th name sits centred above the knob, with a 10th the two top names sit side by side above it. Each line now leaves the knob radially (from its evenly spaced position on the ~270° arc) and turns horizontal at the height of its name.
 - ⚙ Save works on the default Overview dashboard on Home Assistant versions before 2026.2 too (it failed with “Unknown config specified: lovelace”).
