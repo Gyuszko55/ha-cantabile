@@ -35,7 +35,7 @@
           "duck_level": "Az eredeti hangerő százalékában; 0 = elnémul.",
           "spotify_client_id": "A developer.spotify.com → Dashboard → Create app oldalról. A SPOTIFY fülön a katalógus keresését engedi. Nem kell, ha be van kötve a Home Assistant Spotify-integrációja (azzal a saját listák is látszanak). Lejátszás: Sonoson a Sonos appba bekötött Spotify-jal, vagy Spotify Connect-hangszórón a Spotify-integráción át (Premium).",
           "tidal_client_id": "A developer.tidal.com → Dashboard → Create app oldalról. A TIDAL fülön a katalógus keresését engedi; lejátszás Sonoson, a Sonos appba bekötött Tidallal.",
-          "tv_players": "Cast-eszközök (pl. TV-stick), amelyek Cantabile-hangszóróként szólnak, a képernyőn TV-oldallal: equalizer / hullámforma, előadókép, a szám adatai és haladásjelző. Kell hozzá a „cantabile-tv” vezérlőpult egy „tv” nézettel, benne a Cantabile TV kártyával (lásd README)."
+          "tv_players": "TV-k, amelyek Cantabile-hangszóróként szólnak, a képernyőn a számmal. Cast-eszközön (pl. TV-stick) a teljes TV-oldal: equalizer / hullámforma, előadókép, a szám adatai és haladásjelző (kell hozzá a „cantabile-tv” vezérlőpult egy „tv” nézettel, benne a Cantabile TV kártyával, lásd README). DLNA-s TV-n (DLNA Digital Media Renderer integráció) álló adatlap: borító, előadókép és a szám adatai."
         }
       }
     }

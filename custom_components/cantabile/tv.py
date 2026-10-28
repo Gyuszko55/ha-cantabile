@@ -52,6 +52,8 @@ TV_VIEW = "tv"
 OLDAL_VARAS = 35                     # mp – ennyit vár, hogy a kiküldött TV-oldal bejelentkezzen
 ALAIRAS = timedelta(hours=8)
 KEP_URL = "/api/cantabile/tv/image"
+VIDEO_URL = "/api/cantabile/tv/video"
+ELO_URL = "/api/cantabile/tv/live"
 MAPPAKEPEK = ("cover", "folder", "front", "album", "albumart", "albumartsmall")
 KEPKITERJ = (".jpg", ".jpeg", ".png", ".webp")
 DEEZER = "https://api.deezer.com"
@@ -69,6 +71,8 @@ class TvKozpont:
         self.lejatszok: dict[str, CantabileTv] = {}     # entity_id → lejátszó
         self._var: CantabileTv | None = None             # erre a lejátszóra vár egy éppen kiküldött oldal
         self._deezer: dict[str, str | None] = {}
+        self._video_zar: dict[str, asyncio.Lock] = {}
+        self.elo: dict[str, tuple[str, str]] = {}      # élő DLNA-videó: kulcs → (adatlap képe, adó címe)
 
     # ---- oldal ↔ lejátszó ----
     @callback
@@ -150,8 +154,10 @@ class TvKozpont:
                 kep = await self.hass.async_add_executor_job(_mappakep, fajl)
                 if kep:
                     meta["cover"] = async_sign_path(self.hass, f"{KEP_URL}?f={quote(kep, safe='')}", ALAIRAS)
+                    meta["_cover_file"] = kep
                 elif meta.pop("_beagyazott", False):
                     meta["cover"] = async_sign_path(self.hass, f"{KEP_URL}?e={quote(fajl, safe='')}", ALAIRAS)
+                    meta["_cover_embedded"] = fajl
             meta.pop("_beagyazott", None)
             meta.setdefault("kind", "file")
         else:
@@ -246,6 +252,150 @@ class TvKozpont:
         return kep
 
 
+    # ---- DLNA mód: a szám adatlapja képként (tv_kep.py) ----
+    async def dlna_kep(self, meta: dict[str, Any]) -> str | None:
+        """Megrajzolja (vagy a tárból veszi) az adatlapot, és a TV számára bejelentkezés nélkül olvasható, aláírt belső
+        címét adja vissza (a DLNA-s TV a borítót maga tölti le)."""
+        ut = await self.dlna_kepfajl(meta)
+        return self.belso_cim(f"{KEP_URL}?d={os.path.basename(ut)}") if ut else None
+
+    def belso_cim(self, ut: str) -> str | None:
+        from homeassistant.helpers.network import NoURLAvailableError, get_url
+
+        try:
+            alap = get_url(self.hass, allow_external=False, allow_cloud=False, prefer_external=False)
+        except NoURLAvailableError:
+            return None
+        return alap + async_sign_path(self.hass, ut, ALAIRAS)
+
+    async def dlna_video(self, meta: dict[str, Any], fajl: str) -> str | None:
+        """A szám „videóként”: egyetlen álló képkocka (az adatlap) + a zene, MP4-be (a tárba). A Samsung és más DLNA-s TV-k
+        így teljes képernyőn mutatják az adatlapot, a saját haladásjelzőjükkel; a fájl tekerhető. Aláírt belső cím, vagy None."""
+        kep = await self.dlna_kepfajl(meta)
+        if not kep:
+            return None
+        hossz = float(meta.get("duration") or 0)    # a hang hossza: a kép ne nyújtsa meg a videót
+        try:
+            mtime = await self.hass.async_add_executor_job(os.path.getmtime, fajl)
+        except OSError:
+            return None
+        kulcs = hashlib.sha1(f"{kep}|{fajl}|{mtime}".encode()).hexdigest()[:20]
+        tar = self.hass.config.path(".cache", "cantabile_tv")
+        cel = os.path.join(tar, f"video_{kulcs}.mp4")
+        if not os.path.exists(cel):
+            async with self._video_zar.setdefault(cel, asyncio.Lock()):
+                if not os.path.exists(cel):
+                    ideig = cel + ".tmp.mp4"
+                    for kodolo in (["-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage", "-pix_fmt", "yuv420p"],
+                                   ["-c:v", "mpeg4", "-q:v", "3", "-pix_fmt", "yuv420p"]):
+                        p = await asyncio.create_subprocess_exec(
+                            "ffmpeg", "-v", "error", "-y", "-loop", "1", "-framerate", "1", "-i", kep, "-i", fajl,
+                            "-map", "0:v", "-map", "1:a", "-vf", "scale=1280:720", *kodolo, "-r", "1", "-g", "10",
+                            "-c:a", "aac", "-b:a", "256k", "-shortest", *(["-t", f"{hossz:.2f}"] if hossz else []),
+                            "-movflags", "+faststart", ideig,
+                            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
+                        try:
+                            _, hiba = await asyncio.wait_for(p.communicate(), 180)
+                        except TimeoutError:
+                            p.kill()
+                            hiba = b"timeout"
+                        if p.returncode == 0 and os.path.exists(ideig):
+                            await self.hass.async_add_executor_job(os.replace, ideig, cel)
+                            break
+                        _LOGGER.warning("Cantabile TV: a DLNA-videó nem készült el (%s): %s", kodolo[1], (hiba or b"")[-300:].decode(errors="replace"))
+                    self._video_zar.pop(cel, None)
+                    await self.hass.async_add_executor_job(_takarit, tar)
+        if not os.path.exists(cel):
+            return None
+        return self.belso_cim(f"{VIDEO_URL}/{os.path.basename(cel)}")
+
+    async def dlna_elo(self, meta: dict[str, Any], url: str) -> str | None:
+        """Webes adó „élő videóként” (az adatlap + az adó hangja, menet közben kódolva, MPEG-TS); aláírt belső cím."""
+        kep = await self.dlna_kepfajl(meta)
+        if not kep:
+            return None
+        kulcs = hashlib.sha1(f"{kep}|{url}".encode()).hexdigest()[:20]
+        if len(self.elo) > 50:
+            self.elo.clear()
+        self.elo[kulcs] = (kep, url)
+        return self.belso_cim(f"{ELO_URL}/{kulcs}.ts")
+
+    async def dlna_kepfajl(self, meta: dict[str, Any]) -> str | None:
+        """Az adatlap képfájlja a tárban (szükség esetén megrajzolja)."""
+        from . import tv_kep
+
+        kulcs = hashlib.sha1(json.dumps({k: v for k, v in meta.items() if not k.startswith("_") or k == "_cover_file"},
+                                        sort_keys=True, default=str).encode()).hexdigest()[:20]
+        tar = self.hass.config.path(".cache", "cantabile_tv")
+        cel = os.path.join(tar, f"dlna_{kulcs}.jpg")
+        if not os.path.exists(cel):
+            borito = None
+            if meta.get("_cover_file"):
+                borito = await self.hass.async_add_executor_job(_olvas, meta["_cover_file"])
+            elif meta.get("_cover_embedded"):
+                ut = await beagyazott(self.hass, meta["_cover_embedded"])
+                borito = await self.hass.async_add_executor_job(_olvas, ut) if ut else None
+            elif str(meta.get("cover") or "").startswith("http"):
+                borito = await self._letolt(meta["cover"])
+            eloado = await self._letolt(meta["artist_image"]) if meta.get("artist_image") else None
+            kep = await self.hass.async_add_executor_job(tv_kep.rajzol, meta, eloado, borito)
+
+            def ment() -> None:
+                os.makedirs(tar, exist_ok=True)
+                regiek = sorted((os.path.join(tar, n) for n in os.listdir(tar) if n.startswith("dlna_")), key=os.path.getmtime)
+                for r in regiek[:-200]:                    # legfeljebb 200 adatlap marad a tárban
+                    with contextlib.suppress(OSError):
+                        os.remove(r)
+                with open(cel, "wb") as f:
+                    f.write(kep)
+
+            await self.hass.async_add_executor_job(ment)
+        return cel
+
+    async def _letolt(self, url: str) -> bytes | None:
+        try:
+            async with asyncio.timeout(10), async_get_clientsession(self.hass).get(url) as r:
+                return await r.read() if r.status == 200 else None
+        except Exception:  # noqa: BLE001
+            return None
+
+
+def _takarit(tar: str) -> None:
+    """A tárban legfeljebb ~1,5 GB DLNA-videó marad (a legrégebbiek törlődnek)."""
+    try:
+        videok = sorted((os.path.join(tar, n) for n in os.listdir(tar) if n.startswith("video_") and n.endswith(".mp4")), key=os.path.getmtime)
+        osszes = sum(os.path.getsize(v) for v in videok)
+        for v in videok:
+            if osszes < 1_500_000_000:
+                break
+            osszes -= os.path.getsize(v)
+            os.remove(v)
+    except OSError:
+        pass
+
+
+def _olvas(ut: str) -> bytes | None:
+    try:
+        with open(ut, "rb") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+async def beagyazott(hass: HomeAssistant, ut: str) -> str | None:
+    """A zenefájlba ágyazott borító kibontva a tárba (ffmpeg); a tárbeli kép útja, vagy None."""
+    tar = hass.config.path(".cache", "cantabile_tv")
+    cel = os.path.join(tar, hashlib.sha1(ut.encode()).hexdigest() + ".jpg")
+    if not os.path.exists(cel):
+        await hass.async_add_executor_job(lambda: os.makedirs(tar, exist_ok=True))
+        p = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-v", "error", "-y", "-i", ut, "-an", "-frames:v", "1", "-vf", "scale='min(800,iw)':-2", cel,
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(p.wait(), 20)
+    return cel if os.path.exists(cel) else None
+
+
 def _mappakep(fajl: str) -> str | None:
     mappa = os.path.dirname(fajl)
     try:
@@ -279,27 +429,99 @@ class TvKep(HomeAssistantView):
                 return valodi
         return None
 
+    async def head(self, request: web.Request) -> web.StreamResponse:
+        return await self.get(request)
+
     async def get(self, request: web.Request) -> web.StreamResponse:
         if f := request.query.get("f"):
             ut = self._engedett(f)
             if not ut or not ut.lower().endswith(KEPKITERJ):
                 return web.Response(status=404)
             return web.FileResponse(ut, headers={"Cache-Control": "max-age=86400"})
+        if d := request.query.get("d"):                    # DLNA-adatlap a tárból
+            if not re.fullmatch(r"dlna_[0-9a-f]{20}\.jpg", d):
+                return web.Response(status=404)
+            ut = self.hass.config.path(".cache", "cantabile_tv", d)
+            if not await self.hass.async_add_executor_job(os.path.isfile, ut):
+                return web.Response(status=404)
+            return web.FileResponse(ut, headers={"Cache-Control": "max-age=86400"})
         ut = self._engedett(request.query.get("e", ""))
         if not ut:
             return web.Response(status=404)
-        tar = self.hass.config.path(".cache", "cantabile_tv")
-        cel = os.path.join(tar, hashlib.sha1(ut.encode()).hexdigest() + ".jpg")
-        if not os.path.exists(cel):
-            await self.hass.async_add_executor_job(lambda: os.makedirs(tar, exist_ok=True))
-            p = await asyncio.create_subprocess_exec(
-                "ffmpeg", "-v", "error", "-y", "-i", ut, "-an", "-frames:v", "1", "-vf", "scale='min(800,iw)':-2", cel,
-                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
-            with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(p.wait(), 20)
-            if not os.path.exists(cel):
-                return web.Response(status=404)
+        cel = await beagyazott(self.hass, ut)
+        if not cel:
+            return web.Response(status=404)
         return web.FileResponse(cel, headers={"Cache-Control": "max-age=86400"})
+
+
+class TvVideo(HomeAssistantView):
+    """A DLNA-videó a tárból (aláírt címmel; a FileResponse tekerhető, Range-kérést kezel)."""
+
+    url = VIDEO_URL + "/{v}"                # a cím .mp4-re végződik: egyes TV-k ebből döntik el a fajtát
+    name = "api:cantabile:tv:video"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def head(self, request: web.Request, v: str) -> web.StreamResponse:
+        return await self.get(request, v)       # a DLNA-s TV-k (pl. Samsung) lejátszás előtt HEAD-del kérdeznek
+
+    async def get(self, request: web.Request, v: str) -> web.StreamResponse:
+        if not re.fullmatch(r"video_[0-9a-f]{20}\.mp4", v):
+            return web.Response(status=404)
+        ut = self.hass.config.path(".cache", "cantabile_tv", v)
+        if not await self.hass.async_add_executor_job(os.path.isfile, ut):
+            return web.Response(status=404)
+        return web.FileResponse(ut, headers={"Content-Type": "video/mp4", "transferMode.dlna.org": "Streaming",
+                                             "contentFeatures.dlna.org": "DLNA.ORG_OP=01;DLNA.ORG_CI=1"})
+
+
+class TvElo(HomeAssistantView):
+    """Élő DLNA-videó webes adóhoz: az ffmpeg az adatlapot és az adó hangját folyamatosan MPEG-TS-be kódolja."""
+
+    url = ELO_URL + "/{v}"
+    name = "api:cantabile:tv:live"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    def _cel(self, v: str) -> tuple[str, str] | None:
+        m = re.fullmatch(r"([0-9a-f]{20})\.ts", v)
+        return kozpont(self.hass).elo.get(m.group(1)) if m else None
+
+    async def head(self, request: web.Request, v: str) -> web.StreamResponse:
+        if not self._cel(v):
+            return web.Response(status=404)
+        return web.Response(status=200, headers={"Content-Type": "video/mp2t", "transferMode.dlna.org": "Streaming",
+                                                 "contentFeatures.dlna.org": "DLNA.ORG_OP=00;DLNA.ORG_CI=1"})
+
+    async def get(self, request: web.Request, v: str) -> web.StreamResponse:
+        cel = self._cel(v)
+        if not cel:
+            return web.Response(status=404)
+        kep, url = cel
+        p = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-v", "error", "-loop", "1", "-framerate", "1", "-i", kep, "-user_agent", "Cantabile (Home Assistant)",
+            "-reconnect", "1", "-reconnect_streamed", "1", "-i", url, "-map", "0:v", "-map", "1:a", "-vf", "scale=1280:720",
+            "-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage", "-pix_fmt", "yuv420p", "-r", "1", "-g", "4",
+            "-c:a", "aac", "-b:a", "192k", "-f", "mpegts", "pipe:1",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        ki = web.StreamResponse(status=200, headers={"Content-Type": "video/mp2t", "Cache-Control": "no-cache",
+                                                     "transferMode.dlna.org": "Streaming", "contentFeatures.dlna.org": "DLNA.ORG_OP=00;DLNA.ORG_CI=1"})
+        await ki.prepare(request)
+        try:
+            while darab := await p.stdout.read(32768):
+                await ki.write(darab)
+        except (ConnectionResetError, asyncio.CancelledError):
+            pass                                # a TV leállt / másra váltott
+        finally:
+            if p.returncode is None:
+                p.kill()
+                with contextlib.suppress(Exception):
+                    await p.wait()
+        return ki
 
 
 @websocket_api.websocket_command({vol.Required("type"): "cantabile/tv/subscribe", vol.Optional("tv"): str})
@@ -331,5 +553,7 @@ def ws_report(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: di
 def regisztral(hass: HomeAssistant) -> None:
     hass.data[DOMAIN]["tv"] = TvKozpont(hass)
     hass.http.register_view(TvKep(hass))
+    hass.http.register_view(TvVideo(hass))
+    hass.http.register_view(TvElo(hass))
     websocket_api.async_register_command(hass, ws_subscribe)
     websocket_api.async_register_command(hass, ws_report)

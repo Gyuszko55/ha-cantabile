@@ -87,6 +87,14 @@ class Sorrend:
         self.i += 1
         return self.utolso
 
+    def kovetkezo(self) -> str | None:
+        """A soron következő szám (előkészítéshez, pl. a DLNA-s TV videójához); keverésnél a következő kör még nem ismert."""
+        if self.i < len(self.lista):
+            return self.lista[self.i]
+        if self.rt.rounds < ROUNDS_INFINITE and self.kor >= self.rt.rounds:
+            return None
+        return self.szamok[0] if self.szamok else None
+
     def hozzaad(self, uj: list[str]) -> None:
         """Új számok a sor végére (pl. a háttérben feltöltött saját zene); az első körben még sorra kerülnek."""
         self.szamok.extend(uj)
@@ -167,6 +175,15 @@ class Cantabile:
         """A szóló sorozat új sorrendje (a SOR fülön húzással): a szóló szám után ebben a sorrendben folytatja."""
         if (s := self._sorrend.get(entity_id)) is not None:
             s.atrendez(tracks)
+
+    def ugrik(self, entity_id: str, lepes: int) -> bool:
+        """Következő / előző szám a sorozatlejátszásban (a szóló számhoz képest); False, ha nincs futó sorozat."""
+        s = self._sorrend.get(entity_id)
+        if s is None or not s.szamok:
+            return False
+        most = s.szamok.index(s.most) if s.most in s.szamok else 0
+        self.play_tracks(entity_id, s.szamok, max(0, min(len(s.szamok) - 1, most + lepes)))
+        return True
 
     def tracks_info(self, entity_id: str) -> dict[str, Any] | None:
         """A szóló sorozat számai és a szóló szám helye (a kártya ebből viszi át a kazettát másik kimenetre)."""

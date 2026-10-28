@@ -47,7 +47,10 @@ class CantabileOptionsFlow(OptionsFlow):
                     selector.NumberSelectorConfig(min=0, max=100, step=5, unit_of_measurement="%", mode=selector.NumberSelectorMode.SLIDER)
                 ),
                 vol.Optional(CONF_TV_PLAYERS, default=o.get(CONF_TV_PLAYERS, [])): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="media_player", integration="cast", multiple=True)
+                    selector.EntitySelectorConfig(multiple=True, filter=[
+                        selector.EntityFilterSelectorConfig(domain="media_player", integration="cast"),
+                        selector.EntityFilterSelectorConfig(domain="media_player", integration="dlna_dmr"),
+                    ])
                 ),
                 vol.Optional(CONF_SPOTIFY_ID, description={"suggested_value": o.get(CONF_SPOTIFY_ID)}): selector.TextSelector(),
                 vol.Optional(CONF_SPOTIFY_SECRET, description={"suggested_value": o.get(CONF_SPOTIFY_SECRET)}): selector.TextSelector(

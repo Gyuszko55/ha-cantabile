@@ -35,7 +35,7 @@
           "duck_level": "Percentage of the original volume; 0 = muted.",
           "spotify_client_id": "From developer.spotify.com → Dashboard → Create app. Enables catalogue search on the SPOTIFY tab. Not needed if the Home Assistant Spotify integration is set up (that also shows your own playlists). Playback: on Sonos with Spotify linked in the Sonos app, or on Spotify Connect speakers via the Spotify integration (Premium).",
           "tidal_client_id": "From developer.tidal.com → Dashboard → Create app. Enables catalogue search on the TIDAL tab; playback on Sonos with Tidal linked in the Sonos app.",
-          "tv_players": "Cast devices (e.g. a TV stick) that become Cantabile speakers with a TV page: equalizer / waveform, artist image, track details and progress on the screen. Needs the “cantabile-tv” dashboard with a “tv” view holding the Cantabile TV card (see README)."
+          "tv_players": "TVs that become Cantabile speakers with the track on screen. Cast devices (e.g. a TV stick) get the full TV page – equalizer / waveform, artist image, track details and progress (needs the “cantabile-tv” dashboard with a “tv” view holding the Cantabile TV card, see README). DLNA TVs (DLNA Digital Media Renderer integration) show a still track card: cover, artist image and details."
         }
       }
     }
