@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.4 – unreleased
+
+- The card uses its own fonts everywhere: a bundled Arial-compatible sans (Arimo, OFL) for all labels next to Michroma, Exo 2 and Great Vibes, so a phone with a replaced system font no longer changes the look; the phone's enlarged text size no longer pushes the layout apart (`text-size-adjust: none`).
+- Speaker selector: names 30 % larger (with room for them, and accents no longer clipped); the SPEAKERS label is the same size and colour as VOLUME.
+
 ## 1.12.3 – 2026-10-28
 
 - Speaker selector: at most 4 names per side; a 9th name sits centred above the knob, with a 10th the two top names sit side by side above it. Each line now leaves the knob radially (from its evenly spaced position on the ~270° arc) and turns horizontal at the height of its name.
