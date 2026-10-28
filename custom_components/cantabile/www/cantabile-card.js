@@ -474,7 +474,7 @@ class CantabileCard extends HTMLElement {
 
   // az integráció entitásai (ismétlésszám, alvásidőzítő, NET-adó) a cantabile/info parancsból
   async _infoKer() {
-    try { const v = await this._hass.callWS({ type: "cantabile/info" }); this._ent = v.entities || {}; this._haIndult = v.started ? v.started * 1000 : null; this._stream = v.streaming || {}; }
+    try { const v = await this._hass.callWS({ type: "cantabile/info" }); this._ent = v.entities || {}; this._haIndult = v.started ? v.started * 1000 : null; this._stream = v.streaming || {}; this._tvMap = v.tv || {}; }
     catch (e) { this._ent = {}; this._nincsIntegracio = true; }
     this._frissit();
   }
@@ -2205,8 +2205,12 @@ class CantabileCard extends HTMLElement {
   // (azzal a képernyőn is megjelenik a szám; a saját lejátszón csak a hang megy át)
   _tvPar(entity) {
     if (!entity || !this._hass) return null;
-    const par = Object.values(this._hass.states).find((x) => x.entity_id.startsWith("media_player.") && x.attributes?.cast_entity === entity);
-    return par ? { entity: par.entity_id, nev: par.attributes.friendly_name || par.entity_id } : null;
+    // az integráció adja a párokat (akkor is, ha a TV épp nem elérhető, és az állapotában nincs cast_entity); tartalék: az állapot
+    const tvE = Object.keys(this._tvMap || {}).find((k) => this._tvMap[k] === entity)
+      || Object.values(this._hass.states).find((x) => x.entity_id.startsWith("media_player.") && x.attributes?.cast_entity === entity)?.entity_id;
+    if (!tvE) return null;
+    const st = this._hass.states[tvE];
+    return { entity: tvE, nev: st?.attributes?.friendly_name || this._hass.entities?.[tvE]?.name || tvE };
   }
 
   _tvJelolt(entity) {
@@ -2220,7 +2224,9 @@ class CantabileCard extends HTMLElement {
     b.hidden = false;
     // csak olyan lejátszó választható, amelyik tud médiát indítani (PLAY_MEDIA); a már beállítottat mindig mutatjuk
     const beallitott = new Set(sz.hangszorok.map((h) => h.entity));
-    const lejatszok = Object.values(this._hass?.states || {}).filter((x) => x.entity_id.startsWith("media_player.") && ((Number(x.attributes?.supported_features) & 512) || beallitott.has(x.entity_id)))
+    // a TV-k saját Cast- / DLNA-lejátszója nem választható, ha van hozzá Cantabile TV-lejátszó (azzal a képernyőn is megjelenik a szám)
+    const lejatszok = Object.values(this._hass?.states || {}).filter((x) => x.entity_id.startsWith("media_player.")
+      && (beallitott.has(x.entity_id) || ((Number(x.attributes?.supported_features) & 512) && !this._tvPar(x.entity_id))))
       .sort((x, y) => (x.attributes.friendly_name || x.entity_id).localeCompare(y.attributes.friendly_name || y.entity_id, NYELV()));
     const opc = (val) => lejatszok.map((x) => `<option value="${x.entity_id}" ${x.entity_id === val ? "selected" : ""}>${ESC(x.attributes.friendly_name || x.entity_id)} (${x.entity_id.slice(13)})</option>`).join("");
     const be = (lista, i, mezo, ertek, extra = "") => `<input data-l="${lista}" data-i="${i}" data-m="${mezo}" value="${ESC(ertek ?? "")}" ${extra}>`;

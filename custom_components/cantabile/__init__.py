@@ -74,8 +74,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             eid = entries[0].entry_id
             for kulcs, uid, platform in (("rounds", UID_ROUNDS, "number"), ("sleep", UID_SLEEP, "sensor"), ("net", UID_NET, "sensor")):
                 ent[kulcs] = reg.async_get_entity_id(platform, DOMAIN, f"{eid}_{uid}")
+        # a Cantabile TV-lejátszók és a TV saját lejátszója (a kártya ezeket rejti a választóban, figyelmeztet rájuk)
+        tvk = {lj.entity_id: lj.cast for lj in tv.kozpont(hass).lejatszok.values()} if "tv" in hass.data.get(DOMAIN, {}) else {}
         connection.send_result(msg["id"], {"version": VERSION, "configured": bool(entries), "entities": ent, "started": indult,
-                                              "streaming": streaming.allapot(hass)})
+                                              "streaming": streaming.allapot(hass), "tv": tvk})
 
     websocket_api.async_register_command(hass, ws_info)
 
