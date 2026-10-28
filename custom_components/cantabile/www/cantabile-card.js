@@ -102,6 +102,10 @@ const EN = {
   "(beépített)": "(built-in)",
   "Kijelző": "Display",
   "Előlap": "Front panel",
+  "Ez a TV saját lejátszója: csak a hang megy át. A képernyőhöz válaszd a(z) „{n}” lejátszót.": "This is the TV's own player: only the sound gets through. For the screen, choose “{n}”.",
+  "Átállítás": "Switch",
+  "Tipp: ha ennek az eszköznek van képernyője, a Cantabile integráció beállításaiban (TV-lejátszók) felvéve a szám a képernyőn is megjelenik.": "Tip: if this device has a screen, add it under TV players in the Cantabile integration options to show the track on screen.",
+  "A(z) {h} a TV saját lejátszója – csak a hang megy át. A ⚙-ben állítsd át a(z) „{n}” lejátszóra.": "{h} is the TV's own player – only the sound gets through. Switch it to “{n}” in ⚙.",
   "A Cantabile TV-oldala a Cast-os TV-re: equalizer, előadókép, a szám adatai és haladásjelző.": "The Cantabile TV page for a Cast TV: equalizer, artist image, track details and progress.",
   "Ezüst (húzott alumínium)": "Silver (brushed aluminium)",
   "Fekete (90-es évek)": "Black (nineties)",
@@ -1183,6 +1187,9 @@ class CantabileCard extends HTMLElement {
         .bresz h3 { margin: 0; font: 700 11px/1 Arial, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #6a5f4e; display: flex; align-items: center; gap: 8px; }
         .bresz h3 .bgomb { margin-left: auto; letter-spacing: 0; text-transform: none; padding: 3px 9px; }
         .bsor { display: grid; gap: 6px; align-items: center; }
+        .bfigy { margin: 0 0 4px; padding: 7px 9px; border-radius: 6px; font-size: 12.5px; line-height: 1.35; color: #5a3a00; background: #fff1d2; border: 1px solid #f0b54a; }
+        .bfigy .bgomb { margin-left: 6px; padding: 3px 9px; }
+        .btipp { margin: -2px 0 4px; font-size: 12px; line-height: 1.35; color: #7a7064; }
         .bsor.ado { grid-template-columns: 1.3fr .8fr 70px 2.4fr auto auto; }
         .bsor.hsz2 { grid-template-columns: 1fr .7fr 2fr 1fr auto; }
         .bsor.ket { grid-template-columns: 150px 1fr; }
@@ -2048,6 +2055,8 @@ class CantabileCard extends HTMLElement {
       this._frissit();
       return;
     }
+    const tvPar = cel && this._tvPar(cel.entity);
+    if (tvPar) this._uzen(T("A(z) {h} a TV saját lejátszója – csak a hang megy át. A ⚙-ben állítsd át a(z) „{n}” lejátszóra.", { h: KN(cel), n: tvPar.nev }));   // figyelmeztet, de vált
     if (((kiz === "sonos" && !this._spotifyConnectSzol(regi)) && cel?.mod !== "sonos") || (kiz === "bt" && cel?.entity !== HELYI)) {
       // a Deezer / Sonos-kedvenc csak Sonoson, a telefonos zene csak BT-n szól: a választó marad, a zene szól tovább
       this._uzen(kiz === "sonos" ? T("A Deezer és a Sonos-kedvencek csak Sonoson szólnak – a(z) {h} szól tovább.", { h: KN(regi) })
@@ -2192,6 +2201,19 @@ class CantabileCard extends HTMLElement {
     b.hidden = true; b.innerHTML = "";
   }
 
+  // TV-figyelmeztetés: a választott lejátszó egy TV saját Cast- / DLNA-lejátszója, amelyhez van Cantabile TV-lejátszó
+  // (azzal a képernyőn is megjelenik a szám; a saját lejátszón csak a hang megy át)
+  _tvPar(entity) {
+    if (!entity || !this._hass) return null;
+    const par = Object.values(this._hass.states).find((x) => x.entity_id.startsWith("media_player.") && x.attributes?.cast_entity === entity);
+    return par ? { entity: par.entity_id, nev: par.attributes.friendly_name || par.entity_id } : null;
+  }
+
+  _tvJelolt(entity) {
+    const pl = this._hass?.entities?.[entity]?.platform;
+    return (pl === "cast" || pl === "dlna_dmr") && !this._tvPar(entity);
+  }
+
   _beallRajz(uzenet = "") {
     const b = this.shadowRoot.getElementById("beall"), sz = this._szerk;
     if (!sz) return;
@@ -2221,7 +2243,9 @@ class CantabileCard extends HTMLElement {
         </section>
         <section class="bresz"><h3>${T("Hangszórók")} <button class="bgomb" data-a="ujhsz">${T("+ Új hangszóró")}</button></h3>
           <div class="bfejlec hsz2"><span>${T("NÉV")}</span><span>${T("A KÁRTYÁN (MAX. 8)")}</span><span>${T("LEJÁTSZÓ")}</span><span>${T("FAJTA")}</span><span></span></div>
-          ${sz.hangszorok.map((h, i) => `<div class="bsor hsz2">${be("hangszorok", i, "nev", h.nev, `placeholder="${T("Név")}"`)}${be("hangszorok", i, "rovid", h.rovid, `maxlength="${NEV_MAX}" placeholder="${T("max. 8")}"`)}<select data-l="hangszorok" data-i="${i}" data-m="entity">${opc(h.entity)}</select><select data-l="hangszorok" data-i="${i}" data-m="mod"><option value="sonos" ${h.mod === "sonos" ? "selected" : ""}>Sonos</option><option value="url" ${h.mod !== "sonos" ? "selected" : ""}>${T("Egyéb (sor nélkül, pl. WiiM)")}</option></select><button class="bx" data-a="torol" data-l="hangszorok" data-i="${i}" title="${T("Törlés")}">×</button></div>`).join("")}
+          ${sz.hangszorok.map((h, i) => { const par = this._tvPar(h.entity), figy = par
+            ? `<div class="bfigy">⚠ ${ESC(T("Ez a TV saját lejátszója: csak a hang megy át. A képernyőhöz válaszd a(z) „{n}” lejátszót.", { n: par.nev }))} <button class="bgomb" data-a="tvatall" data-i="${i}">${T("Átállítás")}</button></div>`
+            : this._tvJelolt(h.entity) ? `<div class="btipp">${ESC(T("Tipp: ha ennek az eszköznek van képernyője, a Cantabile integráció beállításaiban (TV-lejátszók) felvéve a szám a képernyőn is megjelenik."))}</div>` : ""; return `<div class="bsor hsz2">${be("hangszorok", i, "nev", h.nev, `placeholder="${T("Név")}"`)}${be("hangszorok", i, "rovid", h.rovid, `maxlength="${NEV_MAX}" placeholder="${T("max. 8")}"`)}<select data-l="hangszorok" data-i="${i}" data-m="entity">${opc(h.entity)}</select><select data-l="hangszorok" data-i="${i}" data-m="mod"><option value="sonos" ${h.mod === "sonos" ? "selected" : ""}>Sonos</option><option value="url" ${h.mod !== "sonos" ? "selected" : ""}>${T("Egyéb (sor nélkül, pl. WiiM)")}</option></select><button class="bx" data-a="torol" data-l="hangszorok" data-i="${i}" title="${T("Törlés")}">×</button></div>${figy}`; }).join("")}
         </section>
         <section class="bresz"><h3>${T("Tape deck")}</h3>
           <div class="bsor ket"><label>${T("Zenemappa")}</label>${be("magno", 0, "nas", sz.magno.nas, 'placeholder="media-source://media_source/local/Music"')}</div>
@@ -2246,6 +2270,7 @@ class CantabileCard extends HTMLElement {
       sz.hangszorok[Number(i)].entity = el.value;
       sz.hangszorok[Number(i)].mod = this._hass?.entities?.[el.value]?.platform === "sonos" ? "sonos" : "url";
       if (el.tagName === "SELECT") { const t = el.parentElement.querySelector('select[data-m="mod"]'); if (t) t.value = sz.hangszorok[Number(i)].mod; }
+      if (el.tagName === "SELECT" && (this._tvPar(el.value) || this._tvJelolt(el.value) || el.parentElement.nextElementSibling?.matches?.(".bfigy, .btipp"))) setTimeout(() => this._beallRajz(), 0);
     }
     else if (l === "magno") sz.magno[m] = el.value;
     else sz[l][Number(i)][m] = el.value;
@@ -2258,6 +2283,7 @@ class CantabileCard extends HTMLElement {
     if (a === "ujado") { sz.adok.push({ nev: "", frekvencia: "", url: "" }); return this._beallRajz(); }
     if (a === "ujhsz") { sz.hangszorok.push({ nev: "", entity: "", mod: "url" }); return this._beallRajz(); }
     if (a === "torol") { sz[el.dataset.l].splice(i, 1); return this._beallRajz(); }
+    if (a === "tvatall") { const par = this._tvPar(sz.hangszorok[i].entity); if (par) Object.assign(sz.hangszorok[i], { entity: par.entity, mod: "url" }); return this._beallRajz(); }
     if (a === "keres") return this._keres();
     if (a === "felvesz") {
       const t = this._talalatok[i];
