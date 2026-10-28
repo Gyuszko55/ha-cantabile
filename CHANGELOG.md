@@ -3,6 +3,8 @@
 ## 1.12.2 – 2026-10-28
 
 - Cantabile TV: when the integration reloads (e.g. after adding a TV), a running TV page and its track details – CUE sheet included – carry over to the re-created player, so the card no longer falls back to the whole file's title and length. If a player still doesn't know what plays, the TV page sends the details again and signs in anew.
+- Speaker selector: the knob positions (where the lines meet the knob, and where the pointer turns) are spread evenly over a ~270° arc, from bottom left clockwise to bottom right, like on a real selector; with the names on one side only, over the knob's right half.
+- TV page clock: 12 or 24 hours by the country set in Home Assistant (your profile's 12/24 setting wins), instead of the Cast receiver's language.
 - Speaker selector: up to 10 positions (5 per side, rows a little closer). On phones the radio puts a two-sided selector on its own full-width row, and the tape deck draws it a little smaller.
 
 ## 1.12.1 – 2026-10-28

@@ -605,13 +605,17 @@ class CantabileCard extends HTMLElement {
     const ketOldal = nL > 4, nBal = ketOldal ? Math.floor(nL / 2) : 0, sorMax = ketOldal ? nL - nBal : nL;
     const R = 26, SOR = sorMax > 4 ? 16 : 18, VH = Math.max(90, sorMax * SOR + 24), CY = Math.round(VH / 2) - 3, KAR = 16, VIZ = 9;
     const CX = ketOldal ? 108 : R + 8, VW = ketOldal ? 216 : CX + R + KAR + VIZ + 74;
+    // a mutató állásai (és a vonalak csatlakozása a gombon) egyenletesen egy kb. 270°-os íven, a bal alsótól az óramutató
+    // irányában a jobb alsóig – mint egy valódi kapcsolón; csak jobb oldali neveknél a gomb jobb felén (0–150°)
+    const IV = ketOldal ? [-135, 135] : [0, 150];
     const allas = {};
     L0.forEach((i, n) => {
       const bal = n < nBal, k = bal ? nBal : nL - nBal, j = bal ? nBal - 1 - n : n - nBal;     // bal oldalt alulról felfelé, jobb oldalt fentről lefelé
       const y = CY + (j - (k - 1) / 2) * SOR, kx = CX + (bal ? -1 : 1) * (R + KAR);
-      const szog = Math.atan2(kx - CX, -(y - CY));
-      const pont = (r) => [CX + r * Math.sin(szog), CY - r * Math.cos(szog)];
-      allas[i] = { bal, y, kx, lx: kx + (bal ? -VIZ : VIZ), fok: (szog * 180) / Math.PI, p: pont(R + 2), l: pont(R + 8) };
+      const fok = nL > 1 ? IV[0] + ((IV[1] - IV[0]) * n) / (nL - 1) : 0, szog = (fok * Math.PI) / 180;
+      const p = [CX + (R + 2) * Math.sin(szog), CY - (R + 2) * Math.cos(szog)];
+      const dx = kx - p[0], dy = y - p[1], d = Math.hypot(dx, dy) || 1;                       // a lámpa a ferde szakaszon, a gomb mellett
+      allas[i] = { bal, y, kx, lx: kx + (bal ? -VIZ : VIZ), fok, p, l: [p[0] + (dx / d) * 5, p[1] + (dy / d) * 5] };
     });
     this._forgoSzog = (i) => (allas[i] ? allas[i].fok : 0);
     const f1 = (x) => x.toFixed(1);
@@ -4053,6 +4057,9 @@ const TV_SVG_LEMEZ = `<svg viewBox="0 0 200 200"><defs><radialGradient id="tvl" 
   <circle cx="100" cy="100" r="98" fill="url(#tvl)"/>${[30, 38, 46, 54, 62, 70, 78, 86, 93].map((r) => `<circle cx="100" cy="100" r="${r}" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="1"/>`).join("")}
   <path d="M100 2 A98 98 0 0 1 198 100" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="3"/><circle cx="100" cy="100" r="3" fill="#070708"/></svg>`;
 
+// országok, ahol a 12 órás kijelzés a szokás (a többiben 24 órás)
+const ORA12 = ["US", "CA", "AU", "NZ", "IN", "PH", "PK", "BD", "EG", "SA", "MY", "CO", "MX", "JO", "OM", "QA", "KW", "AE", "SV", "HN", "NI"];
+
 class CantabileTv extends HTMLElement {
   setConfig(c) { this._c = { visual: "both", ...(c || {}) }; }
 
@@ -4172,8 +4179,11 @@ class CantabileTv extends HTMLElement {
     window.addEventListener("resize", meret);
     if (window.ResizeObserver) new ResizeObserver(meret).observe(this);
     const ora = () => {
-      const d = new Date(), nyelv = this._h?.locale?.language || "en";
-      const o = d.toLocaleTimeString(nyelv, { hour: "2-digit", minute: "2-digit" });
+      const d = new Date(), nyelv = this._h?.locale?.language || "en", tf = this._h?.locale?.time_format;
+      // 12 / 24 órás: a HA-profil beállítása, különben a HA-ban megadott ország szokása (pl. HU → 24, US → 12)
+      const orszag = String(this._h?.config?.country || "").toUpperCase();
+      const h12 = tf === "12" ? true : tf === "24" ? false : orszag ? ORA12.includes(orszag) : undefined;
+      const o = d.toLocaleTimeString(nyelv, { hour: "2-digit", minute: "2-digit", ...(h12 !== undefined ? { hour12: h12 } : {}) });
       sr.querySelector(".o").textContent = o; sr.querySelector(".o2").textContent = o;
       sr.querySelector(".d").textContent = d.toLocaleDateString(nyelv, { weekday: "long", month: "long", day: "numeric" }).toUpperCase();
     };
