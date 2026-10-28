@@ -69,11 +69,24 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self._cim_tar: tuple[str | None, str | None] = (None, None)
 
     async def async_added_to_hass(self) -> None:
-        kozpont(self.hass).lejatszok[self.entity_id] = self
+        kp = kozpont(self.hass)
+        kp.lejatszok[self.entity_id] = self
+        if regi := kp.atadas.pop(self.entity_id, None):        # újratöltés: átvesszük az elődtől
+            self.oldal = regi["oldal"]
+            if self.oldal:
+                self.oldal_jott.set()
+            self._meta, self._src, self._mcid, self._cue_i = regi["meta"], regi["src"], regi["mcid"], regi["cue_i"]
+            self._allapot, self._poz, self._poz_ido, self._hossz = regi["allapot"], regi["poz"], regi["poz_ido"], regi["hossz"]
         self.async_on_remove(async_track_state_change_event(self.hass, [self.cast], self._cast_valtozott))
 
     async def async_will_remove_from_hass(self) -> None:
-        kozpont(self.hass).lejatszok.pop(self.entity_id, None)
+        kp = kozpont(self.hass)
+        kp.lejatszok.pop(self.entity_id, None)
+        kp.atadas[self.entity_id] = {"oldal": self.oldal, "meta": self._meta, "src": self._src, "mcid": self._mcid, "cue_i": self._cue_i,
+                                     "allapot": self._allapot, "poz": self._poz, "poz_ido": self._poz_ido, "hossz": self._hossz}
+
+    def meta_ismert(self) -> bool:
+        return bool(self._meta) or self._allapot not in (MediaPlayerState.PLAYING, MediaPlayerState.PAUSED)
 
     @callback
     def _cast_valtozott(self, _ev: Event) -> None:

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.2 – 2026-10-28
+
+- Cantabile TV: when the integration reloads (e.g. after adding a TV), a running TV page and its track details – CUE sheet included – carry over to the re-created player, so the card no longer falls back to the whole file's title and length. If a player still doesn't know what plays, the TV page sends the details again and signs in anew.
+- Speaker selector: up to 10 positions (5 per side, rows a little closer). On phones the radio puts a two-sided selector on its own full-width row, and the tape deck draws it a little smaller.
+
 ## 1.12.1 – 2026-10-28
 
 - Cantabile TV, single-file albums with a CUE sheet (e.g. `Album.flac` + `Album.cue`): the TV page and the card show the track actually playing – title, artist, “TRACK 3 / 10”, and the track's own time and length instead of the whole file's; next / previous jump within the file (Cast). On DLNA TVs the current track follows the TV's playback position.

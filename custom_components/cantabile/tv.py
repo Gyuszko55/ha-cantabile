@@ -69,6 +69,9 @@ class TvKozpont:
     def __init__(self, hass: HomeAssistant) -> None:
         self.hass = hass
         self.lejatszok: dict[str, CantabileTv] = {}     # entity_id → lejátszó
+        # az integráció újratöltésekor (pl. új TV felvétele) a lejátszó újra létrejön: a TV-oldal kapcsolata és a szóló szám
+        # adatai itt várják meg az utódot (entity_id szerint), így a futó lejátszás nem „felejtődik el”
+        self.atadas: dict[str, dict[str, Any]] = {}
         self._var: CantabileTv | None = None             # erre a lejátszóra vár egy éppen kiküldött oldal
         self._deezer: dict[str, str | None] = {}
         self._video_zar: dict[str, asyncio.Lock] = {}
@@ -601,7 +604,8 @@ def ws_subscribe(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg:
     if lj is None:
         conn.send_error(msg["id"], "no_tv", "Nincs ehhez az oldalhoz rendelhető Cantabile TV-lejátszó")
         return
-    conn.subscriptions[msg["id"]] = lambda: lj.oldal_ki(conn, msg["id"])
+    tv_id = lj.entity_id
+    conn.subscriptions[msg["id"]] = lambda: (kozpont(hass).lejatszok.get(tv_id) or lj).oldal_ki(conn, msg["id"])
     conn.send_result(msg["id"])
     lj.uzen({"cmd": "hello", "tv": lj.entity_id, "name": lj.name})
 
@@ -617,7 +621,9 @@ def ws_report(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: di
     lj = kozpont(hass).lejatszok.get(msg["tv"])
     if lj is not None:
         lj.jelentes(msg)
-    conn.send_result(msg["id"])
+    # a lejátszó nem tudja, mi szól, vagy nem ehhez az oldalhoz kötött (pl. újratöltés után): az oldal küldje újra az
+    # adatokat, és jelentkezzen be újra
+    conn.send_result(msg["id"], {"resend": bool(lj is not None and (not lj.meta_ismert() or lj.oldal is None))})
 
 
 def regisztral(hass: HomeAssistant) -> None:

@@ -600,9 +600,10 @@ class CantabileCard extends HTMLElement {
     </div></div>`;
     // forgó hangszóró-választó (hi-fi SELECTOR mintára): a gomb két oldalán egymás alatt a nevek (bal oldalt jobbra, jobb
     // oldalt balra zárva), mindegyiktől vízszintes, majd ferde vonal fut a gombhoz – a mutató abba az irányba fordul; a
-    // lámpa a vonalon, a gomb mellett. Legfeljebb 4 állásnál minden név jobbra kerül; legfeljebb 8 állás (oldalanként 4).
-    const L0 = kim.map((h, i) => i).filter((i) => kim[i].entity !== HELYI).slice(0, 8), nL = L0.length;
-    const ketOldal = nL > 4, nBal = ketOldal ? Math.floor(nL / 2) : 0, R = 26, SOR = 18, VH = 90, CY = 42, KAR = 16, VIZ = 9;
+    // lámpa a vonalon, a gomb mellett. Legfeljebb 4 állásnál minden név jobbra kerül; legfeljebb 10 állás (oldalanként 5).
+    const L0 = kim.map((h, i) => i).filter((i) => kim[i].entity !== HELYI).slice(0, 10), nL = L0.length;
+    const ketOldal = nL > 4, nBal = ketOldal ? Math.floor(nL / 2) : 0, sorMax = ketOldal ? nL - nBal : nL;
+    const R = 26, SOR = sorMax > 4 ? 16 : 18, VH = Math.max(90, sorMax * SOR + 24), CY = Math.round(VH / 2) - 3, KAR = 16, VIZ = 9;
     const CX = ketOldal ? 108 : R + 8, VW = ketOldal ? 216 : CX + R + KAR + VIZ + 74;
     const allas = {};
     L0.forEach((i, n) => {
@@ -614,7 +615,7 @@ class CantabileCard extends HTMLElement {
     });
     this._forgoSzog = (i) => (allas[i] ? allas[i].fok : 0);
     const f1 = (x) => x.toFixed(1);
-    const forgo = `<div class="kimenet forgo"><div class="valaszto" style="width:${VW}px;height:${VH}px">
+    const forgo = `<div class="kimenet forgo${ketOldal ? " ket" : ""}"><div class="valaszto" style="width:${VW}px;height:${VH}px">
       <svg class="vvonal" width="${VW}" height="${VH}" viewBox="0 0 ${VW} ${VH}">${L0.map((i) => { const a = allas[i];
         return `<polyline points="${f1(a.p[0])},${f1(a.p[1])} ${f1(a.kx)},${f1(a.y)} ${f1(a.lx)},${f1(a.y)}"/>`; }).join("")}</svg>
       ${L0.map((i) => { const a = allas[i];
@@ -1379,6 +1380,11 @@ class CantabileCard extends HTMLElement {
         :host([keskeny]) .elo:not(.magno) .adosor .bill { height: 39px; flex-direction: column; align-items: center; gap: 2px; padding: 9px 2px 2px; }
         :host([keskeny]) .elo:not(.magno) .adosor .bill b { font-size: 12px; }
         :host([keskeny]) .jobb.rjobb { order: 4; grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "rbal hang otg" "rbal hang kim"; justify-content: stretch; align-content: center; gap: 2px 4px; }
+        /* telefonos rádió, kétoldalas választó (ötnél több hangszóró): a választó külön sorba, teljes szélességben */
+        :host([keskeny]) .jobb.rjobb:has(> .forgo.ket) { grid-template-areas: "rbal hang otg" "kim kim kim"; }
+        :host([keskeny]) .rjobb > .forgo.ket { justify-self: center; }
+        :host([keskeny]) .rjobb > .forgo.ket .valaszto { zoom: .95; }
+        :host([keskeny]) .magno .mjobb > .forgo.ket .valaszto { zoom: .8; }
         :host([keskeny]) .rjobb > .rbal { align-self: center; padding-top: 0; }
         :host([keskeny]) .rjobb > .hangero { transform: scale(.68); margin: -28px; }
         :host([keskeny]) .rjobb > .rotg { align-self: end; }
@@ -4253,7 +4259,15 @@ class CantabileTv extends HTMLElement {
     const a = this._a, hossz = a && isFinite(a.duration) ? a.duration : null;
     this._h.callWS({ type: "cantabile/tv/report", tv: this._tv, state: this._allapot || "idle", position: a ? a.currentTime : null,
       duration: hossz, src: this._src || null, ...(hiba ? { error: hiba } : {}), ...(this._cueI != null ? { track: this._cueI } : {}),
-      ...(metaval && this._meta ? { meta: this._meta } : {}) }).catch(() => {});
+      ...(metaval && this._meta ? { meta: this._meta } : {}) })
+      .then((v) => {
+        // a lejátszó nem tudja, mi szól (pl. az integráció újratöltődött): adatok újra, és újra bejelentkezés
+        if (!v || !v.resend || metaval || this._ujraKer) return;
+        this._ujraKer = true;
+        this._jelent(null, true);
+        if (this._leir) { const u = this._leir; this._leir = null; Promise.resolve(u()).catch(() => {}).then(() => this._feliratkozik()); }
+        setTimeout(() => { this._ujraKer = false; }, 5000);
+      }).catch(() => {});
   }
 
   // CUE-s album (egyetlen fájl): melyik szám szól az idő alapján – címet, előadót, sorszámot cserél, jelenti a szervernek
