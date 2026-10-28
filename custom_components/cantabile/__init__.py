@@ -1,4 +1,4 @@
-"""Cantabile: 70-es évekbeli rádió és kazettás magnó a Home Assistant vezérlőpultjára.
+"""Cantabile: régi hi-fi rádió és kazettás magnó a Home Assistant vezérlőpultjára.
 
 Az integráció hozza a `custom:cantabile-card` kártyát (és az írott márkanév betűkészletét), és mindazt, ami a
 kártyához a szerveren kell:

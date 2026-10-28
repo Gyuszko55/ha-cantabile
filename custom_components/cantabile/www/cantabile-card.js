@@ -1,4 +1,4 @@
-// Cantabile – 70-es évekbeli rádió és kazettás magnó kártya a Home Assistanthoz (custom:cantabile-card).
+// Cantabile – régi hi-fi rádió és kazettás magnó kártya a Home Assistanthoz (custom:cantabile-card).
 // https://github.com/Gyuszko55/ha-cantabile · a kártyát a `cantabile` integráció szolgálja ki és regisztrálja.
 //
 // Rádió: fent a fekete üvegskála (FM 87,5–108 MHz), a piros mutató az épp szóló adó frekvenciájára csúszik.
@@ -240,7 +240,7 @@ const EN = {
   "Ebben a zenetárban nincs keresés – böngéssz a mappák között (töröld a keresőt).": "This library can't be searched – browse the folders instead (clear the search box).",
   "Ezt, ami most szól, nem tudom átvinni a(z) {h} hangszóróra – a(z) {r} szól tovább.": "I can't move what's playing now to {h} – it keeps playing on {r}.",
   "Üres hely – koppints, és a NET-katalógusból tegyél ide adót": "Empty slot – tap to put a station here from the NET catalogue",
-  "70-es évekbeli ezüst rádió és tape deck: adógombok, NET-rádió, forgó kazetta, valódi VU-mérők, NAS és Deezer.": "1970s silver radio and tape deck: station buttons, internet radio, turning cassette, real VU meters, music folder and Deezer.",
+  "Régi hi-fi rádió és tape deck (ezüst vagy fekete): adógombok, NET-rádió, forgó kazetta, valódi VU-mérők, NAS, Deezer, Spotify és Tidal.": "Old hi-fi radio and tape deck (silver or black): station buttons, NET radio, turning cassette, real VU meters, NAS, Deezer, Spotify and Tidal.",
   "A(z) {h} nem tud zenét fogadni a Cantabile-tól (nincs lejátszás-indítás funkciója) – válassz másik lejátszót a ⚙ beállításokban.": "{h} can't receive music from Cantabile (it has no play-media function) – pick another player in ⚙ settings.",
   "A KÁRTYÁN (MAX. 8)": "ON CARD (MAX. 8)",
   "max. 8": "max. 8",
@@ -3987,5 +3987,5 @@ if (!customElements.get("cantabile-card")) {
   if (!customElements.get("tablet-radio")) customElements.define("tablet-radio", class extends CantabileCard {});
   window.customCards = window.customCards || [];
   window.customCards.push({ type: "cantabile-card", name: "Cantabile", preview: true,
-    description: T("70-es évekbeli ezüst rádió és tape deck: adógombok, NET-rádió, forgó kazetta, valódi VU-mérők, NAS és Deezer.") });
+    description: T("Régi hi-fi rádió és tape deck (ezüst vagy fekete): adógombok, NET-rádió, forgó kazetta, valódi VU-mérők, NAS, Deezer, Spotify és Tidal.") });
 }

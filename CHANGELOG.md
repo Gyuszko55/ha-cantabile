@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.11.1 – 2026-10-28
+
+- Wording: "old hi-fi" instead of "1970s" (card picker description, README); the card description now also mentions the black front, Spotify and Tidal.
+- README: new black cassette-deck picture, refreshed radio / tape / phone pictures (lamps at the selector ticks), new sections on the front panels, card names and messages, Spotify / Tidal voice examples and a voice troubleshooting row.
+
 ## 1.11.0 – 2026-10-28
 
 - Messages appear on the player itself instead of Home Assistant's toast: a smoked-glass window with an amber edge, a blinking lamp and a CANTABILE header (Michroma), the text in Exo 2; it slides in over the visible part of the card, an amber line runs down while it stays (4–10 s depending on length), then it fades out – a tap closes it at once. It is a separate layer above the card, so the layout is untouched. When the card is not visible (e.g. another page of a pager), the Home Assistant toast is used as before.

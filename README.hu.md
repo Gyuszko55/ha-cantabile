@@ -1,7 +1,7 @@
 # Cantabile
 
-**70-es évekbeli ezüst rádió és tape deck a Home Assistant vezérlőpultjára.** Adógombok egy FM-skálán, internetes
-rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemappád, Deezer és hangvezérlés.
+**Régi hi-fi rádió és tape deck – húzott ezüst vagy 90-es évekbeli fekete – a Home Assistant vezérlőpultjára.** Adógombok egy FM-skálán, internetes
+rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemappád, Deezer, Spotify és Tidal, és hangvezérlés.
 
 *English: [README.md](README.md)*
 
@@ -10,6 +10,8 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
 ![Cantabile rádió: FM-skála adógombokkal, térerő-mérő, hangerő és hangszóróválasztó](docs/images/radio.png)
 
 ![Cantabile tape deck: forgó orsók, VU-mérők, zongorabillentyűs vezérlés](docs/images/tape.png)
+
+![Cantabile tape deck fekete előlappal (finish: black) és fluoreszcens (VFD) kijelzővel](docs/images/tape-black.png)
 
 <p align="center"><img src="docs/images/phone.png" alt="Cantabile rádió telefonon" width="320"></p>
 
@@ -38,6 +40,14 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
 - **DALSZÖVEG**: koppints a kazettán a dal címére (vagy a rádió műsorinfójára, ha dalt mutat) – a szöveg az
   [LRCLIB](https://lrclib.net)-ről jön; a magnón az épp szóló sor kiemelve, a zenével együtt halad.
 
+**Megjelenés**
+- Két előlap: húzott **ezüst** (régi hi-fi) vagy finoman húzott **fekete** (90-es évek) fekete gombokkal és
+  tárcsákkal – ⚙ → *Előlap*, vagy YAML-ban `finish: black`.
+- Minden hangszórónak van legfeljebb 8 karakteres **kártyán megjelenő neve** (pl. *Nappali*): ez kerül a forgó
+  választóra, a fejlécbe és a kazettára, a hangvezérlés pedig továbbra is a teljes nevet használja.
+- **Üzenetek a lejátszón**: a tippek és hibák magán a kártyán, egy füstüveg ablakban jelennek meg, majd elhalványulnak
+  (koppintásra bezárul); ha a kártya nem látszik, a Home Assistant saját értesítője jön.
+
 **Hangszórók**
 - Sonos (minden funkció, „Mindkettő” csoporttal együtt), és bármely más lejátszó, ami URL-t tud lejátszani
   (pl. WiiM – az albumot az integráció számonként játssza le).
@@ -47,9 +57,10 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
 **Hangvezérlés**
 - Assist-eszköz bármelyik LLM-es beszélgetőügynökhöz (Google Gemini, OpenAI, Anthropic, Ollama…):
   *„Játssz Queent a nappaliban”*, *„Tedd be a Kind of Magic albumot”*, *„Kapcsold be a Jazz FM-et a hálóban”*,
-  *„Játszd a Deezerről Adele-t”*. Ami a zenemappában nincs meg, azt a Deezeren keresi.
+  *„Játszd a Deezerről Adele-t”*, *„Játssz Daft Punkot a Spotifyról”*. Ami a zenemappában nincs meg, azt a Deezeren
+  keresi; a Spotifyt és a Tidalt akkor használja, ha azt kéred (Sonoson).
 
-Az előlapok feliratai mindig angolok, mint egy igazi 70-es évekbeli hifin; a beállítások, az üzenetek és a súgók a Home Assistant nyelvét követik: **magyar** vagy **angol**.
+Az előlapok feliratai mindig angolok, mint egy igazi régi hi-fin; a beállítások, az üzenetek és a súgók a Home Assistant nyelvét követik: **magyar** vagy **angol**.
 
 ## Feltételek és kompatibilitás
 
@@ -98,8 +109,8 @@ Az integráció beállítása után nyisd meg a beszélgetőügynök beállítá
 ## Saját hangszórók és források hozzáadása
 
 - **Hangszórók**: a kártya ⚙ → *Hangszórók* → **+ Új hangszóró** → a lejátszó kiválasztása. Csak lejátszani tudó
-  lejátszók szerepelnek; a fajtát (Sonos / egyéb) magától beállítja. Hosszú névnél adj *rövid* nevet – az kerül a forgó
-  választóra. Két vagy több Sonosnál *Multiroom* állás is lesz (Sonos-csoport).
+  lejátszók szerepelnek; a fajtát (Sonos / egyéb) magától beállítja. A *kártyán megjelenő név* (max. 8 karakter, hosszabb
+  teljes névnél kötelező) látszik a kártyán – a forgó választón, a fejlécben és a kazettán; a hangvezérlés a teljes nevet használja. Két vagy több Sonosnál *Multiroom* állás is lesz (Sonos-csoport).
 - **Rádióadók**: ⚙ → keresés a Radio Browserben név szerint, vagy név és stream-cím kézzel. A frekvencia elhagyható
   (csak a skálán való helyét adja). A rádión egy üres **+** helyre vagy a **NET** gombra koppintva több ezer adó közül
   választhatsz, és gombra teheted.
@@ -131,6 +142,7 @@ Az integráció beállítása után nyisd meg a beszélgetőügynök beállítá
 | A Deezer nem indul | A Sonos appban kösd be a Deezert, vagy rejtsd el a DEEZER fület. |
 | Egy adó Sonoson szól, BT-n nem | Próbáld a stream-cím http-s változatát; a BT-rádió az integráción át megy (`/api/cantabile/stream`). |
 | A VU-mérő csak „utánoz” | Nincs `ffmpeg` a gazdagépen, vagy titkosított a stream (Deezer). |
+| Hangvezérlés: az ügynök azt mondja, nem tud zenét indítani, vagy az Assist-hibakeresőben „Tool … not found” | Kapcsold be a *Cantabile*-t az ügynök beállításaiban. Ha a saját utasításod megnevezi az eszközt, a pontos nevét írd – bekapcsolt Assist mellett `cantabile__cantabile_play`. |
 | Üres a zenemappa | Ellenőrizd a ⚙-ben a médiaforrás-útvonalat, és hogy a mappa látszik-e a **Média** menüben. |
 
 ## A kártya beállításai (YAML)

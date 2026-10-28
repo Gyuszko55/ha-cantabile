@@ -1,7 +1,7 @@
 # Cantabile
 
-**A 1970s silver radio and cassette deck for your Home Assistant dashboard** – preset buttons on an FM dial,
-internet radio, a cassette deck with turning reels and real VU meters, your own music folder, Deezer, and voice control.
+**An old hi-fi radio and cassette deck – brushed silver or nineties black – for your Home Assistant dashboard** – preset buttons on an FM dial,
+internet radio, a cassette deck with turning reels and real VU meters, your own music folder, Deezer, Spotify and Tidal, and voice control.
 
 *Magyar leírás: [README.hu.md](README.hu.md)*
 
@@ -10,6 +10,8 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
 ![Cantabile radio: FM dial with preset buttons, signal meter, volume and speaker selector](docs/images/radio.png)
 
 ![Cantabile cassette deck: turning reels, VU meters, piano-key transport](docs/images/tape.png)
+
+![Cantabile cassette deck with the black front panel (finish: black) and the fluorescent (VFD) display](docs/images/tape-black.png)
 
 <p align="center"><img src="docs/images/phone.png" alt="Cantabile radio on a phone" width="320"></p>
 
@@ -38,6 +40,14 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
 - **LYRICS**: tap the song title on the cassette (or the radio's now-playing line when it shows a song) – the lyrics
   come from [LRCLIB](https://lrclib.net); on the tape the current line is highlighted and follows the music.
 
+**Look**
+- Two front panels: brushed **silver** (old hi-fi) or finely brushed **black** (1990s) with black keys and knobs –
+  ⚙ → *Front panel*, or `finish: black` in YAML.
+- Each speaker has a **card name** of up to 8 characters (e.g. *Lounge*): it goes on the rotary selector, the header and
+  the cassette, while voice control keeps using the full name.
+- **Messages on the player**: hints and errors appear in a smoked-glass window on the card itself, then fade out
+  (tap to close); when the card isn't visible, Home Assistant's own notification is used.
+
 **Speakers**
 - Sonos (full feature set, including grouping as “Both”), and any other media player that can play a URL
   (e.g. WiiM – albums are played track by track by the integration).
@@ -47,9 +57,10 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
 **Voice**
 - An Assist tool for any LLM conversation agent (Google Gemini, OpenAI, Anthropic, Ollama…):
   *“Play Queen in the living room”*, *“Put on the Kind of Magic album”*, *“Turn on Jazz FM in the bedroom”*,
-  *“Play Adele from Deezer”*. Anything not in your music folder is looked up on Deezer.
+  *“Play Adele from Deezer”*, *“Play Daft Punk from Spotify”*. Anything not in your music folder is looked up on Deezer;
+  Spotify and Tidal are used when you ask for them (on Sonos).
 
-Front-panel labels are always English, like on a real 1970s hi-fi; settings, messages and tooltips follow your Home Assistant language: **Hungarian** or **English**.
+Front-panel labels are always English, like on a real old hi-fi; settings, messages and tooltips follow your Home Assistant language: **Hungarian** or **English**.
 
 ## Requirements and compatibility
 
@@ -97,8 +108,8 @@ After setting up the integration, open your conversation agent's options (e.g. *
 ## Adding your own speakers and sources
 
 - **Speakers**: card ⚙ → *Speakers* → **+ New speaker** → pick the player. Only players that can play media are listed;
-  the type (Sonos / other) is set automatically. Give a *short* name if the full name is long – it goes on the rotary
-  selector. With two or more Sonos speakers a *Multiroom* position appears (Sonos grouping).
+  the type (Sonos / other) is set automatically. The *card name* (max. 8 characters, needed when the full name is longer) is
+  what the card shows – on the rotary selector, the header and the cassette; voice control uses the full name. With two or more Sonos speakers a *Multiroom* position appears (Sonos grouping).
 - **Radio stations**: ⚙ → search the Radio Browser by name, or add a name and stream URL by hand. The frequency is
   optional (it only places the station on the dial). On the radio, tap an empty **+** slot or **NET** to browse thousands
   of stations and put one on a button.
@@ -130,6 +141,7 @@ After setting up the integration, open your conversation agent's options (e.g. *
 | Deezer doesn't start | Link Deezer in the Sonos app, or hide the DEEZER tab. |
 | A station plays on Sonos but not on BT | Try the http variant of the stream URL; BT radio goes through the integration (`/api/cantabile/stream`). |
 | VU meters only “simulate” | No `ffmpeg` on the host, or an encrypted stream (Deezer). |
+| Voice: the agent says it can't play music, or “Tool … not found” in the Assist debug | Turn on *Cantabile* in the agent's options. If your own agent prompt names the tool, use its exact name – with Assist also on it is `cantabile__cantabile_play`. |
 | Music folder is empty | Check the media-source path in ⚙ and that the folder is visible under **Media**. |
 
 ## Card configuration (YAML)
