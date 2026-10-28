@@ -1452,8 +1452,10 @@ class CantabileCard extends HTMLElement {
         .adosor .bill.akt, .adosor .bill:active { transform: translateY(2px); box-shadow: 0 1px 0 #80858c, 0 2px 3px rgba(0,0,0,.25); }
         .adosor .adoures { background: linear-gradient(180deg, #eceef0, #d6dade); border-style: dashed; border-color: #a3a8af; box-shadow: 0 2px 0 #9ca1a8; align-items: center; padding: 0; }
         .adosor .adoures .plusz { font: 300 calc(20px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; color: #8a8f97; }
-        .jobb.rjobb { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "rbal hang" "otg otg" "kim kim"; justify-content: stretch; align-content: space-between; align-items: center; gap: 2px 4px; }
-        .rjobb > .rbal { grid-area: rbal; display: flex; flex-direction: column; align-items: center; gap: 12px; align-self: start; padding-top: 4px; }
+        /* széles rádió: balra a hangerőgomb, jobbra a POWER és alatta a RADIO / TAPE kapcsoló */
+        .jobb.rjobb { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "hang rbal" "otg otg" "kim kim"; justify-content: stretch; align-content: space-between; align-items: center; gap: 2px 4px; }
+        .rjobb > .rbal { grid-area: rbal; display: flex; flex-direction: column; align-items: center; gap: 12px; align-self: start; padding-top: 0; }
+        .rjobb > .rbal .power { align-self: flex-end; }   /* széles rádión a jobb felső sarokban */
         .rjobb > .hangero { grid-area: hang; justify-self: center; transform: scale(.74); margin: -24px; }
         .rjobb > .rotg { grid-area: otg; }
         .rjobb > .forgo { grid-area: kim; justify-self: center; }
