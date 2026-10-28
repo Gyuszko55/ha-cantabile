@@ -141,7 +141,8 @@ brand: Cantabile                 # elhagyható
 finish: silver                   # silver (ezüst húzott alumínium) | black (90-es évek fekete húzott előlap)
 bt: true                         # BT-kimenet ezen a készüléken; false = nincs
 speakers:
-  - name: Nappali
+  - name: Nappali                      # teljes név – a hangvezérlés ezt használja
+    short: Sonos 1               # a kártyán megjelenő név, max. 8 karakter (hosszabb névnél kötelező)
     entity: media_player.nappali
     mode: sonos                  # sonos | url (sor nélküli lejátszó, pl. WiiM)
   - name: WiiM

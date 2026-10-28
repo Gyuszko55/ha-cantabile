@@ -140,7 +140,8 @@ brand: Cantabile                 # optional
 finish: silver                   # silver (brushed aluminium) | black (nineties black brushed front)
 bt: true                         # BT output on this device; false = hidden
 speakers:
-  - name: Living room
+  - name: Living room            # full name – voice control uses this
+    short: Sonos 1               # name shown on the card, max. 8 characters (needed when the name is longer)
     entity: media_player.living_room
     mode: sonos                  # sonos | url (players without a queue, e.g. WiiM)
   - name: WiiM

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.0 – 2026-10-28
+
+- Speaker card names: each speaker has a name shown on the card (`short`, ⚙ column "On card", max. 8 characters) – used on the dial, the radio speaker switch, the header, the cassette info line, the queue and the messages. The full `name` stays for voice control and the Spotify device lookup. ⚙ refuses a longer card name, and asks for one when the full name is longer than 8 characters; a longer YAML name is cut to 8 on the card. The built-in Multiroom position keeps its label.
+
 ## 1.9.9 – 2026-10-28
 
 - New front panel option: `finish: black` gives both decks a nineties-style black brushed front – light lettering, black keys, black knurled knobs with dark anodised caps. The displays, the cassette and the lamps keep their colours. Also selectable in ⚙ (Front panel: Silver / Black); `silver` stays the default.
