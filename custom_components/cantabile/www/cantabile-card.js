@@ -4399,6 +4399,29 @@ class CantabileTv extends HTMLElement {
     this._indit();
   }
 
+  // ---- képernyő ébren tartása ----
+  // Az Android TV csak a (képes) videót tekinti „nézett” lejátszásnak: a TV-oldal hangja mellett kb. 15 perc múlva
+  // képernyővédőre, majd alvásba vált (a bot leesik a hálózatról). Lejátszás közben a Screen Wake Lock-ot kéri; az
+  // eredményt egyszer visszajelzi (cantabile_tv_diag „ebren”: ok / nincs / hiba). Az oldal elrejtésekor a böngésző
+  // elengedi – újra láthatóvá váláskor, ha szól, megint kéri.
+  async _ebren(kell) {
+    const w = window, jelez = (ertek) => { if (!w._cantabileEbrenJelzett) { w._cantabileEbrenJelzett = true; this._diag({ ebren: ertek }); } };
+    if (!w._cantabileEbrenFigyel) {
+      w._cantabileEbrenFigyel = true;
+      document.addEventListener("visibilitychange", () => {
+        const akt = w._cantabileTv;
+        if (document.visibilityState === "visible" && akt && akt._allapot === "playing") akt._ebren(true);
+      });
+    }
+    if (!kell) { const l = w._cantabileEbren; w._cantabileEbren = null; if (l) l.release().catch(() => {}); return; }
+    if (w._cantabileEbren && !w._cantabileEbren.released) return;
+    if (!("wakeLock" in navigator)) return jelez("nincs (a Cast-vevő nem ismeri a Wake Lock API-t)");
+    try {
+      w._cantabileEbren = await navigator.wakeLock.request("screen");
+      jelez("ok");
+    } catch (e) { jelez(`hiba: ${e && e.name}: ${e && e.message}`); }
+  }
+
   // ---- hang ----
   _hang() {
     if (this._a) return this._a;
@@ -4408,6 +4431,8 @@ class CantabileTv extends HTMLElement {
     // az események mindig az épp aktív (látható) példányhoz mennek – a Cast-vevő a kártyát le is cserélheti
     ["playing", "pause", "ended", "error", "loadedmetadata", "seeked"].forEach((e) => a.addEventListener(e, () => {
       const ez = window._cantabileTv || this;
+      if (e === "playing") ez._ebren(true);
+      else if (e === "pause" || e === "ended" || e === "error") ez._ebren(false);
       if (e === "ended") { ez._allapot = "idle"; ez._v.classList.add("ures2"); }
       if (e === "error") { ez._allapot = "idle"; ez._diag({ hiba: `audio error ${a.error?.code || ""} ${a.error?.message || ""}`, net: a.networkState, rs: a.readyState, src: String(a.src).slice(0, 90) }); }
       ez._jelent(e === "error" ? `audio ${a.error?.code || ""}` : null);
