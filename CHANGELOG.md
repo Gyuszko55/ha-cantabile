@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.5 – 2026-10-28
+
+- Spotify Connect: the device Spotify is currently playing on also counts when the card looks for the speaker (Spotify may leave a WiiM out of its device list while it plays, listing only an anonymous id); when playback is already on that device, the card starts the cassette there without switching devices first.
+
 ## 1.9.4 – 2026-10-28
 
 - Spotify, adapted to the stricter limits of Spotify developer apps (first test with a live Premium account):

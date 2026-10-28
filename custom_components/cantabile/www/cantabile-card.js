@@ -2844,9 +2844,10 @@ class CantabileCard extends HTMLElement {
     return !!s.tidal && this._vanSonos();
   }
 
-  // a Spotify Connect-eszköz neve egy hangszóróhoz: a beállított spotify_device, különben név szerint a Spotify forráslistájából
+  // a Spotify Connect-eszköz neve egy hangszóróhoz: a beállított spotify_device, különben név szerint a Spotify forráslistájából;
+  // az épp játszó eszköz is jelölt (a Spotify a WiiM-et játszás közben is kihagyhatja a listából, csak azonosítót ad helyette)
   _spotifyEszkoz(hsz) {
-    const sp = this._stream?.spotify_entity, lista = this._hass?.states[sp]?.attributes?.source_list || [];
+    const sp = this._stream?.spotify_entity, a = this._hass?.states[sp]?.attributes || {}, lista = [...new Set([...(a.source_list || []), a.source].filter(Boolean))];
     if (!hsz || hsz.entity === HELYI || !lista.length) return null;
     const norm = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
     const nevek = [hsz.spotify_device, hsz.nev, this._hass.states[hsz.entity]?.attributes?.friendly_name].filter(Boolean).map(norm);
@@ -2858,7 +2859,8 @@ class CantabileCard extends HTMLElement {
     const sp = this._stream?.spotify_entity, eszk = this._spotifyEszkoz(hsz);
     if (!eszk) throw new Error(T("A(z) {h} nem szerepel a Spotify Connect-eszközök között (nyisd meg rajta egyszer a Spotify appot, vagy add meg a nevét: spotify_device).", { h: hsz.nev }));
     const uri = kaz.uri || kaz.id;
-    await this._hiv("media_player", "select_source", { entity_id: sp, source: eszk });
+    // ha már ezen az eszközön van a lejátszás, nem kell (és listából hiányzó eszközre nem is lehet) átváltani
+    if (this._hass.states[sp]?.attributes?.source !== eszk) await this._hiv("media_player", "select_source", { entity_id: sp, source: eszk });
     await this._hiv("media_player", "play_media", { entity_id: sp, media_content_id: uri, media_content_type: kaz.mtype || (String(uri).split(":")[1] || "playlist") });
     TAR.ir("tablet-magno-kazetta", JSON.stringify({ ...kaz, entity: hsz.entity }));
     this._frissit();
