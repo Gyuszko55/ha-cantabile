@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.12.8 – 2026-10-28
+
+- Manifest: `network` listed under `after_dependencies` (the stream relay reads Home Assistant's own networks); 1.12.7 failed the hassfest check because of it. No functional change.
+
 ## 1.12.7 – 2026-10-28
 
 Fixes from a full review of the integration:

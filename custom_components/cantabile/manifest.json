@@ -5,6 +5,7 @@
     "cast",
     "dlna_dmr",
     "lovelace",
+    "network",
     "sonos",
     "wiim"
   ],
@@ -26,5 +27,5 @@
     "async-upnp-client"
   ],
   "single_config_entry": true,
-  "version": "1.12.7"
+  "version": "1.12.8"
 }
