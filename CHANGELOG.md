@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.12.10 – unreleased
+
+- No silent failures any more:
+  - every failed command shows a message (“Sonos 2: the command failed – …”);
+  - a feature the player lacks (volume, shuffle, repeat, grouping) says so;
+  - a tape or stream that can't play on the chosen speaker names the speakers it plays on (“This can't be played on Technics – it plays on: Sonos 1, Sonos 2”);
+  - if the speaker accepts a tape, station or NET station but doesn't start playing within 12 s (45 s on Cantabile TV), the card says so and suggests other speakers.
+
 ## 1.12.9 – 2026-10-28
 
 - When the chosen player is unavailable (e.g. a TV stick that went to sleep or dropped off the network), volume, next / previous and the other controls no longer do nothing silently: the card says “… is not available right now – turn it on or pick another speaker” (at most every 4 s while turning the knob), and the SPEAKERS selector shows unavailable positions dimmed, with a red lamp when one is selected.

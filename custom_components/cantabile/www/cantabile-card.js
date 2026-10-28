@@ -130,14 +130,20 @@ const EN = {
   "Legalább egy hangszóró kell.": "At least one speaker is required.",
   "nem találom a kártyát ezen a vezérlőpulton": "the card was not found on this dashboard",
   "Áttekintés": "Overview",
+  "A(z) {h}: a parancs nem sikerült – {e}": "{h}: the command failed – {e}",
+  "A parancs nem sikerült: {e}": "The command failed: {e}",
+  "egyik sem": "none",
+  "A(z) {h} hangszórón ez nem játszható le – lejátszható: {l}.": "This can't be played on {h} – it plays on: {l}.",
+  "Lejátszható: {l}.": "It plays on: {l}.",
+  "A(z) {h} nem kezdte el lejátszani: „{c}”. Lehet, hogy ezt nem tudja lejátszani – próbáld ezeken: {l}.": "{h} didn't start playing “{c}”. It may not be able to play it – try: {l}.",
   "A(z) {h} most nem érhető el – kapcsold be, vagy válassz másik hangszórót.": "{h} is not available right now – turn it on or pick another speaker.",
-  "Ez a lejátszó nem tud keverni.": "This player can't shuffle.",
+  "A(z) {h} ezt nem tudja: {m}.": "{h} can't do this: {m}.",
+  "hangerő": "volume", "keverés": "shuffle", "ismétlés": "repeat", "csoportba kapcsolás": "grouping",
   "Beállítások elmentve: {n}.": "Settings saved: {n}.",
   "Nem sikerült: {h}.": "Failed: {h}.",
   "A mentéshez rendszergazdai felhasználó kell.": "Saving requires an administrator user.",
   "A mentés nem sikerült: {h}": "Saving failed: {h}",
   "A telefonról választott zene a BT kimeneten szól – átváltottam.": "Music picked from the phone plays on the BT output – switched to it.",
-  "A streaming kazetta csak Sonos hangszórón szól.": "Streaming tapes only play on Sonos speakers.",
   "Ebben a mappában nincs lejátszható szám.": "There are no playable tracks in this folder.",
   "Adó keresése név szerint…": "Search stations by name…",
   "Bezár": "Close",
@@ -1688,10 +1694,60 @@ class CantabileCard extends HTMLElement {
     // amit a lejátszó nem tud (pl. egyes DLNA- vagy Cast-vevők), azt nem hívjuk – különben csendben hibát dobna
     if (d === "media_player" && KEPESSEG[s] && adat?.entity_id) {
       const ids = [].concat(adat.entity_id).filter((e) => { const f = this._hass.states[e]?.attributes?.supported_features; return f == null || (f & KEPESSEG[s]); });
-      if (!ids.length) { if (s === "shuffle_set") this._uzen(T("Ez a lejátszó nem tud keverni.")); return Promise.resolve(); }
+      if (!ids.length) {
+        const mit = { volume_set: T("hangerő"), shuffle_set: T("keverés"), repeat_set: T("ismétlés"), join: T("csoportba kapcsolás") }[s];
+        const e = [].concat(adat.entity_id)[0], h = (this._kimenetek || []).find((x) => x.entity === e);
+        const uz = T("A(z) {h} ezt nem tudja: {m}.", { h: h ? KN(h) : e, m: mit });
+        if (this._nemTudUtolso !== uz || Date.now() - (this._nemTudIdo || 0) > 4000) { this._nemTudUtolso = uz; this._nemTudIdo = Date.now(); this._uzen(uz); }
+        return Promise.resolve();
+      }
       adat = { ...adat, entity_id: Array.isArray(adat.entity_id) ? ids : ids[0] };
     }
-    return this._hass.callService(d, s, adat);
+    const p = this._hass.callService(d, s, adat);
+    // semmi ne hiúsuljon meg csendben: a sikertelen hívás mindig üzenetet ad (a hívó pontosabb üzenete felülírhatja)
+    p.catch((err) => this._hivHiba(adat?.entity_id, err));
+    return p;
+  }
+
+  _hivHiba(entity, err) {
+    const e = [].concat(entity || [])[0], h = (this._kimenetek || []).find((x) => x.entity === e);
+    const nev = h ? KN(h) : this._hass?.states[e]?.attributes?.friendly_name || e || "";
+    const m = String(err?.message || err?.code || err || "");
+    if (this._hivHibaUtolso === m && Date.now() - (this._hivHibaIdo || 0) < 3000) return;
+    this._hivHibaUtolso = m; this._hivHibaIdo = Date.now();
+    this._uzen(nev ? T("A(z) {h}: a parancs nem sikerült – {e}", { h: nev, e: m }) : T("A parancs nem sikerült: {e}", { e: m }));
+  }
+
+  // mely hangszórókon játszható le egy kazetta / adó (a hibaüzenetben ajánlja): a streamek (Deezer, Tidal, Spotify-link)
+  // csak Sonoson, a Spotify Spotify Connecten is; a NAS, a telefon és a rádió bármelyiken (elérhetőn)
+  _kepesek(kaz, kiveve = null) {
+    const ok = (h) => {
+      if (h.tagok || (kiveve && h.entity === kiveve.entity)) return false;
+      if (h.entity !== HELYI && this._hass?.states[h.entity]?.state === "unavailable") return false;
+      if (kaz?.forras !== "stream") return true;
+      if (h.entity === HELYI) return false;
+      return h.mod === "sonos" || (kaz.tipus === "spotify" && !!this._spotifyEszkoz(h));
+    };
+    return (this._kimenetek || []).filter(ok).map((h) => KN(h)).join(", ") || T("egyik sem");
+  }
+
+  // a hangszóró elfogadta a parancsot, de nem kezdett játszani („visszadobta”): rövid várakozás után szól, és ajánl helyette
+  _inditasFigyel(hsz, cim, kaz = null) {
+    if (!hsz || hsz.entity === HELYI) return;
+    const jel = this._inditasJel = {}, t0 = Date.now(), ent = hsz.entity;
+    const tv = /^media_player\.cantabile_tv_/.test(ent) || !!this._tvMap?.[ent], hatar = tv ? 45000 : 12000;
+    const spotify = kaz?.forras === "stream" && kaz.tipus === "spotify" && hsz.mod !== "sonos" ? this._stream?.spotify_entity : null;
+    const k = () => {
+      if (this._inditasJel !== jel) return;                       // közben más indult
+      const st = this._hass?.states[spotify || ent]?.state;
+      if (st === "playing" || st === "buffering") return;
+      if (Date.now() - t0 > hatar) {
+        this._uzen(T("A(z) {h} nem kezdte el lejátszani: „{c}”. Lehet, hogy ezt nem tudja lejátszani – próbáld ezeken: {l}.", { h: KN(hsz), c: cim || "", l: this._kepesek(kaz, hsz) }));
+        return;
+      }
+      setTimeout(k, 700);
+    };
+    setTimeout(k, 1500);
   }
 
   // ---- BT kimenet: lejátszás ezen a készüléken (<audio>) ----
@@ -2208,6 +2264,7 @@ class CantabileCard extends HTMLElement {
     this._szkriptLeallit();
     const cim = hsz.mod === "sonos" ? `x-rincon-mp3radio://${CIM(a.url)}` : a.url;
     const p = this._hiv("media_player", "play_media", { entity_id: hsz.entity, media_content_id: cim, media_content_type: "music" });
+    p.then(() => this._inditasFigyel(hsz, a.nev), () => {});
     this._frissit();
     return p;
   }
@@ -2722,7 +2779,7 @@ class CantabileCard extends HTMLElement {
       }
       if (kaz.forras === "stream") {
         if (hsz.mod !== "sonos" && kaz.tipus === "spotify" && this._stream?.spotify_entity && hsz.entity !== HELYI) return this._spotifyConnect(kaz, hsz);
-        if (hsz.mod !== "sonos") throw new Error(T("A streaming kazetta csak Sonos hangszórón szól."));
+        if (hsz.mod !== "sonos") throw Object.assign(new Error(T("A(z) {h} hangszórón ez nem játszható le – lejátszható: {l}.", { h: KN(hsz), l: this._kepesek(kaz, hsz) })), { hely: true });
         if (kaz.tipus === "spotify" && /^spotify:\/\//.test(kaz.id)) {
           // a HA Spotify-integrációjának könyvtárából (a Sonos-integráció alakítja Spotify-címmé)
           await this._hiv("media_player", "play_media", { ...e, media_content_id: kaz.id, media_content_type: kaz.mtype || "playlist" });
@@ -2754,10 +2811,11 @@ class CantabileCard extends HTMLElement {
         }
       }
       TAR.ir("tablet-magno-kazetta", JSON.stringify({ ...kaz, entity: hsz.entity }));
+      this._inditasFigyel(hsz, kaz.cim, kaz);
       this._frissit();
     } catch (err) {
       const m = err?.message || String(err);
-      this._uzen(kaz?.tipus === "deezer" ? T("A Deezer nem indult el ({h}). A Sonos appban kösd be a Deezer-fiókot (Beállítások → Szolgáltatások), vagy a ⚙ beállításokban rejtsd el a DEEZER fület.", { h: m }) : m);
+      this._uzen(kaz?.tipus === "deezer" && !err?.hely ? T("A Deezer nem indult el ({h}). A Sonos appban kösd be a Deezer-fiókot (Beállítások → Szolgáltatások), vagy a ⚙ beállításokban rejtsd el a DEEZER fület.", { h: m }) : m);
     }
   }
 
@@ -3037,7 +3095,7 @@ class CantabileCard extends HTMLElement {
     this._szkriptLeallit();
     this._netZar();
     const cim = hsz.mod === "sonos" ? `x-rincon-mp3radio://${CIM(url)}` : url;
-    try { await this._hiv("media_player", "play_media", { entity_id: hsz.entity, media_content_id: cim, media_content_type: "music" }); }
+    try { await this._hiv("media_player", "play_media", { entity_id: hsz.entity, media_content_id: cim, media_content_type: "music" }); this._inditasFigyel(hsz, k.nev); }
     catch (err) { this._kezi = null; this._uzen(T("A(z) {h} nem tudta lejátszani: {e}", { h: KN(hsz), e: err?.message || err })); }
     // a Radio Browser népszerűségi számlálója (az adatbázis kéri lejátszáskor)
     if (kattint && t.stationuuid) this._rb(`/json/url/${t.stationuuid}`).catch(() => {});
@@ -3163,11 +3221,12 @@ class CantabileCard extends HTMLElement {
   // Spotify Connect: a HA Spotify-integrációja a hangszórót választja lejátszó eszköznek, és ott indít (Premium kell)
   async _spotifyConnect(kaz, hsz) {
     const sp = this._stream?.spotify_entity, eszk = this._spotifyEszkoz(hsz);
-    if (!eszk) throw new Error(T("A(z) {h} nem szerepel a Spotify Connect-eszközök között (nyisd meg rajta egyszer a Spotify appot, vagy add meg a nevét: spotify_device).", { h: KN(hsz) }));
+    if (!eszk) throw new Error(T("A(z) {h} nem szerepel a Spotify Connect-eszközök között (nyisd meg rajta egyszer a Spotify appot, vagy add meg a nevét: spotify_device).", { h: KN(hsz) }) + " " + T("Lejátszható: {l}.", { l: this._kepesek(kaz, hsz) }));
     const uri = kaz.uri || kaz.id;
     // ha már ezen az eszközön van a lejátszás, nem kell (és listából hiányzó eszközre nem is lehet) átváltani
     if (this._hass.states[sp]?.attributes?.source !== eszk) await this._hiv("media_player", "select_source", { entity_id: sp, source: eszk });
     await this._hiv("media_player", "play_media", { entity_id: sp, media_content_id: uri, media_content_type: kaz.mtype || (String(uri).split(":")[1] || "playlist") });
+    this._inditasFigyel(hsz, kaz.cim, kaz);
     TAR.ir("tablet-magno-kazetta", JSON.stringify({ ...kaz, entity: hsz.entity }));
     this._frissit();
   }
