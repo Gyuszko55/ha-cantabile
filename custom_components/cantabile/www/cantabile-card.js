@@ -523,11 +523,13 @@ class CantabileCard extends HTMLElement {
 
   connectedCallback() {
     HELYI_KOZOS.kartya = this;
+    this._betuKorr();
     // telefonon (keskeny helyen) álló elrendezés
     if (!this._meret && "ResizeObserver" in window) {
       this._meret = new ResizeObserver((e) => {
         const sz = e[0]?.contentRect.width;
         if (sz) this.toggleAttribute("keskeny", sz < 600);
+        if (sz && !this._bkMert) this._betuKorr();
         // panel nézet / magas kártyahely: az előlap a saját magasságában, függőlegesen középen (nem nyúlik szét)
         const mag = e[0]?.contentRect.height;
         if (sz && mag) this.toggleAttribute("magas", sz >= 600 && mag > sz * 0.62);
@@ -540,6 +542,23 @@ class CantabileCard extends HTMLElement {
       this._lato = new IntersectionObserver((e) => { this._lathato = e[0]?.isIntersecting; this._jelFeliratkozas(); this._animIndit(); });
       this._lato.observe(this);
     }
+  }
+
+  // a telefon / HA-alkalmazás szövegnagyítása (Android WebView textZoom; a text-size-adjust nem hat rá): egy 100 px-es betű
+  // és egy 100 px-es doboz aránya adja; a kártya betűméretei ennyivel kisebbek (--bk), így a kép a tervezett marad
+  _betuKorr() {
+    const sr = this.shadowRoot; if (!sr) return;
+    const p = document.createElement("div");
+    p.style.cssText = "position:absolute;left:0;top:0;visibility:hidden;pointer-events:none";
+    p.innerHTML = '<span style="display:inline-block;font:100px/1 Arial">X</span><div style="width:1px;height:100px"></div>';
+    sr.appendChild(p);
+    const a = p.firstChild.getBoundingClientRect().height, b = p.lastChild.getBoundingClientRect().height;
+    p.remove();
+    if (!a || !b) return;                          // még nem látszik: az átméretezéskor újra mér
+    this._bkMert = true;
+    const k = a / b;
+    if (k > 1.03 && k < 4) this.style.setProperty("--bk", (1 / k).toFixed(4));
+    else this.style.removeProperty("--bk");
   }
 
   disconnectedCallback() {
@@ -747,7 +766,7 @@ class CantabileCard extends HTMLElement {
         <!-- címke -->
         <rect x="12" y="17.5" width="216" height="27" rx="2" fill="#17181b" stroke="rgba(255,255,255,.06)"/>
         <rect id="sav" x="12" y="17.5" width="216" height="1.6" fill="#888"/>
-        <rect x="211" y="21" width="13" height="13" fill="#3a3b3f"/><text x="217.5" y="31.5" text-anchor="middle" font-family=""Cantabile Sans", Arial, sans-serif" font-size="11" fill="#141416">A</text>
+        <rect x="211" y="21" width="13" height="13" fill="#3a3b3f"/><text x="217.5" y="31.5" text-anchor="middle" font-family="'Cantabile Sans', Arial, sans-serif" style="font-size:calc(11px * var(--bk, 1))" fill="#141416">A</text>
         <!-- átlátszó ablaksáv: tekercsek (az ablakra vágva), középen a rács -->
         <rect x="20" y="48" width="200" height="41" rx="3" fill="#0a0a0b"/>
         <g clip-path="url(#ablakvag)">
@@ -760,7 +779,7 @@ class CantabileCard extends HTMLElement {
         <g class="orso" id="ob">${this._orso(75, 68.5)}</g><g class="orso" id="oj">${this._orso(165, 68.5)}</g>
         <!-- aranycsík -->
         <path d="M12 92.5H228M12 103.5H228" stroke="#a88b4f" stroke-width=".9"/>
-        <text x="16" y="100.6" font-family=""Cantabile Sans", Arial, sans-serif" font-weight="700" font-size="6" letter-spacing="1" fill="#c9ad72">${ESC((c.marka || "Cantabile").toUpperCase())}</text>
+        <text x="16" y="100.6" font-family="'Cantabile Sans', Arial, sans-serif" font-weight="700" style="font-size:calc(6px * var(--bk, 1))" letter-spacing="1" fill="#c9ad72">${ESC((c.marka || "Cantabile").toUpperCase())}</text>
         <!-- fejnyílás a szalaggal, görgők, csavarok -->
         <path d="M40 149 L50 121 H190 L200 149" fill="#121315" stroke="#2c2e33"/>
         <path id="szalag" d="M46 146 H194" stroke="#3a2414" stroke-width="1.6"/>
@@ -822,13 +841,13 @@ class CantabileCard extends HTMLElement {
           transition: opacity .35s, transform .35s; }
         .elo.rejt { opacity: 0; transform: translateY(14px) scale(.97); pointer-events: none; }
         .bal { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-        .fej { display: flex; align-items: baseline; font: 700 10px/1 "Cantabile Sans", Arial, sans-serif;
+        .fej { display: flex; align-items: baseline; font: 700 calc(10px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif;
           letter-spacing: .28em; color: #3d4148; text-transform: uppercase; }
         .fej .hszfej { letter-spacing: .12em; font-weight: 500; color: #5b6068; margin-left: auto; }
-        .fej .tipus { margin-left: 12px; font: 400 20px/0 "Great Vibes", "Brush Script MT", cursive; letter-spacing: 0; text-transform: none;
+        .fej .tipus { margin-left: 12px; font: 400 calc(20px * var(--bk, 1))/0 "Great Vibes", "Brush Script MT", cursive; letter-spacing: 0; text-transform: none;
           color: #3d4148; position: relative; top: 9px; text-shadow: 0 1px 0 rgba(255,255,255,.85); }
         /* írott márkanév (10-26 óta 4 px-szel lejjebb, hogy ne érjen a készülék széléig): kilóg a felső margóba, így nem veszi el a helyet a skálától / kazettától */
-        .fej .marka { font: 400 30px/0 "Great Vibes", "Brush Script MT", cursive; letter-spacing: 0; text-transform: none; color: #26292e;
+        .fej .marka { font: 400 calc(30px * var(--bk, 1))/0 "Great Vibes", "Brush Script MT", cursive; letter-spacing: 0; text-transform: none; color: #26292e;
           position: relative; top: 9px; text-shadow: 0 1px 0 rgba(255,255,255,.85), 0 -1px 0 rgba(0,0,0,.18); }
         .skala { position: relative; flex: 1; min-height: 120px; border-radius: 5px; overflow: hidden;
           background: linear-gradient(180deg, #0b0c0d, #16181a 60%, #0d0e0f);
@@ -845,12 +864,12 @@ class CantabileCard extends HTMLElement {
         .jelsvg .jl1 { stop-color: #1b4f49; transition: stop-color .8s; } .jelsvg .jl2 { stop-color: #0a201e; transition: stop-color .8s; }
         .be .jelsvg .jl1 { stop-color: #7ff2dc; } .be .jelsvg .jl2 { stop-color: #1fa58f; }
         .be .jelsvg { box-shadow: 0 0 0 1px #2a2d31, 0 0 14px rgba(80,230,200,.35); }
-        .jelsvg text { font: 700 6px/1 "Cantabile Sans", Arial, sans-serif; fill: #062421; text-anchor: middle; }
-        .jelsvg .jcim { font-size: 6.5px; letter-spacing: .12em; }
+        .jelsvg text { font: 700 calc(6px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; fill: #062421; text-anchor: middle; }
+        .jelsvg .jcim { font-size: calc(6.5px * var(--bk, 1)); letter-spacing: .12em; }
         .jmut { transform-origin: 50px 58px; transform: rotate(-40deg); transition: transform 1.4s cubic-bezier(.3,1.25,.5,1); }
-        .jfel { font: 600 9px/1 "Cantabile Sans", Arial, sans-serif; color: #5f7d79; white-space: nowrap; letter-spacing: .04em; min-height: 9px; }
+        .jfel { font: 600 calc(9px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; color: #5f7d79; white-space: nowrap; letter-spacing: .04em; min-height: 9px; }
         .be .jfel { color: #8fe9d6; }
-        .jelm .stereo { font: 700 8px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; color: #5a2420; border: 1px solid #3a1714; padding: 2px 5px; border-radius: 2px; display: flex; gap: 4px; align-items: center; }
+        .jelm .stereo { font: 700 calc(8px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; color: #5a2420; border: 1px solid #3a1714; padding: 2px 5px; border-radius: 2px; display: flex; gap: 4px; align-items: center; }
         .jelm .stereo i { width: 5px; height: 5px; transform: rotate(45deg); background: #5a2420; }
         .be .jelm .stereo { color: #ff4b3a; border-color: #ff4b3a; text-shadow: 0 0 6px rgba(255,75,58,.7); }
         .be .jelm .stereo i { background: #ff4b3a; box-shadow: 0 0 6px #ff4b3a; }
@@ -858,45 +877,45 @@ class CantabileCard extends HTMLElement {
         .kerek { width: 100%; flex: 1; max-height: 74px; border-radius: 3px; box-shadow: inset 0 0 0 1px #000, 0 0 0 1px #3a3d42;
           background: linear-gradient(180deg, rgba(0,0,0,.85), rgba(0,0,0,0) 22%, rgba(255,255,255,.18) 50%, rgba(0,0,0,0) 78%, rgba(0,0,0,.85)),
             repeating-linear-gradient(90deg, #c9ced3 0 2px, #6d7278 2px 3px, #e8ebee 3px 5px, #8b9096 5px 7px); }
-        .giro small { font: 700 7px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .16em; color: #6d7179; }
+        .giro small { font: 700 calc(7px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .16em; color: #6d7179; }
         .be .giro small { color: #8fb8e6; }
         .giro:active .kerek { box-shadow: inset 0 0 0 1px #000, 0 0 0 1px #6fa8ff; }
         .kezi .mutato { transition: none; }
         .sav { position: absolute; left: 22px; right: 22px; top: 0; bottom: 0; }
         .j { position: absolute; top: 34%; width: 1px; height: 9px; background: #6d6a62; transform: translateX(-.5px); transition: background .8s; }
         .j.n { top: calc(34% - 5px); height: 14px; width: 2px; transform: translateX(-1px); }
-        .sz { position: absolute; top: calc(34% + 14px); transform: translateX(-50%); font: 600 13px/1 "Cantabile Sans", Arial, sans-serif; color: #77736a; transition: color .8s, text-shadow .8s; }
+        .sz { position: absolute; top: calc(34% + 14px); transform: translateX(-50%); font: 600 calc(13px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; color: #77736a; transition: color .8s, text-shadow .8s; }
         .be .j { background: #9fd0ff; box-shadow: 0 0 4px rgba(110,180,255,.8); } .be .sz { color: #cfe7ff; text-shadow: 0 0 6px rgba(90,160,255,.9); }
         .vonal { position: absolute; left: 0; right: 0; top: calc(34% + 9px); height: 1px; background: #4a4842; }
         .be .vonal { background: #6fa8e8; }
         .aj { position: absolute; top: calc(34% - 13px); width: 7px; height: 5px; transform: translateX(-50%); background: #7c5a22; clip-path: polygon(0 0, 100% 0, 50% 100%); }
         .be .aj { background: #ffb347; box-shadow: 0 0 4px #ffb347; }
-        .mertek { position: absolute; left: 10px; top: 10px; font: 700 10px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .2em; color: #8a857a; }
+        .mertek { position: absolute; left: 10px; top: 10px; font: 700 calc(10px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .2em; color: #8a857a; }
         .mertek.j2 { left: auto; right: 10px; }
         .be .mertek { color: #9fd0ff; } .be .mertek:first-child { color: #ff5a3c; text-shadow: 0 0 6px rgba(255,90,60,.7); }
         .mutato { position: absolute; top: 6px; bottom: 6px; width: 3px; margin-left: -1.5px; border-radius: 2px;
           background: linear-gradient(90deg, #a00, #ff2a2a 50%, #a00); box-shadow: 0 0 6px rgba(255,40,40,.75), 0 0 1px #f66;
           transition: left 1.8s cubic-bezier(.45,.05,.15,1); }
         .kiir { position: absolute; left: 12px; right: 12px; bottom: 9px; display: flex; justify-content: space-between; gap: 14px;
-          font: 500 13px/1.2 "Cantabile Sans", Arial, sans-serif; color: #6f6b62; white-space: nowrap; }
+          font: 500 calc(13px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; color: #6f6b62; white-space: nowrap; }
         .kiir b { color: #8b867b; font-weight: 700; letter-spacing: .04em; }
         .kiir span:last-child { overflow: hidden; text-overflow: ellipsis; }
         .be .kiir { color: #b9d9ff; } .be .kiir b { color: #e6f2ff; }
         .gombsor { display: flex; gap: 7px; height: 64px; flex: none; }
-        .nincsado { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 12px; border: 1px dashed #8a8e94; border-radius: 3px; font: 500 12px/1.3 "Cantabile Sans", Arial, sans-serif; color: #4a4e55; }
+        .nincsado { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 12px; border: 1px dashed #8a8e94; border-radius: 3px; font: 500 calc(12px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; color: #4a4e55; }
         .bill { flex: 1; min-width: 0; position: relative; border: 1px solid #7c8189; border-radius: 3px; cursor: pointer; padding: 14px 2px 4px;
           display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
           background: linear-gradient(180deg, #fafbfc, #dde0e4 70%, #c9cdd2); box-shadow: 0 5px 0 #80858c, 0 6px 6px rgba(0,0,0,.25);
           transform: translateY(0); transition: transform .12s, box-shadow .12s; -webkit-tap-highlight-color: transparent; color: #2b2e33; }
-        .bill b { font: 700 13px/1 "Cantabile Sans", Arial, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-        .bill small { font: 500 11px/1 "Cantabile Sans", Arial, sans-serif; color: #636871; }
+        .bill b { font: 700 calc(13px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .bill small { font: 500 calc(11px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; color: #636871; }
         .bill .led { position: absolute; top: 6px; left: 50%; width: 14px; height: 4px; margin-left: -7px; border-radius: 2px; background: #6b3a35; box-shadow: inset 0 1px 1px rgba(0,0,0,.5); }
         .bill.akt, .bill:active { transform: translateY(4px); box-shadow: 0 1px 0 #80858c, 0 2px 3px rgba(0,0,0,.25); background: linear-gradient(180deg, #e7e9ec, #cfd3d8); }
         .bill.akt .led { background: #ff3b2f; box-shadow: 0 0 6px #ff3b2f; }
         .msor { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1.6fr 1fr; gap: 8px; padding: 5px 10px 9px; border-radius: 3px; box-sizing: border-box;
           background: linear-gradient(180deg, #b8bcc1, #d9dcdf); box-shadow: inset 0 2px 4px rgba(0,0,0,.35), 0 1px 0 #fff; }
         .mg { display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 0; border: 0; padding: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .mg small { display: flex; justify-content: center; align-items: center; gap: 3px; font: 400 9px/1 "Cantabile Sans", Arial, sans-serif; color: #3c4046; white-space: nowrap; }
+        .mg small { display: flex; justify-content: center; align-items: center; gap: 3px; font: 400 calc(9px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; color: #3c4046; white-space: nowrap; }
         .mg small svg { height: 7px; width: auto; fill: #3c4046; }
         .mbill { flex: 1; min-height: 36px; display: block; border-radius: 2px; position: relative; transition: transform .1s, box-shadow .1s;
           background: linear-gradient(180deg, #f3f4f5 0%, #d2d5d9 55%, #b6babf 100%);
@@ -918,17 +937,17 @@ class CantabileCard extends HTMLElement {
         .kap .kapcs::after, .rbal .kapcs::after { left: 2px; top: 2px; width: 16px; height: 18px; transition: top .2s; }
         .magno .kap .kapcs::after { left: 2px; top: 20px; }
         .sleep, .fgomb { position: relative; border: 1px solid #7c8189; border-radius: 3px; cursor: pointer; padding: 11px 6px 3px; min-width: 64px; display: flex; gap: 4px; justify-content: center; align-items: baseline;
-          font: 700 8px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .18em; color: #2b2e33; background: linear-gradient(180deg, #f6f7f8, #d0d4d9); box-shadow: 0 2px 0 #80858c; -webkit-tap-highlight-color: transparent; }
+          font: 700 calc(8px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .18em; color: #2b2e33; background: linear-gradient(180deg, #f6f7f8, #d0d4d9); box-shadow: 0 2px 0 #80858c; -webkit-tap-highlight-color: transparent; }
         .sleep .led, .fgomb .led { position: absolute; top: 4px; left: 50%; width: 10px; height: 3px; margin-left: -5px; border-radius: 2px; background: #6b5a35; }
         .sleep.be .led, .fgomb.be .led { background: #ffb020; box-shadow: 0 0 6px #ffb020; }
-        .sleep .amar, .fgomb .amar { letter-spacing: 0; font-size: 9px; color: #8a5a00; }
+        .sleep .amar, .fgomb .amar { letter-spacing: 0; font-size: calc(9px * var(--bk, 1)); color: #8a5a00; }
         .sleep:active, .fgomb:active { transform: translateY(1px); box-shadow: 0 1px 0 #80858c; }
         .tolok { display: flex; gap: 12px; align-items: flex-start; }
         .toloo { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-        .toloo small { font: 700 7px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .22em; color: #6d7179; }
+        .toloo small { font: 700 calc(7px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .22em; color: #6d7179; }
         .tolo { display: flex; gap: 5px; align-items: stretch; }
         .tnevek { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; }
-        .tnevek button { border: 0; background: none; padding: 1px 0; cursor: pointer; font: 400 9px/1.25 "Cantabile Sans", Arial, sans-serif; color: #5b6068; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+        .tnevek button { border: 0; background: none; padding: 1px 0; cursor: pointer; font: 400 calc(9px * var(--bk, 1))/1.25 "Cantabile Sans", Arial, sans-serif; color: #5b6068; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
         .tnevek button.akt { font-weight: 700; color: #1f2226; }
         .sin { position: relative; width: 20px; min-height: 46px; border-radius: 2px; cursor: pointer; -webkit-tap-highlight-color: transparent;
           background: linear-gradient(90deg, #d8dbde, #f6f7f8 50%, #c3c6ca); box-shadow: 0 0 0 1px #8a8e94, inset 0 1px 0 #fff; }
@@ -940,7 +959,7 @@ class CantabileCard extends HTMLElement {
         .bton .thsz .tnevek button.akt { font-weight: 400; color: #8a8e94; }
         .hangero { position: relative; width: 176px; height: 176px; flex: none; }
         .bj { position: absolute; left: 50%; top: 50%; width: 2px; height: 8px; margin: -78px 0 0 -1px; background: #3d4148; transform-origin: 1px 78px; }
-        .bsz { position: absolute; left: 50%; top: 50%; width: 16px; margin: -6px 0 0 -8px; text-align: center; font: 700 10px/12px "Cantabile Sans", Arial, sans-serif; color: #3d4148; }
+        .bsz { position: absolute; left: 50%; top: 50%; width: 16px; margin: -6px 0 0 -8px; text-align: center; font: 700 calc(10px * var(--bk, 1))/12px "Cantabile Sans", Arial, sans-serif; color: #3d4148; }
         .gomb { position: absolute; left: 50%; top: 50%; width: 128px; height: 128px; margin: -64px 0 0 -64px; border-radius: 50%;
           background: repeating-conic-gradient(#d8dbdf 0 2.5deg, #7d828a 2.5deg 5deg);
           box-shadow: 0 6px 12px rgba(0,0,0,.45), 0 0 0 2px #50545a; touch-action: none; cursor: grab; }
@@ -949,19 +968,19 @@ class CantabileCard extends HTMLElement {
           background: conic-gradient(from 20deg, #f4f5f6, #a9aeb4 12%, #eceef0 25%, #9da2a8 38%, #f1f2f3 50%, #a2a7ad 62%, #e9ebed 75%, #9ca1a7 88%, #f4f5f6);
           box-shadow: inset 0 2px 2px rgba(255,255,255,.9), inset 0 -3px 5px rgba(0,0,0,.35); }
         .sapka::after { content: ""; position: absolute; left: 50%; top: 9px; width: 5px; height: 22px; margin-left: -2.5px; border-radius: 3px; background: #1d1f22; box-shadow: inset 0 1px 1px rgba(255,255,255,.3); }
-        .hcim { position: absolute; left: 0; right: 0; bottom: -1px; text-align: center; font: 700 10px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .25em; color: #3d4148; }
+        .hcim { position: absolute; left: 0; right: 0; bottom: -1px; text-align: center; font: 700 calc(10px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .25em; color: #3d4148; }
         .hcim span { letter-spacing: .05em; color: #5b6068; font-weight: 600; }
         .lent { display: flex; align-items: center; gap: 10px; flex: none; }
         .hszk { display: flex; flex: 1; border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px #7c8189, 0 2px 0 #80858c; }
         .hsz { flex: 1; border: 0; border-right: 1px solid #9a9fa6; padding: 6px 4px; cursor: pointer; color: #2b2e33;
-          font: 700 11px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .06em; display: flex; align-items: center; justify-content: center; gap: 6px;
+          font: 700 calc(11px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .06em; display: flex; align-items: center; justify-content: center; gap: 6px;
           background: linear-gradient(180deg, #f6f7f8, #d3d7db); -webkit-tap-highlight-color: transparent; }
         .hsz:last-child { border-right: 0; }
         .hsz .lamp { width: 7px; height: 7px; border-radius: 50%; background: #5a5f55; box-shadow: inset 0 1px 1px rgba(0,0,0,.5); }
         .hsz.akt { background: linear-gradient(180deg, #d2d6da, #e6e8eb); box-shadow: inset 0 2px 3px rgba(0,0,0,.25); }
         .hsz.akt .lamp { background: #6ef07a; box-shadow: 0 0 5px #6ef07a; }
         .valto { display: flex; align-items: center; gap: 6px; border: 0; background: none; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent;
-          font: 700 9px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; color: #8a8f96; }
+          font: 700 calc(9px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; color: #8a8f96; }
         .kapcs { position: relative; width: 40px; height: 18px; border-radius: 3px; background: linear-gradient(180deg, #24262a, #44474d);
           box-shadow: inset 0 2px 3px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.8); }
         .kapcs::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 14px; border-radius: 2px; transition: left .2s;
@@ -969,12 +988,12 @@ class CantabileCard extends HTMLElement {
         .magno .kapcs::after { left: 20px; }
         .elo:not(.magno) .vr, .magno .vm { color: #2b2e33; }
         .tap { display: flex; align-items: center; gap: 8px; }
-        .tap .stereo { font: 700 10px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .15em; color: #7a7f86; display: flex; align-items: center; gap: 5px; }
+        .tap .stereo { font: 700 calc(10px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .15em; color: #7a7f86; display: flex; align-items: center; gap: 5px; }
         .tap .stereo i { width: 7px; height: 7px; border-radius: 50%; background: #5d4a2a; }
         .be .tap .stereo i { background: #ffb020; box-shadow: 0 0 6px #ffb020; }
         .be .tap .stereo { color: #3d4148; }
         .power { width: 64px; height: 30px; border: 1px solid #7c8189; border-radius: 3px; cursor: pointer; position: relative;
-          font: 700 9px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .2em; color: #2b2e33; padding: 12px 0 0;
+          font: 700 calc(9px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .2em; color: #2b2e33; padding: 12px 0 0;
           background: linear-gradient(180deg, #f6f7f8, #d0d4d9); box-shadow: 0 3px 0 #80858c; -webkit-tap-highlight-color: transparent; }
         .power::before { content: ""; position: absolute; top: 5px; left: 50%; width: 10px; height: 4px; margin-left: -5px; border-radius: 2px; background: #6b3a35; }
         .be .power { transform: translateY(2px); box-shadow: 0 1px 0 #80858c; }
@@ -992,11 +1011,11 @@ class CantabileCard extends HTMLElement {
         .nlogo { width: 30px; height: 30px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; display: block; }
         .nlogo img { width: 100%; height: 100%; object-fit: contain; display: block; background: #fff; }
         .nsor .st { display: grid; gap: 2px; min-width: 0; }
-        .nsor b { font: 600 12.5px/1.25 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .nsor small { color: #a88f6b; font: 500 11px/1.2 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .nsor .ngomb { border: 0; border-radius: 3px; padding: 0 9px; cursor: pointer; background: rgba(255,255,255,.07); color: #cdb995; font: 700 10px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .06em; white-space: nowrap; }
+        .nsor b { font: 600 calc(12.5px * var(--bk, 1))/1.25 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .nsor small { color: #a88f6b; font: 500 calc(11px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .nsor .ngomb { border: 0; border-radius: 3px; padding: 0 9px; cursor: pointer; background: rgba(255,255,255,.07); color: #cdb995; font: 700 calc(10px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .06em; white-space: nowrap; }
         .nado:active, .ngomb:active { background: rgba(255,216,146,.28); }
-        .eloadok button small { color: #a88f6b; font-size: 10px; }
+        .eloadok button small { color: #a88f6b; font-size: calc(10px * var(--bk, 1)); }
         .tilt .bill, .tilt .power { opacity: .5; pointer-events: none; }
 
         /* magnó */
@@ -1011,7 +1030,7 @@ class CantabileCard extends HTMLElement {
         .ajto .krom { position: absolute; top: 0; bottom: 0; width: 2.4%; min-width: 5px;
           background: linear-gradient(90deg, #8d9197, #f7f8f9 35%, #b9bdc2 55%, #fdfdfd 75%, #8a8e94); box-shadow: 0 0 2px rgba(0,0,0,.6); }
         .ajto .kb { left: 0; } .ajto .kj { right: 0; }
-        .ajto span { position: absolute; left: 0; right: 0; bottom: 2.6%; text-align: center; font: 700 9px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .3em; color: rgba(230,232,235,.5); }
+        .ajto span { position: absolute; left: 0; right: 0; bottom: 2.6%; text-align: center; font: 700 calc(9px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .3em; color: rgba(230,232,235,.5); }
         .kaz { position: absolute; inset: 5.5% 6.5% 10%; container-type: size; filter: drop-shadow(0 4px 6px rgba(0,0,0,.7)); transition: transform .5s cubic-bezier(.3,1.3,.5,1), opacity .4s; color: #ececec;
           font-family: "Cantabile Sans", Arial, sans-serif; }
         .kaz > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -1024,17 +1043,17 @@ class CantabileCard extends HTMLElement {
         .vissza .orso { animation-direction: reverse; }
         @keyframes forog { to { transform: rotate(-360deg); } }  /* lejátszáskor óramutatóval ellentétes: alul balról jobbra fut a szalag */
         .ksav { position: absolute; left: 3%; right: 3%; top: 1.2%; height: 9.5%; display: flex; align-items: center; justify-content: space-between; gap: 2cqw;
-          font-size: 3.6cqw; font-weight: 700; white-space: nowrap; }
+          font-size: calc(3.6cqw * var(--bk, 1)); font-weight: 700; white-space: nowrap; }
         .ksav span { display: inline-flex; align-items: center; gap: .8cqw; min-width: 0; }
         .ksav svg { height: 4.4cqw; fill: currentColor; flex: none; }
         .ksav .lista { flex: 1; justify-content: center; overflow: hidden; text-overflow: ellipsis; letter-spacing: .03em; }
         .ksav .lista b { overflow: hidden; text-overflow: ellipsis; }
-        .ksav .doboz { border: 1px solid currentColor; border-radius: 2px; padding: 0 .8cqw; font-size: 2.9cqw; line-height: 1.25; }
+        .ksav .doboz { border: 1px solid currentColor; border-radius: 2px; padding: 0 .8cqw; font-size: calc(2.9cqw * var(--bk, 1)); line-height: 1.25; }
         .ksav .kapcsolo { cursor: pointer; }
         .ksav .ki { opacity: .38; }
-        .kcim { position: absolute; left: 7%; right: 13%; top: 13.2%; text-align: center; font-size: 5cqw; font-weight: 800; letter-spacing: .02em;
+        .kcim { position: absolute; left: 7%; right: 13%; top: 13.2%; text-align: center; font-size: calc(5cqw * var(--bk, 1)); font-weight: 800; letter-spacing: .02em;
           text-transform: uppercase; }
-        .ksor { position: absolute; left: 7%; right: 13%; top: 21.6%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3cqw; font-size: 3.7cqw; font-weight: 600; }
+        .ksor { position: absolute; left: 7%; right: 13%; top: 21.6%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3cqw; font-size: calc(3.7cqw * var(--bk, 1)); font-weight: 600; }
         .ksor .kmin { display: flex; align-items: center; gap: 1cqw; justify-content: flex-end; white-space: nowrap; }
         .ksor .kures { grid-column: 1 / -1; display: flex; justify-content: center; }
         .ksor .kea .gord { align-items: center; gap: 1cqw; }
@@ -1051,7 +1070,7 @@ class CantabileCard extends HTMLElement {
         .ksor span:nth-child(2) { justify-content: center; } .ksor span:nth-child(3) { justify-content: flex-end; }
         .ksor em { font-style: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ksor svg { height: 4.2cqw; fill: #cfd3d8; flex: none; }
-        .kido { position: absolute; left: 7%; right: 7%; top: 70.2%; display: flex; justify-content: space-between; font-size: 4.3cqw; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .kido { position: absolute; left: 7%; right: 7%; top: 70.2%; display: flex; justify-content: space-between; font-size: calc(4.3cqw * var(--bk, 1)); font-weight: 800; font-variant-numeric: tabular-nums; }
         .kido svg { height: 3.4cqw; fill: #fff; margin-right: .8cqw; }
         .kcsik { position: absolute; left: 30%; right: 25%; top: 74%; height: 1.4%; background: rgba(255,255,255,.2); border-radius: 1px; }
         .kcsik i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #e53935; border-radius: 1px; }
@@ -1059,8 +1078,8 @@ class CantabileCard extends HTMLElement {
         .kcsik::before { content: ""; position: absolute; left: -3%; right: -3%; top: -700%; bottom: -700%; }
         .kcsik i::after { content: ""; position: absolute; right: -1px; top: -150%; width: 2px; height: 400%; background: #fff; border-radius: 1px; }
         .kform { position: absolute; left: 30%; right: 4%; top: 62.4%; height: 7%; display: flex; justify-content: flex-end; align-items: center; gap: 1.6cqw;
-          font-size: 3.1cqw; font-weight: 700; color: #d9c08a; white-space: nowrap; }
-        .kform .jel { color: #ce93d8; border: 1px solid #ce93d8; border-radius: 2px; padding: 0 .7cqw; font-size: 2.8cqw; line-height: 1.3; }
+          font-size: calc(3.1cqw * var(--bk, 1)); font-weight: 700; color: #d9c08a; white-space: nowrap; }
+        .kform .jel { color: #ce93d8; border: 1px solid #ce93d8; border-radius: 2px; padding: 0 .7cqw; font-size: calc(2.8cqw * var(--bk, 1)); line-height: 1.3; }
         .kform svg { height: 3.8cqw; fill: #ff4f7b; }
         .vuk { display: flex; flex-direction: row; align-items: center; gap: 8px; min-width: 0; min-height: 0; }
         .vu { flex: 1 1 0; min-width: 0; aspect-ratio: 176 / 106; border-radius: 8px; overflow: hidden; box-shadow: inset 0 0 0 1px #3a3b3e, 0 1px 0 rgba(255,255,255,.8), 0 2px 5px rgba(0,0,0,.35); background: #0b0b0c; padding: 3px; }
@@ -1086,17 +1105,17 @@ class CantabileCard extends HTMLElement {
         /* öt egyforma funkciógomb (REPEAT · SHUFFLE · FADE · SLEEP · BT), a felirat a gomb alatt */
         .otg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
         .og { display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 0; }
-        .og small { text-align: center; font: 700 7.5px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; color: #3d4148; white-space: nowrap; }
-        .og small .amar { letter-spacing: 0; color: #8a5a00; font-size: 8.5px; }
+        .og small { text-align: center; font: 700 calc(7.5px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; color: #3d4148; white-space: nowrap; }
+        .og small .amar { letter-spacing: 0; color: #8a5a00; font-size: calc(8.5px * var(--bk, 1)); }
         .og.tiltva { opacity: .4; pointer-events: none; }
         .ogomb { position: relative; height: 34px; border: 1px solid #7c8189; border-radius: 3px; cursor: pointer; padding: 6px 0 0; display: flex; align-items: center; justify-content: center;
           color: #2b2e33; background: linear-gradient(180deg, #f6f7f8, #d0d4d9); box-shadow: 0 2px 0 #80858c; -webkit-tap-highlight-color: transparent; }
         .ogomb .led { position: absolute; top: 4px; left: 50%; width: 10px; height: 3px; margin-left: -5px; border-radius: 2px; background: #6b5a35; }
         .ogomb.be .led { background: #ffb020; box-shadow: 0 0 6px #ffb020; }
         .ogomb i { display: flex; position: relative; }
-        .ogomb .oszam { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 800 9.5px/1 "Cantabile Sans", Arial, sans-serif; color: #2b2e33; padding-top: 1px;
+        .ogomb .oszam { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 800 calc(9.5px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; color: #2b2e33; padding-top: 1px;
           text-shadow: 0 0 1px #e8eaed, 0 0 2px #e8eaed, 0 0 2px #e8eaed, 1px 0 1px #e8eaed, -1px 0 1px #e8eaed; }
-        .ogomb .oszam.vegt { font-size: 12px; }
+        .ogomb .oszam.vegt { font-size: calc(12px * var(--bk, 1)); }
         .ogomb.be .oszam { color: #8a5a00; } .ogomb svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
         .ogomb:active { transform: translateY(1px); box-shadow: 0 1px 0 #80858c; }
         .mjobb > .otg { display: none; }
@@ -1112,7 +1131,7 @@ class CantabileCard extends HTMLElement {
           box-shadow: inset 0 2px 2px rgba(255,255,255,.9), inset 0 -2px 4px rgba(0,0,0,.35); }
         .vsapka::after { content: ""; position: absolute; left: 50%; top: 4px; width: 3px; height: 11px; margin-left: -1.5px; border-radius: 2px; background: #1d1f22; }
         .valaszto .fhsz { position: absolute; transform: translateY(-50%); border: 0; background: none; padding: 3px 2px; display: flex; align-items: center; gap: 3px;
-          white-space: nowrap; cursor: pointer; font: 700 10.4px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: #6d7179; -webkit-tap-highlight-color: transparent; }
+          white-space: nowrap; cursor: pointer; font: 700 calc(10.4px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: #6d7179; -webkit-tap-highlight-color: transparent; }
         .valaszto .fhsz .lamp { width: 5px; height: 5px; border-radius: 50%; background: #9a9fa6; box-shadow: inset 0 1px 1px rgba(0,0,0,.4); }
         .valaszto .fhsz.akt { color: #23262b; }
         .valaszto .fhsz .fn { line-height: 1.3; max-width: 101px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -1123,10 +1142,10 @@ class CantabileCard extends HTMLElement {
         .valaszto .flamp.akt { background: #ffb020; box-shadow: 0 0 5px #ffb020; }
         .magno .mjobb > .forgo .valaszto { zoom: .92; }
         :host([keskeny]) .magno .mjobb > .forgo .valaszto { zoom: .84; }
-        .magno .mjobb .mfelirat { max-width: 66px; font-size: 7.5px; letter-spacing: .04em; }
-        :host([keskeny]) .magno .mjobb .mfelirat { font-size: 8px; letter-spacing: .08em; }
+        .magno .mjobb .mfelirat { max-width: 66px; font-size: calc(7.5px * var(--bk, 1)); letter-spacing: .04em; }
+        :host([keskeny]) .magno .mjobb .mfelirat { font-size: calc(8px * var(--bk, 1)); letter-spacing: .08em; }
         .forgo.bton .fhsz.akt { color: #8a8e94; } .forgo.bton .flamp.akt { background: #c9a14a; box-shadow: none; }
-        .valaszto small { position: absolute; bottom: -4px; text-align: center; font: 700 7px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .25em; color: #3d4148; }
+        .valaszto small { position: absolute; bottom: -4px; text-align: center; font: 700 calc(7px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .25em; color: #3d4148; }
         .mfunk > button { min-width: 0; padding-inline: 2px; letter-spacing: .08em; }
         .fgomb.tiltva { opacity: .4; pointer-events: none; }
         .magno .kap .fgomb { display: none; }
@@ -1154,11 +1173,11 @@ class CantabileCard extends HTMLElement {
         .vfdmod .vfd .vsor { column-gap: 1.11cqw; }
         .vfdmod .vfd .vsz { gap: .83cqw; }
         .vfdmod .vfd .szeg { height: 1.94cqw; gap: .56cqw; }
-        .vfdmod .vfd .vsor b { font-size: 2.5cqw; }
-        .vfdmod .vfd .vsor em { font-size: 2.08cqw; }
+        .vfdmod .vfd .vsor b { font-size: calc(2.5cqw * var(--bk, 1)); }
+        .vfdmod .vfd .vsor em { font-size: calc(2.08cqw * var(--bk, 1)); }
         .vfdmod .vfd .vskala { height: 2.78cqw; }
-        .vfdmod .vfd .vskala span { font-size: 2.22cqw; }
-        .vfdmod .vfd small { font-size: 2.22cqw; }
+        .vfdmod .vfd .vskala span { font-size: calc(2.22cqw * var(--bk, 1)); }
+        .vfdmod .vfd small { font-size: calc(2.22cqw * var(--bk, 1)); }
         .vfdmod .vfd .vall { width: 3.61cqw; height: 3.61cqw; }
         .vfdmod .vfd .vstop svg { max-height: 6.67cqw; min-height: 3.33cqw; }
         .vfd .vszamok { position: relative; }
@@ -1166,8 +1185,8 @@ class CantabileCard extends HTMLElement {
         .vfd .vjelzo i { display: flex; align-items: center; gap: .8cqw; height: 100%; font-style: normal; color: rgba(220,228,232,.12); }
         .vfd .vjelzo svg { height: 100%; width: auto; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; filter: none; }
         .vfd .vjelzo svg circle { fill: currentColor; stroke: none; }
-        .vfd .vjelzo i small, .vfd .vjelzo i em { color: inherit; font: 700 2.1cqw/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .08em; font-style: normal; }
-        .vfd .vjelzo i em { font-size: 2.6cqw; letter-spacing: 0; }
+        .vfd .vjelzo i small, .vfd .vjelzo i em { color: inherit; font: 700 calc(2.1cqw * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .08em; font-style: normal; }
+        .vfd .vjelzo i em { font-size: calc(2.6cqw * var(--bk, 1)); letter-spacing: 0; }
         .vfd .vjelzo i.be { color: #eef2f4; filter: drop-shadow(0 0 3px rgba(225,235,240,.6)); }
         :host([keskeny]) .vfdmod .felso { align-items: stretch; }
         /* a számlálók magassága a maradék helyhez igazodik (flex 1 1 0), a szélesség a számjegyek arányából jön – nem lóghatnak a szintjelzőre */
@@ -1187,13 +1206,13 @@ class CantabileCard extends HTMLElement {
         .vfd .vall { align-self: center; }
         .vfd .vsz svg rect, .vfd .vsz svg circle { fill: rgba(220,228,232,.07); }
         .vfd .vsz svg .be { fill: #eef2f4; }
-        .vfd small { font-size: 6.5px; letter-spacing: .18em; color: #7d858b; font-weight: 700; }
+        .vfd small { font-size: calc(6.5px * var(--bk, 1)); letter-spacing: .18em; color: #7d858b; font-weight: 700; }
         .vfd .vall { width: 10px; height: 10px; }
         .vfd .vall svg { width: 100%; height: 100%; fill: #eef2f4; filter: drop-shadow(0 0 3px rgba(225,235,240,.6)); }
         .vfd .vmero { flex: none; display: grid; row-gap: 2px; }
         .vfd .vsor { display: grid; grid-template-columns: 9% 1fr 11%; align-items: center; column-gap: 4px; }
-        .vfd .vsor b { font-size: 7px; font-weight: 700; color: #b9c1c6; letter-spacing: .05em; }
-        .vfd .vsor em { font-style: normal; font-size: 6px; font-weight: 700; letter-spacing: .08em; color: #ff4a3d; opacity: .35; }
+        .vfd .vsor b { font-size: calc(7px * var(--bk, 1)); font-weight: 700; color: #b9c1c6; letter-spacing: .05em; }
+        .vfd .vsor em { font-style: normal; font-size: calc(6px * var(--bk, 1)); font-weight: 700; letter-spacing: .08em; color: #ff4a3d; opacity: .35; }
         .vfd .vsor em.be { opacity: 1; text-shadow: 0 0 4px rgba(255,74,61,.7); }
         .vfd .szeg { display: flex; gap: 1.5px; height: 4px; }
         .vfd .szeg i { flex: 1; background: rgba(220,228,232,.08); }
@@ -1201,21 +1220,21 @@ class CantabileCard extends HTMLElement {
         .vfd .szeg i.be { background: #eef2f4; box-shadow: 0 0 3px rgba(225,235,240,.7); }
         .vfd .szeg i.p.be { background: #ff4a3d; box-shadow: 0 0 3px rgba(255,74,61,.8); }
         .vfd .vskala { position: relative; height: 8px; }
-        .vfd .vskala span { position: absolute; top: 0; transform: translateX(-50%); font-size: 6.5px; font-weight: 600; color: #aeb6bb; }
+        .vfd .vskala span { position: absolute; top: 0; transform: translateX(-50%); font-size: calc(6.5px * var(--bk, 1)); font-weight: 600; color: #aeb6bb; }
         .vfd .vskala span.p { color: #ff6a5e; }
         .vfd .vskala span:first-child { transform: none; }
         .vfd .vskala span:last-child { transform: translateX(-100%); }
         .vlap { fill: #e4e1d8; transition: fill .8s; }
         .fut .vlap, .szun .vlap { fill: #fbf8ef; }
-        .vu text { font: 500 7.4px/1 "Cantabile Sans", Arial, sans-serif; text-anchor: middle; dominant-baseline: middle; }
-        .vu .vfel { font: 500 10px/1 "Cantabile Sans", Arial, sans-serif; fill: #111; }
-        .vu .vmarka { font: 400 15px/1 "Great Vibes", "Brush Script MT", cursive; fill: #1a1a1a; }
-        .vu .vapro text { font: 600 4.3px/1 "Cantabile Sans", Arial, sans-serif; fill: #222; text-anchor: start; letter-spacing: .02em; }
+        .vu text { font: 500 calc(7.4px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; text-anchor: middle; dominant-baseline: middle; }
+        .vu .vfel { font: 500 calc(10px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; fill: #111; }
+        .vu .vmarka { font: 400 calc(15px * var(--bk, 1))/1 "Great Vibes", "Brush Script MT", cursive; fill: #1a1a1a; }
+        .vu .vapro text { font: 600 calc(4.3px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; fill: #222; text-anchor: start; letter-spacing: .02em; }
         .vu .vapro text[text-anchor=end] { text-anchor: end; }
         .tu { transform-origin: 85px 128px; transform: rotate(-42deg); }
 
-        .mjobb .mfelirat { font: 700 8px/1.3 "Cantabile Sans", Arial, sans-serif; letter-spacing: .08em; color: #5b6068; text-align: center; }
-        .mjobb .mfelirat b { display: block; color: #2b2e33; letter-spacing: .1em; font-size: 10px; max-width: 92px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mjobb .mfelirat { font: 700 calc(8px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; letter-spacing: .08em; color: #5b6068; text-align: center; }
+        .mjobb .mfelirat b { display: block; color: #2b2e33; letter-spacing: .1em; font-size: calc(10px * var(--bk, 1)); max-width: 92px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .fogas { margin-left: 8px; border: 0; background: none; padding: 2px; width: 22px; height: 22px; cursor: pointer; border-radius: 50%; align-self: center;
           -webkit-tap-highlight-color: transparent; }
@@ -1224,40 +1243,40 @@ class CantabileCard extends HTMLElement {
 
         /* beállítások (űrlap) */
         .beall { position: absolute; inset: 6px 12px; z-index: 8; border-radius: 6px; display: flex; flex-direction: column;
-          background: #f4f1ea; color: #2b2622; box-shadow: inset 0 0 0 1px #8a7a62; font: 13px/1.35 "Cantabile Sans", Arial, sans-serif; }
+          background: #f4f1ea; color: #2b2622; box-shadow: inset 0 0 0 1px #8a7a62; font: calc(13px * var(--bk, 1))/1.35 "Cantabile Sans", Arial, sans-serif; }
         .beall[hidden] { display: none; }
         .bfej { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #d8cfbd; }
-        .bfej b { font: 400 24px/1 "Great Vibes", cursive; color: #6b3d20; }
-        .bfej span { flex: 1; color: #6a5f4e; font-size: 12px; }
-        .bfej button, .bgomb { border: 1px solid #b9ad97; background: #fffdf8; color: #2b2622; border-radius: 4px; padding: 5px 12px; cursor: pointer; font: 600 12px/1.2 "Cantabile Sans", Arial, sans-serif; }
+        .bfej b { font: 400 calc(24px * var(--bk, 1))/1 "Great Vibes", cursive; color: #6b3d20; }
+        .bfej span { flex: 1; color: #6a5f4e; font-size: calc(12px * var(--bk, 1)); }
+        .bfej button, .bgomb { border: 1px solid #b9ad97; background: #fffdf8; color: #2b2622; border-radius: 4px; padding: 5px 12px; cursor: pointer; font: 600 calc(12px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; }
         .bfej .ment { background: #6b3d20; color: #fff; border-color: #6b3d20; }
         .btest { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 10px 12px 14px; display: grid; gap: 14px; align-content: start; }
         .bresz { display: grid; gap: 6px; }
-        .bresz h3 { margin: 0; font: 700 11px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #6a5f4e; display: flex; align-items: center; gap: 8px; }
+        .bresz h3 { margin: 0; font: 700 calc(11px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #6a5f4e; display: flex; align-items: center; gap: 8px; }
         .bresz h3 .bgomb { margin-left: auto; letter-spacing: 0; text-transform: none; padding: 3px 9px; }
         .bsor { display: grid; gap: 6px; align-items: center; }
-        .bfigy { margin: 0 0 4px; padding: 7px 9px; border-radius: 6px; font-size: 12.5px; line-height: 1.35; color: #5a3a00; background: #fff1d2; border: 1px solid #f0b54a; }
+        .bfigy { margin: 0 0 4px; padding: 7px 9px; border-radius: 6px; font-size: calc(12.5px * var(--bk, 1)); line-height: 1.35; color: #5a3a00; background: #fff1d2; border: 1px solid #f0b54a; }
         .bfigy .bgomb { margin-left: 6px; padding: 3px 9px; }
-        .btipp { margin: -2px 0 4px; font-size: 12px; line-height: 1.35; color: #7a7064; }
+        .btipp { margin: -2px 0 4px; font-size: calc(12px * var(--bk, 1)); line-height: 1.35; color: #7a7064; }
         .bsor.ado { grid-template-columns: 1.3fr .8fr 70px 2.4fr auto auto; }
         .bsor.hsz2 { grid-template-columns: 1fr .7fr 2fr 1fr auto; }
         .bsor.ket { grid-template-columns: 150px 1fr; }
-        .bsor input, .bsor select { width: 100%; box-sizing: border-box; border: 1px solid #c9bfa9; border-radius: 4px; padding: 5px 7px; font: 13px/1.2 "Cantabile Sans", Arial, sans-serif;
+        .bsor input, .bsor select { width: 100%; box-sizing: border-box; border: 1px solid #c9bfa9; border-radius: 4px; padding: 5px 7px; font: calc(13px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif;
           background: #fffdf8; color: #2b2622; min-width: 0; }
         .bsor input.rossz { border-color: #c62828; background: #fff1f0; }
-        .bsor label { color: #6a5f4e; font-size: 12px; }
-        .bfejlec { display: grid; gap: 6px; font: 600 10px/1 "Cantabile Sans", Arial, sans-serif; color: #8a7d68; letter-spacing: .05em; }
+        .bsor label { color: #6a5f4e; font-size: calc(12px * var(--bk, 1)); }
+        .bfejlec { display: grid; gap: 6px; font: 600 calc(10px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; color: #8a7d68; letter-spacing: .05em; }
         .bfejlec.ado { grid-template-columns: 1.3fr .8fr 70px 2.4fr auto auto; } .bfejlec.hsz2 { grid-template-columns: 1fr .7fr 2fr 1fr auto; }
-        .bx { border: 0; background: none; color: #a33; font: 700 16px/1 "Cantabile Sans", Arial; cursor: pointer; padding: 2px 6px; }
-        .bproba { border: 1px solid #b9ad97; background: #fffdf8; border-radius: 4px; cursor: pointer; padding: 4px 8px; font: 12px/1 "Cantabile Sans", Arial; color: #2b2622; }
+        .bx { border: 0; background: none; color: #a33; font: 700 calc(16px * var(--bk, 1))/1 "Cantabile Sans", Arial; cursor: pointer; padding: 2px 6px; }
+        .bproba { border: 1px solid #b9ad97; background: #fffdf8; border-radius: 4px; cursor: pointer; padding: 4px 8px; font: calc(12px * var(--bk, 1))/1 "Cantabile Sans", Arial; color: #2b2622; }
         .bker { display: flex; gap: 6px; }
         .bker input { flex: 1; }
         .btalalat { display: grid; gap: 4px; }
         .btalalat div { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 4px 6px; background: #fffdf8; border: 1px solid #e3dac8; border-radius: 4px; }
         .btalalat small { color: #8a7d68; white-space: nowrap; }
         .btalalat em { font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .bmeg { color: #8a7d68; font-size: 12px; margin: 0; }
-        .bhiba { color: #b3261e; font-size: 12px; min-height: 1em; }
+        .bmeg { color: #8a7d68; font-size: calc(12px * var(--bk, 1)); margin: 0; }
+        .bhiba { color: #b3261e; font-size: calc(12px * var(--bk, 1)); min-height: 1em; }
 
         /* kazetta-polc */
         .polc { position: absolute; inset: 0; z-index: 5; border-radius: 6px; display: flex; flex-direction: column; padding: 10px 12px; gap: 8px;
@@ -1268,24 +1287,24 @@ class CantabileCard extends HTMLElement {
         .dalpolc { z-index: 6; }
         .dalpolc .dlista { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #8a6a45 transparent;
           text-align: center; padding: 10px 4px; mask-image: linear-gradient(180deg, transparent, #000 14%, #000 86%, transparent); }
-        .dalpolc .dlista p { margin: 0; padding: 5px 0; color: #cdb995; font: 600 17px/1.35 "Cantabile Sans", Arial, sans-serif; transition: color .3s, transform .3s; }
+        .dalpolc .dlista p { margin: 0; padding: 5px 0; color: #cdb995; font: 600 calc(17px * var(--bk, 1))/1.35 "Cantabile Sans", Arial, sans-serif; transition: color .3s, transform .3s; }
         .dalpolc .dlista.szinkron p { opacity: .55; }
         .dalpolc .dlista.szinkron p.most { opacity: 1; color: #ffd892; transform: scale(1.06); text-shadow: 0 0 10px rgba(255,190,90,.35); }
-        .dalpolc .dlista p.szunet { font-size: 13px; letter-spacing: .3em; }
-        .dalpolc .duzenet { margin: auto; color: #cdb995; font: 500 14px/1.4 "Cantabile Sans", Arial, sans-serif; text-align: center; }
-        .dalpolc .dlab { display: flex; justify-content: space-between; gap: 10px; color: #8f7a58; font: 500 10.5px/1.2 "Cantabile Sans", Arial, sans-serif; letter-spacing: .04em; }
-        :host([keskeny]) .dalpolc .dlista p { font-size: 15px; }
+        .dalpolc .dlista p.szunet { font-size: calc(13px * var(--bk, 1)); letter-spacing: .3em; }
+        .dalpolc .duzenet { margin: auto; color: #cdb995; font: 500 calc(14px * var(--bk, 1))/1.4 "Cantabile Sans", Arial, sans-serif; text-align: center; }
+        .dalpolc .dlab { display: flex; justify-content: space-between; gap: 10px; color: #8f7a58; font: 500 calc(10.5px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; letter-spacing: .04em; }
+        :host([keskeny]) .dalpolc .dlista p { font-size: calc(15px * var(--bk, 1)); }
         .pfej { display: flex; align-items: center; gap: 8px; }
-        .pful { border: 0; border-radius: 3px; padding: 6px 12px; cursor: pointer; font: 700 11px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .12em;
+        .pful { border: 0; border-radius: 3px; padding: 6px 12px; cursor: pointer; font: 700 calc(11px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .12em;
           color: #e9dcc4; background: rgba(255,255,255,.08); }
         .pful.akt { background: #e9dcc4; color: #2f1b0d; }
-        .put { flex: 1; min-width: 0; color: #cdb995; font: 500 12px/1.2 "Cantabile Sans", Arial, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .put button { border: 0; background: none; color: #ffd892; cursor: pointer; font: 700 12px/1 "Cantabile Sans", Arial, sans-serif; padding: 4px 6px 4px 0; }
+        .put { flex: 1; min-width: 0; color: #cdb995; font: 500 calc(12px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .put button { border: 0; background: none; color: #ffd892; cursor: pointer; font: 700 calc(12px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; padding: 4px 6px 4px 0; }
         .pkeres { width: 100%; box-sizing: border-box; border: 1px solid rgba(233,220,196,.35); border-radius: 15px; padding: 6px 12px; background: rgba(0,0,0,.25);
-          color: #f3e8d4; font: 500 13px/1.2 "Cantabile Sans", Arial, sans-serif; outline: none; }
+          color: #f3e8d4; font: 500 calc(13px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; outline: none; }
         .pkeres::placeholder { color: #a88f6b; }
         .pkeres:focus { border-color: #ffd892; }
-        .kcsop { margin: 10px 0 6px; color: #cdb995; font: 700 10px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; display: flex; gap: 8px; }
+        .kcsop { margin: 10px 0 6px; color: #cdb995; font: 700 calc(10px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; display: flex; gap: 8px; }
         .kcsop:first-child { margin-top: 2px; }
         .kcsop span { color: #8a6a45; letter-spacing: 0; }
         :host([keskeny]) .pfej { flex-wrap: wrap; }
@@ -1293,17 +1312,17 @@ class CantabileCard extends HTMLElement {
         .ktalal { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px; }
         .ktalal button:not(.sm) { text-align: left; border: 0; border-radius: 3px; padding: 6px 8px; cursor: pointer; background: rgba(255,255,255,.06); color: #f3e8d4;
           display: grid; gap: 2px; min-width: 0; }
-        .ktalal button:not(.sm) b { font: 600 12.5px/1.25 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .ktalal button:not(.sm) small { color: #a88f6b; font: 500 11px/1.2 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ktalal button:not(.sm) b { font: 600 calc(12.5px * var(--bk, 1))/1.25 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ktalal button:not(.sm) small { color: #a88f6b; font: 500 calc(11px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .ktalal button:not(.sm):active, .eloadok button:active { background: rgba(255,216,146,.18); }
-        .sorfej { color: #cdb995; font: 700 10px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; text-transform: uppercase; margin: 2px 0 8px; }
+        .sorfej { color: #cdb995; font: 700 calc(10px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; text-transform: uppercase; margin: 2px 0 8px; }
         .sorlista { display: grid; gap: 3px; }
         .sorlista button:not(.sm) { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; text-align: left; border: 0; border-radius: 3px;
           padding: 5px 8px; cursor: pointer; background: rgba(255,255,255,.05); color: #f3e8d4; }
-        .sorlista .sn { color: #a88f6b; font: 600 11px/1 "Cantabile Sans", Arial, sans-serif; text-align: right; font-variant-numeric: tabular-nums; }
+        .sorlista .sn { color: #a88f6b; font: 600 calc(11px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; text-align: right; font-variant-numeric: tabular-nums; }
         .sorlista .st { display: grid; gap: 2px; min-width: 0; }
-        .sorlista b { font: 600 12.5px/1.25 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .sorlista small { color: #a88f6b; font: 500 11px/1.2 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sorlista b { font: 600 calc(12.5px * var(--bk, 1))/1.25 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sorlista small { color: #a88f6b; font: 500 calc(11px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .sorlista button:not(.sm).akt { background: rgba(255,216,146,.2); box-shadow: inset 3px 0 0 #ffd892; }
         .sorlista button:not(.sm).akt .sn { color: #ffd892; }
         .sorlista button:not(.sm):active { background: rgba(255,216,146,.28); }
@@ -1321,42 +1340,42 @@ class CantabileCard extends HTMLElement {
         .sorsor.akt .sorm { display: none; }
         .sorm { display: flex; gap: 3px; }
         .sorm .sm { border: 0; border-radius: 3px; min-width: 34px; padding: 0 8px; cursor: pointer; background: rgba(255,255,255,.07); color: #cdb995;
-          font: 700 13px/1 "Cantabile Sans", Arial, sans-serif; white-space: nowrap; }
+          font: 700 calc(13px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; white-space: nowrap; }
         .sorm .sm svg { width: 14px; height: 14px; display: block; margin: auto; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-        .sorm .sm.biztos { background: #b8402f; color: #fff; font-size: 10px; letter-spacing: .04em; }
+        .sorm .sm.biztos { background: #b8402f; color: #fff; font-size: calc(10px * var(--bk, 1)); letter-spacing: .04em; }
         .sorm .sm:active { background: rgba(255,216,146,.28); }
         .sorfej span { text-transform: none; letter-spacing: 0; color: #a88f6b; font-weight: 500; }
-        .pzar { border: 0; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; background: rgba(255,255,255,.1); color: #e9dcc4; font: 400 22px/1 "Cantabile Sans", Arial, sans-serif; padding: 0; }
+        .pzar { border: 0; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; background: rgba(255,255,255,.1); color: #e9dcc4; font: 400 calc(22px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; padding: 0; }
         .ptest { flex: 1; min-height: 0; display: flex; gap: 8px; }
         .betuk { display: flex; flex-direction: column; flex-wrap: wrap; gap: 1px; align-content: flex-start; width: 46px; }
-        .betuk button { width: 22px; height: 15px; border: 0; padding: 0; background: none; color: #cdb995; font: 700 10px/15px "Cantabile Sans", Arial, sans-serif; cursor: pointer; }
+        .betuk button { width: 22px; height: 15px; border: 0; padding: 0; background: none; color: #cdb995; font: 700 calc(10px * var(--bk, 1))/15px "Cantabile Sans", Arial, sans-serif; cursor: pointer; }
         .betuk button:active { color: #ffd892; }
         .plista { flex: 1; min-width: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #8a6a45 transparent; }
         .eloadok { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px; }
         .eloadok button { text-align: left; border: 0; border-radius: 3px; padding: 7px 8px; cursor: pointer; background: rgba(255,255,255,.06);
-          color: #f1e6cf; font: 500 12px/1.2 "Cantabile Sans", Arial, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+          color: #f1e6cf; font: 500 calc(12px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .kazettak { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 10px 8px; }
         .kt { border: 0; padding: 0; background: none; cursor: pointer; text-align: left; -webkit-tap-highlight-color: transparent; }
         .kt .test { position: relative; height: 70px; border-radius: 5px; background: #2d2f33; box-shadow: 0 3px 6px rgba(0,0,0,.5), inset 0 0 0 1px #17181a; overflow: hidden; }
         .kt .cl { position: absolute; left: 6px; right: 6px; top: 5px; bottom: 18px; border-radius: 2px; background: #f3ecdb; overflow: hidden; display: flex; }
         .kt .cl img { width: 47px; height: 100%; object-fit: cover; flex: none; }
-        .kt .cl span { flex: 1; min-width: 0; padding: 0 5px; font: 700 10px/1.15 "Cantabile Sans", Arial, sans-serif; color: #2b2622; display: flex; align-items: center;
+        .kt .cl span { flex: 1; min-width: 0; padding: 0 5px; font: 700 calc(10px * var(--bk, 1))/1.15 "Cantabile Sans", Arial, sans-serif; color: #2b2622; display: flex; align-items: center;
           border-top: 9px solid var(--szin); overflow: hidden; }
         .kt .ab { position: absolute; left: 34%; right: 34%; bottom: 5px; height: 9px; border-radius: 5px; background: #0d0d0e; }
         .kt:active .test { transform: translateY(2px); }
-        .kt small { display: block; margin-top: 4px; color: #cdb995; font: 500 10px/1.2 "Cantabile Sans", Arial, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .puzenet { color: #cdb995; font: 500 13px/1.4 "Cantabile Sans", Arial, sans-serif; padding: 16px 6px; }
+        .kt small { display: block; margin-top: 4px; color: #cdb995; font: 500 calc(10px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .puzenet { color: #cdb995; font: 500 calc(13px * var(--bk, 1))/1.4 "Cantabile Sans", Arial, sans-serif; padding: 16px 6px; }
         .tel { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
         .tblokk { display: grid; gap: 8px; align-content: start; padding: 10px 12px; border-radius: 5px; background: rgba(255,255,255,.05); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
-        .tblokk h4 { margin: 0; font: 700 10px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .16em; color: #e9dcc4; }
-        .tblokk p { margin: 0; font: 500 12px/1.4 "Cantabile Sans", Arial, sans-serif; color: #cdb995; }
-        .tblokk .puzenet { padding: 4px 0; font-size: 12px; }
+        .tblokk h4 { margin: 0; font: 700 calc(10px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .16em; color: #e9dcc4; }
+        .tblokk p { margin: 0; font: 500 calc(12px * var(--bk, 1))/1.4 "Cantabile Sans", Arial, sans-serif; color: #cdb995; }
+        .tblokk .puzenet { padding: 4px 0; font-size: calc(12px * var(--bk, 1)); }
         .tsor { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .tgomb { border: 0; border-radius: 3px; padding: 8px 14px; cursor: pointer; font: 700 12px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .04em; background: #e9dcc4; color: #2f1b0d; }
+        .tgomb { border: 0; border-radius: 3px; padding: 8px 14px; cursor: pointer; font: 700 calc(12px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .04em; background: #e9dcc4; color: #2f1b0d; }
         .tgomb.halk { background: rgba(255,255,255,.08); color: #e9dcc4; font-weight: 600; }
         .tgomb.biztos { background: #b3261e; color: #fff; }
         .tgomb:disabled { opacity: .5; cursor: default; }
-        .tall { font: 500 11px/1.3 "Cantabile Sans", Arial, sans-serif; color: #ffd892; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tall { font: 500 calc(11px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; color: #ffd892; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         /* keskeny (telefon, < 600 px): álló elrendezés, a kártya magassága a tartalomhoz igazodik */
         :host([keskeny]) { height: auto; }
@@ -1365,17 +1384,17 @@ class CantabileCard extends HTMLElement {
         :host([keskeny]) .elo.rejt { display: none; }
         :host([keskeny]) .bal { display: contents; }
         :host([keskeny]) .fej { order: 1; flex-wrap: wrap; row-gap: 14px; min-height: 18px; }
-        :host([keskeny]) .fej .marka { font-size: 27px; }
-        :host([keskeny]) .fej .tipus { font-size: 17px; margin-left: 8px; }
+        :host([keskeny]) .fej .marka { font-size: calc(27px * var(--bk, 1)); }
+        :host([keskeny]) .fej .tipus { font-size: calc(17px * var(--bk, 1)); margin-left: 8px; }
         :host([keskeny]) .fej .hszfej { display: none; }
         :host([keskeny]) .fej .fogas { margin-left: auto; }
         :host([keskeny]) .skala { order: 2; flex: none; height: 132px; min-height: 0; }
         :host([keskeny]) .sav { left: 10px; right: 10px; }
         :host([keskeny]) .skala { grid-template-columns: 70px minmax(0, 1fr) 34px; gap: 6px; padding: 6px; }
         :host([keskeny]) .sz.ptl { display: none; }
-        :host([keskeny]) .jfel { font-size: 8px; }
-        :host([keskeny]) .sz { font-size: 10px; }
-        :host([keskeny]) .kiir { font-size: 12px; }
+        :host([keskeny]) .jfel { font-size: calc(8px * var(--bk, 1)); }
+        :host([keskeny]) .sz { font-size: calc(10px * var(--bk, 1)); }
+        :host([keskeny]) .kiir { font-size: calc(12px * var(--bk, 1)); }
         :host([keskeny]) .felso { order: 2; flex: none; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
         :host([keskeny]) .ablak { width: 100%; height: auto; }
         :host([keskeny]) .vfd { aspect-ratio: 320 / 110; }
@@ -1413,11 +1432,11 @@ class CantabileCard extends HTMLElement {
         .elo:not(.magno) .adosor { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); height: 74px; gap: 6px 7px; }
         .adosor .bill { flex: none; height: auto; padding: 7px 3px 1px; flex-direction: column; justify-content: center; align-items: center; gap: 1px; box-shadow: 0 3px 0 #80858c, 0 4px 6px rgba(0,0,0,.25); }
         .adosor .bill .led { top: 3px; width: 12px; height: 3px; margin-left: -6px; }
-        .adosor .bill b { font-size: 11.5px; line-height: 1.05; }
-        .adosor .bill small { font-size: 9px; line-height: 1; flex: none; }
+        .adosor .bill b { font-size: calc(11.5px * var(--bk, 1)); line-height: 1.05; }
+        .adosor .bill small { font-size: calc(9px * var(--bk, 1)); line-height: 1; flex: none; }
         .adosor .bill.akt, .adosor .bill:active { transform: translateY(2px); box-shadow: 0 1px 0 #80858c, 0 2px 3px rgba(0,0,0,.25); }
         .adosor .adoures { background: linear-gradient(180deg, #eceef0, #d6dade); border-style: dashed; border-color: #a3a8af; box-shadow: 0 2px 0 #9ca1a8; align-items: center; padding: 0; }
-        .adosor .adoures .plusz { font: 300 20px/1 "Cantabile Sans", Arial, sans-serif; color: #8a8f97; }
+        .adosor .adoures .plusz { font: 300 calc(20px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; color: #8a8f97; }
         .jobb.rjobb { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "rbal hang" "otg otg" "kim kim"; justify-content: stretch; align-content: space-between; align-items: center; gap: 2px 4px; }
         .rjobb > .rbal { grid-area: rbal; display: flex; flex-direction: column; align-items: center; gap: 12px; align-self: start; padding-top: 4px; }
         .rjobb > .hangero { grid-area: hang; justify-self: center; transform: scale(.74); margin: -24px; }
@@ -1426,7 +1445,7 @@ class CantabileCard extends HTMLElement {
         .rjobb > .forgo .valaszto { zoom: .86; }
         :host([keskeny]) .elo:not(.magno) .adosor { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 39px; height: auto; gap: 9px 6px; order: 3; padding-bottom: 4px; }
         :host([keskeny]) .elo:not(.magno) .adosor .bill { height: 39px; flex-direction: column; align-items: center; gap: 2px; padding: 9px 2px 2px; }
-        :host([keskeny]) .elo:not(.magno) .adosor .bill b { font-size: 12px; }
+        :host([keskeny]) .elo:not(.magno) .adosor .bill b { font-size: calc(12px * var(--bk, 1)); }
         :host([keskeny]) .jobb.rjobb { order: 4; grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "rbal hang otg" "rbal hang kim"; justify-content: stretch; align-content: center; gap: 2px 4px; }
         /* telefonos rádió, kétoldalas választó (ötnél több hangszóró): a választó külön sorba, teljes szélességben */
         :host([keskeny]) .jobb.rjobb:has(> .forgo.ket) { grid-template-areas: "rbal hang otg" "kim kim kim"; }
@@ -1450,15 +1469,15 @@ class CantabileCard extends HTMLElement {
           box-shadow: 0 14px 34px rgba(0,0,0,.55), 0 0 22px rgba(255,160,40,.14), inset 0 1px 0 rgba(255,255,255,.09); -webkit-tap-highlight-color: transparent; }
         .uzablak.lat { opacity: 1; transform: none; pointer-events: auto; }
         .uzablak.zar { opacity: 0; transform: translateY(6px) scale(.98); transition: opacity .6s ease, transform .6s ease; }
-        .uzfej { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font: 400 8.5px/1 Michroma, "Cantabile Sans", Arial, sans-serif;
+        .uzfej { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font: 400 calc(8.5px * var(--bk, 1))/1 Michroma, "Cantabile Sans", Arial, sans-serif;
           letter-spacing: .32em; color: rgba(255,190,90,.78); }
         .uzfej i { width: 6px; height: 6px; border-radius: 50%; background: #ffb020; box-shadow: 0 0 6px #ffb020; animation: uzpislog 1.6s ease-in-out infinite; }
-        .uzszoveg { font: 500 14.5px/1.4 "Exo 2", "Cantabile Sans", Arial, sans-serif; letter-spacing: .015em; color: #f3ead8; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+        .uzszoveg { font: 500 calc(14.5px * var(--bk, 1))/1.4 "Exo 2", "Cantabile Sans", Arial, sans-serif; letter-spacing: .015em; color: #f3ead8; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
         .uzido { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; transform-origin: left center;
           background: linear-gradient(90deg, rgba(255,176,32,.25), #ffb020); box-shadow: 0 0 6px rgba(255,176,32,.7); }
         @keyframes uzfogy { from { transform: scaleX(1); } to { transform: scaleX(0); } }
         @keyframes uzpislog { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
-        :host([keskeny]) .uzszoveg { font-size: 13.5px; }
+        :host([keskeny]) .uzszoveg { font-size: calc(13.5px * var(--bk, 1)); }
         /* fekete előlap (finish: black): a 90-es évek fekete, finoman húzott alumínium előlapja – világos feliratok, sötét gombok és tárcsák;
            a kijelzők, a kazetta és a lámpák színe nem változik */
         :host([fekete]) .elo {
