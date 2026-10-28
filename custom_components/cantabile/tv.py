@@ -27,6 +27,7 @@ import logging
 import os
 import re
 import shutil
+import time
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote, urlsplit
@@ -97,6 +98,7 @@ ELO_URL = "/api/cantabile/tv/live"
 MAPPAKEPEK = ("cover", "folder", "front", "album", "albumart", "albumartsmall")
 KEPKITERJ = (".jpg", ".jpeg", ".png", ".webp")
 DEEZER = "https://api.deezer.com"
+AUDIODB = "https://www.theaudiodb.com/api/v1/json/123"   # a TheAudioDB nyilvános (ingyenes) kulcsa
 
 
 def kozpont(hass: HomeAssistant) -> TvKozpont:
@@ -114,6 +116,7 @@ class TvKozpont:
         self.atadas: dict[str, dict[str, Any]] = {}
         self._var: CantabileTv | None = None             # erre a lejátszóra vár egy éppen kiküldött oldal
         self._deezer: dict[str, str | None] = {}
+        self._adb: dict[str, tuple[float, list[str]]] = {}
         self._video_zar: dict[str, asyncio.Lock] = {}
         self.elo: dict[str, tuple[str, str]] = {}      # élő DLNA-videó: kulcs → (adatlap képe, adó címe)
 
@@ -225,6 +228,11 @@ class TvKozpont:
         eloado = meta.get("artist")
         if eloado:
             meta.setdefault("artist_image", await self._deezer_kep("artist", eloado))
+            # a TV-oldal váltakozó háttérképei: a NAS-on az előadó / album mappájának képei, aztán a TheAudioDB fanartjai
+            hatter = await self.hass.async_add_executor_job(_helyi_hatterek, fajl) if fajl else []
+            meta["backgrounds"] = list(dict.fromkeys(
+                [async_sign_path(self.hass, f"{KEP_URL}?f={quote(k, safe='')}", ALAIRAS) for k in hatter]
+                + await self._adb_hatterek(eloado)))[:10]
             if not meta.get("cover") and meta.get("album"):
                 meta["cover"] = await self._deezer_kep("album", f'artist:"{eloado}" album:"{meta["album"]}"')
         return meta
@@ -310,6 +318,27 @@ class TvKozpont:
         return kep
 
 
+    async def _adb_hatterek(self, eloado: str) -> list[str]:
+        """Az előadó széles háttérképei (fanart, széles fotó) a TheAudioDB nyilvános adatbázisából; előadónként 1 napig tárolva."""
+        kulcs = eloado.lower()
+        tarolt = self._adb.get(kulcs)
+        if tarolt and time.monotonic() - tarolt[0] < 86400:
+            return tarolt[1]
+        kepek: list[str] = []
+        try:
+            sess = async_get_clientsession(self.hass)
+            async with asyncio.timeout(8), sess.get(f"{AUDIODB}/search.php", params={"s": eloado}) as r:
+                talalat = ((await r.json(content_type=None)) or {}).get("artists") or []
+            a = next((x for x in talalat if str(x.get("strArtist") or "").lower() == kulcs), talalat[0] if talalat else {})
+            kepek = [a[k] for k in ("strArtistFanart", "strArtistFanart2", "strArtistFanart3", "strArtistFanart4", "strArtistWideThumb")
+                     if str(a.get(k) or "").startswith("https://")]
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Cantabile TV: TheAudioDB-kép (%s) nem jött", eloado, exc_info=True)
+        if len(self._adb) > 500:
+            self._adb.clear()
+        self._adb[kulcs] = (time.monotonic(), kepek)
+        return kepek
+
     # ---- DLNA mód: a szám adatlapja képként (tv_kep.py) ----
     async def dlna_kep(self, meta: dict[str, Any]) -> str | None:
         """Megrajzolja (vagy a tárból veszi) az adatlapot, és a TV számára bejelentkezés nélkül olvasható, aláírt belső
@@ -386,7 +415,7 @@ class TvKozpont:
         """Az adatlap képfájlja a tárban (szükség esetén megrajzolja)."""
         from . import tv_kep
 
-        kulcs = hashlib.sha1(json.dumps({k: v for k, v in meta.items() if not k.startswith("_") or k == "_cover_file"},
+        kulcs = hashlib.sha1(json.dumps({k: v for k, v in meta.items() if (not k.startswith("_") or k == "_cover_file") and k != "backgrounds"},
                                         sort_keys=True, default=str).encode()).hexdigest()[:20]
         tar = self.hass.config.path(".cache", "cantabile_tv")
         cel = os.path.join(tar, f"dlna_{kulcs}.jpg")
@@ -532,6 +561,25 @@ async def beagyazott(hass: HomeAssistant, ut: str) -> str | None:
         await hass.async_add_executor_job(helyere)
         await hass.async_add_executor_job(_takarit, tar)
     return cel if os.path.exists(cel) else None
+
+
+HATTER_NEV = re.compile(r"^(fanart|backdrop|background|artist|extrafanart)[-_ ]?\d*\.(jpe?g|png|webp)$", re.I)
+
+
+def _helyi_hatterek(fajl: str) -> list[str]:
+    """Kodi-szokás szerinti háttérképek az album és az előadó mappájában (fanart.jpg, backdrop2.jpg, extrafanart/…)."""
+    kepek: list[str] = []
+    album = os.path.dirname(fajl)
+    for mappa in (album, os.path.dirname(album)):
+        for hely in (mappa, os.path.join(mappa, "extrafanart")):
+            try:
+                nevek = sorted(os.listdir(hely))
+            except OSError:
+                continue
+            kiterj = hely.endswith("extrafanart")
+            kepek += [os.path.join(hely, n) for n in nevek
+                      if (HATTER_NEV.match(n) or (kiterj and n.lower().endswith(KEPKITERJ))) and os.path.isfile(os.path.join(hely, n))]
+    return kepek[:6]
 
 
 def _mappakep(fajl: str) -> str | None:

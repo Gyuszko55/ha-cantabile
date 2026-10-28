@@ -218,6 +218,9 @@ After setting up the integration, open your conversation agent's options (e.g. *
 - The TV plays the music folder, radio, NET stations and PHONE music; Deezer, Tidal and the Sonos favourites stay on Sonos.
 - DLNA: about 7 s preparation per track (on albums the next one is prepared in the background), sound as AAC 256 kbps,
   no seeking; radio runs as a live video. Cast: the sound is the original file / stream.
+- Cast TV page background: it changes every 30 s with a slow fade and zoom – the artist's fanart from TheAudioDB (free,
+  no key needed), plus Kodi-style images in the album or artist folder (`fanart.jpg`, `backdrop2.png`, `extrafanart/…`);
+  without them, the artist picture or the cover.
 - Next / previous track work from the card, Home Assistant's controls and by voice.
 
 ## Adding your own speakers and sources

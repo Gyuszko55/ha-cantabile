@@ -4286,7 +4286,7 @@ class CantabileTv extends HTMLElement {
   // óra, haladásjelző, rajzolás – a lekerült példányban leállnak (_elenged), visszakerüléskor újraindulnak
   _indit() {
     this._le = false;
-    this._orak = [setInterval(this._ora, 10000), setInterval(() => this._halad(), 500)];
+    this._orak = [setInterval(this._ora, 10000), setInterval(() => this._halad(), 500), setInterval(() => this._hatterLep(), 30000)];
     this._rajzol();
   }
 
@@ -4320,7 +4320,7 @@ class CantabileTv extends HTMLElement {
       :host([teljes]) { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; padding: 0; z-index: 9; }
       .v { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; overflow: hidden; color: #f3ead8;
         font-family: "Exo 2", "Cantabile Sans", Arial, sans-serif; background: #070708; }
-      .hat { position: absolute; left: -4%; top: -4%; width: 108%; height: 108%; background: center / cover no-repeat; opacity: 0; transition: opacity 1.6s ease;
+      .hat { position: absolute; left: -4%; top: -4%; width: 108%; height: 108%; background: center / cover no-repeat; opacity: 0; transition: opacity 2.5s ease;
         animation: kb 38s ease-in-out infinite alternate; will-change: transform; }
       .hat.lat { opacity: 1; }
       @keyframes kb { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.12) translate(-2.5%, -1.5%); } }
@@ -4367,7 +4367,7 @@ class CantabileTv extends HTMLElement {
       .var small { display: block; margin-top: 26px; font: 400 13px/1 Michroma, "Cantabile Sans", Arial, sans-serif; letter-spacing: .5em; color: rgba(243,234,216,.55); }
     </style>
     <div class="v ures2">
-      <div class="alt lat"><div class="lem">${TV_SVG_LEMEZ}</div></div><div class="hat"></div><div class="sot"></div>
+      <div class="alt lat"><div class="lem">${TV_SVG_LEMEZ}</div></div><div class="hat"></div><div class="hat"></div><div class="sot"></div>
       <div class="fej"><div class="marka">Cantabile</div><div class="ora"><span class="o"></span><small class="d"></small></div></div>
       <div class="var"><b class="o2"></b><small>CANTABILE · READY</small></div>
       <div class="tart"><div class="bor ures"><div class="lem">${TV_SVG_LEMEZ}</div></div>
@@ -4546,16 +4546,36 @@ class CantabileTv extends HTMLElement {
       const bor = sr.querySelector(".bor"), kep = m.cover || (radio ? m.image : "") || "";
       bor.classList.toggle("ures", !kep);
       bor.style.backgroundImage = kep ? `url("${this._abs(kep)}")` : "";
-      const hat = sr.querySelector(".hat"), alt = sr.querySelector(".alt"), hk = m.artist_image || m.cover || "";
-      if (hk) {
-        const kepb = new Image();
-        kepb.onload = () => { hat.style.backgroundImage = `url("${this._abs(hk)}")`; hat.classList.add("lat"); alt.classList.remove("lat"); };
-        kepb.onerror = () => { hat.classList.remove("lat"); alt.classList.add("lat"); };
-        kepb.src = this._abs(hk);
-      } else { hat.classList.remove("lat"); alt.classList.add("lat"); }
+      // háttér: a szerver által gyűjtött képek (NAS-mappa, TheAudioDB), az előadó képe, végül a borító – 30 mp-enként váltva
+      this._hatterLista = [...new Set([...(m.backgrounds || []), m.artist_image, m.cover].filter(Boolean))];
+      this._hatterI = 0;
+      if (this._hatterLista.length) this._hatterMutat(this._hatterLista[0]);
+      else { sr.querySelectorAll(".hat").forEach((h) => h.classList.remove("lat")); sr.querySelector(".alt").classList.add("lat"); }
       sr.querySelector(".hal").classList.toggle("elo2", radio);
       t.classList.remove("valt");
     } catch (e) { this._diag({ hiba: `mutat: ${e && e.stack ? e.stack.slice(0, 300) : e}` }); } }, 450);
+  }
+
+  // a háttér következő képe a rejtett rétegbe töltődik, aztán áttűnéssel cserél (a hibás képet átugorja)
+  _hatterMutat(url, probak = 0) {
+    const sr = this.shadowRoot; if (!sr) return;
+    const [h1, h2] = sr.querySelectorAll(".hat"), uj = h1.classList.contains("lat") ? h2 : h1, regi = uj === h1 ? h2 : h1, alt = sr.querySelector(".alt");
+    const kepb = new Image();
+    kepb.onload = () => { uj.style.backgroundImage = `url("${this._abs(url)}")`; uj.classList.add("lat"); regi.classList.remove("lat"); alt.classList.remove("lat"); };
+    kepb.onerror = () => {
+      const l = this._hatterLista || [];
+      this._hatterLista = l.filter((x) => x !== url);
+      if (this._hatterLista.length && probak < 3) this._hatterMutat(this._hatterLista[this._hatterI % this._hatterLista.length], probak + 1);
+      else if (!regi.classList.contains("lat")) alt.classList.add("lat");
+    };
+    kepb.src = this._abs(url);
+  }
+
+  _hatterLep() {
+    const l = this._hatterLista || [];
+    if (l.length < 2 || document.visibilityState === "hidden") return;
+    this._hatterI = (this._hatterI + 1) % l.length;
+    this._hatterMutat(l[this._hatterI]);
   }
 
   _halad() {

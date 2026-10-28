@@ -219,6 +219,9 @@ Az integráció beállítása után nyisd meg a beszélgetőügynök beállítá
 - A TV a zenemappát, a rádiót, a NET-adókat és a PHONE zenéit játssza; a Deezer, a Tidal és a Sonos-kedvencek Sonoson maradnak.
 - DLNA: számonként kb. 7 mp előkészítés (albumnál a következőt a háttérben készíti), a hang AAC 256 kbps, tekerni nem
   lehet; a rádió élő videóként megy. Cast: a hang az eredeti fájl / adás.
+- A Cast-os TV-oldal háttere 30 mp-enként lassú áttűnéssel és nagyítással vált: az előadó TheAudioDB-s háttérképei
+  (ingyenes, kulcs nélkül), és a Kodi-szokás szerinti képek az album vagy az előadó mappájában (`fanart.jpg`,
+  `backdrop2.png`, `extrafanart/…`); ezek nélkül az előadó képe vagy a borító.
 - Következő / előző szám a kártyáról, a Home Assistant vezérlőiből és hanggal is.
 
 ## Saját hangszórók és források hozzáadása
