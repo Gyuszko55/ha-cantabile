@@ -33,6 +33,7 @@ class Tovabbito(HomeAssistantView):
     url = "/api/cantabile/stream"
     name = "api:cantabile:stream"
     requires_auth = True
+    cors_allowed = True          # a Cantabile TV-oldal a Cast-vevő címéről kéri (tv.py)
 
     def __init__(self, hass: HomeAssistant) -> None:
         self.hass = hass

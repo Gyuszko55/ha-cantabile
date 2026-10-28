@@ -11,7 +11,8 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import (
-    CONF_DUCK_LEVEL, CONF_DUCK_SOURCES, CONF_LLM_API, CONF_SPOTIFY_ID, CONF_SPOTIFY_SECRET, CONF_TIDAL_ID, CONF_TIDAL_SECRET, DOMAIN,
+    CONF_DUCK_LEVEL, CONF_DUCK_SOURCES, CONF_LLM_API, CONF_SPOTIFY_ID, CONF_SPOTIFY_SECRET, CONF_TIDAL_ID, CONF_TIDAL_SECRET, CONF_TV_PLAYERS,
+    DOMAIN,
     DUCK_LEVEL_DEFAULT,
 )
 
@@ -44,6 +45,9 @@ class CantabileOptionsFlow(OptionsFlow):
                 ),
                 vol.Required(CONF_DUCK_LEVEL, default=o.get(CONF_DUCK_LEVEL, DUCK_LEVEL_DEFAULT)): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=0, max=100, step=5, unit_of_measurement="%", mode=selector.NumberSelectorMode.SLIDER)
+                ),
+                vol.Optional(CONF_TV_PLAYERS, default=o.get(CONF_TV_PLAYERS, [])): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="media_player", integration="cast", multiple=True)
                 ),
                 vol.Optional(CONF_SPOTIFY_ID, description={"suggested_value": o.get(CONF_SPOTIFY_ID)}): selector.TextSelector(),
                 vol.Optional(CONF_SPOTIFY_SECRET, description={"suggested_value": o.get(CONF_SPOTIFY_SECRET)}): selector.TextSelector(

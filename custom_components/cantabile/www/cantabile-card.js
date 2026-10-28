@@ -102,6 +102,7 @@ const EN = {
   "(beépített)": "(built-in)",
   "Kijelző": "Display",
   "Előlap": "Front panel",
+  "A Cantabile TV-oldala a Cast-os TV-re: equalizer, előadókép, a szám adatai és haladásjelző.": "The Cantabile TV page for a Cast TV: equalizer, artist image, track details and progress.",
   "Ezüst (húzott alumínium)": "Silver (brushed aluminium)",
   "Fekete (90-es évek)": "Black (nineties)",
   "Deprez-műszer (mutatós VU)": "Moving-coil VU meters",
@@ -597,8 +598,8 @@ class CantabileCard extends HTMLElement {
     const L0 = kim.map((h, i) => i).filter((i) => kim[i].entity !== HELYI), nL = L0.length;
     this._forgoSzog = (i) => (nL > 1 ? -82 + (164 * L0.indexOf(i)) / (nL - 1) : 0);
     const fPont = (i, r) => { const a = (this._forgoSzog(i) * Math.PI) / 180; return [100 + r * Math.sin(a), 64 - r * Math.cos(a)]; };
-    const forgo = `<div class="kimenet forgo"><div class="valaszto">
-      ${L0.map((i) => { const [x, y] = fPont(i, 56); const szg = this._forgoSzog(i), old = szg < -60 ? " fbal" : szg > 60 ? " fjobb" : ""; const [lx, ly] = fPont(i, 38); return `<i class="vt" style="transform:rotate(${this._forgoSzog(i)}deg)"></i><span class="flamp" data-i="${i}" style="left:${lx.toFixed(1)}px;top:${ly.toFixed(1)}px"></span><button class="fhsz${old}" data-i="${i}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><span class="fn">${ESC(KN(kim[i]))}</span></button>`; }).join("")}
+    const forgo = `<div class="kimenet forgo"><div class="valaszto${nL > 5 ? " suru" : ""}">
+      ${L0.map((i, j) => { /* ötnél több állásnál minden második név kijjebb, hogy a szomszédok ne csússzanak egymásra */ const [x, y] = fPont(i, nL > 5 && j % 2 ? 67 : 56); const szg = this._forgoSzog(i), old = szg < -60 ? " fbal" : szg > 60 ? " fjobb" : ""; const [lx, ly] = fPont(i, 38); return `<i class="vt" style="transform:rotate(${this._forgoSzog(i)}deg)"></i><span class="flamp" data-i="${i}" style="left:${lx.toFixed(1)}px;top:${ly.toFixed(1)}px"></span><button class="fhsz${old}" data-i="${i}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><span class="fn">${ESC(KN(kim[i]))}</span></button>`; }).join("")}
       <div class="vgomb" title="${T("Hangszóró váltása")}"><div class="vsapka"></div></div><small>SPEAKERS</small></div></div>`;
     const valto = `<button class="valto" title="${T("Rádió / tape")}"><span class="vr">RADIO</span><span class="kapcs"></span><span class="vm">TAPE</span></button>`;
     let beosztas = "";
@@ -1036,6 +1037,11 @@ class CantabileCard extends HTMLElement {
         .mjobb > .otg { display: none; }
         /* forgó hangszóró-választó (magnó) */
         .valaszto { position: relative; width: 200px; height: 104px; }
+        /* ötnél több állás: a kijjebb tett nevek ne érjenek a fölötte lévő feliratba – telefonon lejjebb, a széles
+           elrendezésben (ott a választó a kártya aljához szorul) kisebb */
+        :host([keskeny]) .valaszto.suru { margin-top: 12px; }
+        :host(:not([keskeny])) .magno .mjobb > .forgo .valaszto.suru { zoom: .82; }
+        :host(:not([keskeny])) .rjobb > .forgo .valaszto.suru { zoom: .78; }
         .valaszto .vt { position: absolute; left: 99px; top: 64px; width: 2px; height: 5px; margin-top: -33px; transform-origin: 1px 33px; background: #3d4148; }
         .vgomb { position: absolute; left: 100px; top: 64px; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; cursor: pointer;
           background: repeating-conic-gradient(#d8dbdf 0 5deg, #7d828a 5deg 10deg); box-shadow: 0 4px 8px rgba(0,0,0,.4), 0 0 0 1.5px #50545a; -webkit-tap-highlight-color: transparent; }
@@ -3988,4 +3994,318 @@ if (!customElements.get("cantabile-card")) {
   window.customCards = window.customCards || [];
   window.customCards.push({ type: "cantabile-card", name: "Cantabile", preview: true,
     description: T("Régi hi-fi rádió és tape deck (ezüst vagy fekete): adógombok, NET-rádió, forgó kazetta, valódi VU-mérők, NAS, Deezer, Spotify és Tidal.") });
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Cantabile TV (custom:cantabile-tv): a Cast-os TV-n futó teljes képernyős oldal. A hangot maga játssza (a Cantabile
+// TV-lejátszó küldi a parancsokat, tv.py), Web Audio-val elemzi: equalizer + hullámforma, mögötte az előadó képe,
+// mellette a szám adatai és a haladásjelző. 1280×720-as vásznon rajzol, és a képernyőhöz nagyítja (a Cast-vevő régi
+// Chrome-jához: nincs container query, nincs inset).
+const TV_SVG_LEMEZ = `<svg viewBox="0 0 200 200"><defs><radialGradient id="tvl" cx=".5" cy=".5" r=".5"><stop offset=".18" stop-color="#d9a441"/><stop offset=".2" stop-color="#121214"/><stop offset=".98" stop-color="#1c1c1f"/><stop offset="1" stop-color="#070708"/></radialGradient></defs>
+  <circle cx="100" cy="100" r="98" fill="url(#tvl)"/>${[30, 38, 46, 54, 62, 70, 78, 86, 93].map((r) => `<circle cx="100" cy="100" r="${r}" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="1"/>`).join("")}
+  <path d="M100 2 A98 98 0 0 1 198 100" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="3"/><circle cx="100" cy="100" r="3" fill="#070708"/></svg>`;
+
+class CantabileTv extends HTMLElement {
+  setConfig(c) { this._c = { visual: "both", ...(c || {}) }; }
+
+  set hass(h) {
+    this._h = h;
+    if (this._kesz) return;
+    this._kesz = true;
+    // hibakeresés a Cast-vevőn (oda nem látunk be): a hibák és az állapot `cantabile_tv_diag` eseményként jönnek vissza
+    window.addEventListener("error", (e) => this._diag({ hiba: `${e.message} @${e.lineno}:${e.colno}` }));
+    window.addEventListener("unhandledrejection", (e) => this._diag({ hiba: `promise: ${e.reason}` }));
+    BETU();
+    this._epit();
+    this._feliratkozik();
+  }
+
+  getCardSize() { return 12; }
+
+  // a Cast-vevő a kártyát kétszer is létrehozhatja: csak a lejátszóhoz kapcsolódott példány látszik (felül), a többi
+  // elrejti magát és nem kapcsolódik újra; a lekerült példány elengedi a kapcsolatot
+  connectedCallback() { clearTimeout(this._levesz); }
+  disconnectedCallback() {
+    this._levesz = setTimeout(() => this._elenged(), 3000);
+  }
+
+  // a lekerült példány elengedi a lejátszót; a hang (közös, az oldalhoz tartozik) szól tovább, az új példány átveszi
+  _elenged() {
+    if (this.isConnected) return;
+    if (this._leir) { this._leir(); this._leir = null; }
+    if (window._cantabileTv === this) window._cantabileTv = null;
+  }
+
+  get _teljes() { return location.hostname === "cast.home-assistant.io" || this._c.fullscreen === true; }
+
+  _diag(adat) {
+    try {
+      const v = this._v;
+      this._h.callWS({ type: "fire_event", event_type: "cantabile_tv_diag", event_data: { ...adat, ures: v ? v.classList.contains("ures2") : null,
+        valt: this.shadowRoot?.querySelector(".tart")?.classList.contains("valt"), w: innerWidth, h: innerHeight, tr: v ? v.style.transform : "", ua: navigator.userAgent.slice(-40) } }).catch(() => {});
+    } catch (e) { /* hibakeresés közben ne legyen újabb hiba */ }
+  }
+
+  _abs(p) { return !p ? "" : /^https?:/i.test(p) ? p : this._h.hassUrl ? this._h.hassUrl(p) : p; }
+
+  _epit() {
+    const sr = this.shadowRoot || this.attachShadow({ mode: "open" });
+    sr.innerHTML = `<style>
+      :host { display: block; position: relative; width: 100%; padding-top: 56.25%; overflow: hidden; background: #050506; }
+      :host([teljes]) { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; padding: 0; z-index: 9; }
+      .v { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; overflow: hidden; color: #f3ead8;
+        font-family: "Exo 2", "Helvetica Neue", Arial, sans-serif; background: #070708; }
+      .hat { position: absolute; left: -4%; top: -4%; width: 108%; height: 108%; background: center / cover no-repeat; opacity: 0; transition: opacity 1.6s ease;
+        animation: kb 38s ease-in-out infinite alternate; will-change: transform; }
+      .hat.lat { opacity: 1; }
+      @keyframes kb { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.12) translate(-2.5%, -1.5%); } }
+      .alt { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1.6s ease;
+        background: radial-gradient(60% 80% at 78% 40%, rgba(214,140,40,.28), transparent 70%), radial-gradient(50% 60% at 15% 90%, rgba(120,60,150,.22), transparent 70%), linear-gradient(160deg, #141217, #07070a); }
+      .alt.lat { opacity: 1; }
+      .alt .lem { position: absolute; right: -120px; top: 40px; width: 640px; height: 640px; opacity: .55; animation: forog 18s linear infinite; }
+      @keyframes forog { to { transform: rotate(360deg); } }
+      .sot { position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+        background: linear-gradient(90deg, rgba(6,6,8,.94) 0%, rgba(6,6,8,.8) 42%, rgba(6,6,8,.35) 100%), linear-gradient(0deg, rgba(4,4,5,.96) 0%, rgba(4,4,5,.55) 34%, transparent 60%); }
+      .fej { position: absolute; left: 64px; right: 64px; top: 30px; display: flex; align-items: baseline; justify-content: space-between; }
+      .marka { font: 400 46px/1 "Great Vibes", "Brush Script MT", cursive; color: #f3ead8; text-shadow: 0 2px 10px rgba(0,0,0,.6); }
+      .ora { font: 400 24px/1 Michroma, Arial, sans-serif; letter-spacing: .08em; color: #f3ead8; text-align: right; }
+      .ora small { display: block; margin-top: 8px; font-size: 11px; letter-spacing: .3em; color: rgba(243,234,216,.6); }
+      .tart { position: absolute; left: 64px; right: 64px; top: 128px; height: 340px; display: flex; gap: 52px; align-items: center; transition: opacity .6s ease; }
+      .tart.valt { opacity: 0; }
+      .bor { flex: none; width: 330px; height: 330px; border-radius: 6px; background: #111 center / cover no-repeat; position: relative;
+        box-shadow: 0 24px 50px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.08); }
+      .bor .lem { position: absolute; left: 6%; top: 6%; width: 88%; height: 88%; display: none; }
+      .bor.ures { background: radial-gradient(circle at 30% 25%, #2a2620, #0e0d0c); } .bor.ures .lem { display: block; animation: forog 9s linear infinite; }
+      .adat { min-width: 0; flex: 1; }
+      .cimke { font: 400 12px/1 Michroma, Arial, sans-serif; letter-spacing: .38em; color: #ffb547; text-shadow: 0 0 10px rgba(255,170,50,.45); display: flex; align-items: center; gap: 12px; }
+      .cimke i { width: 9px; height: 9px; border-radius: 50%; background: #ffb020; box-shadow: 0 0 8px #ffb020; animation: pis 1.6s ease-in-out infinite; }
+      @keyframes pis { 50% { opacity: .3; } }
+      .cim { margin-top: 18px; font-weight: 600; font-size: 54px; line-height: 1.08; color: #fff; text-shadow: 0 3px 18px rgba(0,0,0,.6);
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+      .elo { margin-top: 14px; font-weight: 500; font-size: 30px; color: #f1e3c6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .alb { margin-top: 8px; font-size: 21px; color: #b9ad98; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .csipek { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 10px; }
+      .csipek span { font: 400 11px/1 Michroma, Arial, sans-serif; letter-spacing: .14em; padding: 7px 10px 6px; border-radius: 3px; color: #ffd08a;
+        border: 1px solid rgba(255,176,32,.45); background: rgba(20,16,10,.45); }
+      canvas { position: absolute; left: 64px; bottom: 70px; width: 1152px; height: 170px; }
+      .hal { position: absolute; left: 64px; right: 64px; bottom: 30px; display: flex; align-items: center; gap: 18px; font: 400 14px/1 Michroma, Arial, sans-serif; letter-spacing: .06em; color: #e7dcc6; }
+      .sav { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,.14); position: relative; }
+      .tel { position: absolute; left: 0; top: 0; height: 100%; width: 0; border-radius: 2px; background: linear-gradient(90deg, #b8741c, #ffb020); box-shadow: 0 0 10px rgba(255,170,40,.7); }
+      .gomb { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: #ffe2a8; box-shadow: 0 0 10px #ffb020; left: 0; }
+      .elo2 .sav { display: none; } .elo2 .vege { display: none; }
+      .eloj { display: none; color: #ff6a4d; letter-spacing: .3em; } .elo2 .eloj { display: inline; animation: pis 2s ease-in-out infinite; }
+      .szun .cimke i { animation: none; opacity: .35; }
+      .ures2 .tart, .ures2 .hal, .ures2 canvas { opacity: 0; }
+      .var { position: absolute; left: 0; right: 0; top: 250px; text-align: center; opacity: 0; transition: opacity .8s; pointer-events: none; }
+      .ures2 .var { opacity: 1; }
+      .var b { display: block; font: 400 110px/1 Michroma, Arial, sans-serif; letter-spacing: .04em; color: #f3ead8; }
+      .var small { display: block; margin-top: 26px; font: 400 13px/1 Michroma, Arial, sans-serif; letter-spacing: .5em; color: rgba(243,234,216,.55); }
+    </style>
+    <div class="v ures2">
+      <div class="alt lat"><div class="lem">${TV_SVG_LEMEZ}</div></div><div class="hat"></div><div class="sot"></div>
+      <div class="fej"><div class="marka">Cantabile</div><div class="ora"><span class="o"></span><small class="d"></small></div></div>
+      <div class="var"><b class="o2"></b><small>CANTABILE · READY</small></div>
+      <div class="tart"><div class="bor ures"><div class="lem">${TV_SVG_LEMEZ}</div></div>
+        <div class="adat"><div class="cimke"><i></i><span class="ck">NOW PLAYING</span></div><div class="cim"></div><div class="elo"></div><div class="alb"></div><div class="csipek"></div></div></div>
+      <canvas></canvas>
+      <div class="hal"><span class="most">0:00</span><div class="sav"><div class="tel"></div><div class="gomb"></div></div><span class="vege">0:00</span><span class="eloj">● LIVE</span></div>
+    </div>`;
+    this.toggleAttribute("teljes", this._teljes);
+    this._v = sr.querySelector(".v");
+    this._cv = sr.querySelector("canvas");
+    const meret = () => {
+      const w = this._teljes ? innerWidth : this.clientWidth, hh = this._teljes ? innerHeight : this.clientWidth * 0.5625;
+      const s = Math.min(w / 1280, hh / 720) || 1;
+      this._v.style.transform = `translate(${(w - 1280 * s) / 2}px, ${(hh - 720 * s) / 2}px) scale(${s})`;
+      const dpr = Math.min(1.5, (window.devicePixelRatio || 1) * s);
+      this._cv.width = Math.round(1152 * dpr); this._cv.height = Math.round(170 * dpr);
+    };
+    meret();
+    window.addEventListener("resize", meret);
+    if (window.ResizeObserver) new ResizeObserver(meret).observe(this);
+    const ora = () => {
+      const d = new Date(), nyelv = this._h?.locale?.language || "en";
+      const o = d.toLocaleTimeString(nyelv, { hour: "2-digit", minute: "2-digit" });
+      sr.querySelector(".o").textContent = o; sr.querySelector(".o2").textContent = o;
+      sr.querySelector(".d").textContent = d.toLocaleDateString(nyelv, { weekday: "long", month: "long", day: "numeric" }).toUpperCase();
+    };
+    ora(); setInterval(ora, 10000);
+    this._rajzol();
+    setInterval(() => this._halad(), 500);
+  }
+
+  // ---- hang ----
+  _hang() {
+    if (this._a) return this._a;
+    const a = new Audio();
+    a.crossOrigin = "anonymous";
+    a.preload = "auto";
+    // az események mindig az épp aktív (látható) példányhoz mennek – a Cast-vevő a kártyát le is cserélheti
+    ["playing", "pause", "ended", "error", "loadedmetadata", "seeked"].forEach((e) => a.addEventListener(e, () => {
+      const ez = window._cantabileTv || this;
+      if (e === "ended") { ez._allapot = "idle"; ez._v.classList.add("ures2"); }
+      if (e === "error") { ez._allapot = "idle"; ez._diag({ hiba: `audio error ${a.error?.code || ""} ${a.error?.message || ""}`, net: a.networkState, rs: a.readyState, src: String(a.src).slice(0, 90) }); }
+      ez._jelent(e === "error" ? `audio ${a.error?.code || ""}` : null);
+    }));
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      this._ctx = new Ctx();
+      const forras = this._ctx.createMediaElementSource(a);
+      this._an = this._ctx.createAnalyser(); this._an.fftSize = 2048; this._an.smoothingTimeConstant = 0.78;
+      forras.connect(this._an); this._an.connect(this._ctx.destination);
+      this._frek = new Uint8Array(this._an.frequencyBinCount); this._ido = new Uint8Array(this._an.fftSize);
+    } catch (e) { this._an = null; }
+    return (this._a = a);
+  }
+
+  _feliratkozik() {
+    this._msg = { type: "cantabile/tv/subscribe" };
+    if (this._c.tv || this._tv) this._msg.tv = this._c.tv || this._tv;    // a lecserélt példány utódja azonnal átveszi a lejátszót
+    this._h.connection.subscribeMessage((m) => this._parancs(m), this._msg)
+      .then((u) => {
+        this._leir = u;
+        const regi = window._cantabileTv;
+        window._cantabileTv = this;
+        this.style.display = ""; this.style.zIndex = "10";
+        if (regi && regi !== this) regi.style.display = "none";
+      })
+      .catch(() => {
+        const akt = window._cantabileTv;
+        if (akt && akt !== this && akt.isConnected) { this.style.display = "none"; return; }
+        if (akt && akt !== this) { clearTimeout(akt._levesz); akt._elenged(); setTimeout(() => this._feliratkozik(), 800); return; }   // a régi, lekerült példány tartotta
+        setTimeout(() => this._feliratkozik(), 10000);               // még nincs hozzárendelhető lejátszó
+      });
+    if (!this._jelIdo) this._jelIdo = setInterval(() => { if (this._allapot === "playing" && window._cantabileTv === this) this._jelent(); }, 2000);
+  }
+
+  async _parancs(m) {
+    const a = this._hang();
+    if (m.cmd === "hello") {                         // újrakapcsolódáskor ugyanahhoz a lejátszóhoz
+      this._tv = m.tv; this._msg.tv = m.tv;
+      if (this._src && a.src && !a.ended && this._allapot !== "idle") {        // átvett, már szóló zene: azonnal mutatja
+        this._mutat(this._meta || {});
+        this._v.classList.toggle("szun", this._allapot === "paused");
+      }
+      return;
+    }
+    if (m.cmd === "play") {
+      this._src = m.src;
+      this._meta = m.meta || {};
+      this._mutat(this._meta);
+      a.src = this._abs(m.src);
+      this._allapot = "playing";
+      try { if (this._ctx && this._ctx.state !== "running") await this._ctx.resume(); await a.play(); }
+      catch (e) { this._allapot = "idle"; this._jelent(String(e)); this._diag({ hiba: `play: ${e}`, src: String(a.src).slice(0, 90) }); }
+    } else if (m.cmd === "pause") { a.pause(); this._allapot = "paused"; }
+    else if (m.cmd === "resume") { this._allapot = "playing"; try { await a.play(); } catch (e) { this._jelent(String(e)); } }
+    else if (m.cmd === "seek") { try { a.currentTime = m.position; } catch (e) {} }
+    else if (m.cmd === "stop") { a.pause(); a.removeAttribute("src"); a.load(); this._allapot = "idle"; this._v.classList.add("ures2"); }
+    this._v.classList.toggle("szun", this._allapot === "paused");
+    this._jelent();
+  }
+
+  _jelent(hiba) {
+    if (!this._tv) return;
+    const a = this._a, hossz = a && isFinite(a.duration) ? a.duration : null;
+    this._h.callWS({ type: "cantabile/tv/report", tv: this._tv, state: this._allapot || "idle", position: a ? a.currentTime : null,
+      duration: hossz, src: this._src || null, ...(hiba ? { error: hiba } : {}) }).catch(() => {});
+  }
+
+  // ---- megjelenítés ----
+  _mutat(m) {
+    const sr = this.shadowRoot, t = sr.querySelector(".tart");
+    t.classList.add("valt");
+    this._v.classList.remove("ures2");
+    setTimeout(() => { try {
+      const radio = m.kind === "stream";
+      sr.querySelector(".ck").textContent = radio ? "ON AIR" : "NOW PLAYING";
+      sr.querySelector(".cim").textContent = (radio ? m.title || m.station : m.title) || "";
+      sr.querySelector(".elo").textContent = radio ? (m.title ? m.station : m.artist || "") : m.artist || "";
+      sr.querySelector(".alb").textContent = [m.album, m.year].filter(Boolean).join("  ·  ");
+      const khz = m.rate ? `${(m.rate / 1000).toLocaleString("en", { maximumFractionDigits: 1 })} kHz${m.bits ? ` / ${m.bits} bit` : ""}` : "";
+      const csip = [m.codec, khz, m.kbps ? `${m.kbps} kbps` : "", m.track ? `TRACK ${m.track}` : "", m.genre, radio ? "INTERNET RADIO" : ""].filter(Boolean);
+      sr.querySelector(".csipek").innerHTML = csip.map((x) => `<span>${ESC(String(x).toUpperCase())}</span>`).join("");
+      const bor = sr.querySelector(".bor"), kep = m.cover || (radio ? m.image : "") || "";
+      bor.classList.toggle("ures", !kep);
+      bor.style.backgroundImage = kep ? `url("${this._abs(kep)}")` : "";
+      const hat = sr.querySelector(".hat"), alt = sr.querySelector(".alt"), hk = m.artist_image || m.cover || "";
+      if (hk) {
+        const kepb = new Image();
+        kepb.onload = () => { hat.style.backgroundImage = `url("${this._abs(hk)}")`; hat.classList.add("lat"); alt.classList.remove("lat"); };
+        kepb.onerror = () => { hat.classList.remove("lat"); alt.classList.add("lat"); };
+        kepb.src = this._abs(hk);
+      } else { hat.classList.remove("lat"); alt.classList.add("lat"); }
+      sr.querySelector(".hal").classList.toggle("elo2", radio);
+      t.classList.remove("valt");
+    } catch (e) { this._diag({ hiba: `mutat: ${e && e.stack ? e.stack.slice(0, 300) : e}` }); } }, 450);
+  }
+
+  _halad() {
+    const a = this._a, sr = this.shadowRoot;
+    if (!a || !sr) return;
+    const ido = (s) => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), p = Math.floor((s % 3600) / 60), mp = String(s % 60).padStart(2, "0"); return h ? `${h}:${String(p).padStart(2, "0")}:${mp}` : `${p}:${mp}`; };
+    const hossz = isFinite(a.duration) && a.duration > 0 ? a.duration : 0;
+    sr.querySelector(".most").textContent = ido(a.currentTime);
+    sr.querySelector(".vege").textContent = hossz ? ido(hossz) : "";
+    const p = hossz ? Math.min(100, (a.currentTime / hossz) * 100) : 0;
+    sr.querySelector(".tel").style.width = `${p}%`; sr.querySelector(".gomb").style.left = `${p}%`;
+  }
+
+  // equalizer (logaritmikus sávok, eső csúcsjelzővel és tükörképpel) + hullámforma-vonal
+  _rajzol() {
+    const g = this._cv.getContext("2d"), N = 56, csucs = new Array(N).fill(0), simit = new Array(N).fill(0);
+    const kor = () => {
+      requestAnimationFrame(kor);
+      const W = this._cv.width, H = this._cv.height, alap = H * 0.72;
+      g.clearRect(0, 0, W, H);
+      if (!this._an || this._allapot !== "playing") { for (let i = 0; i < N; i++) { simit[i] *= 0.9; csucs[i] *= 0.95; } }
+      else {
+        this._an.getByteFrequencyData(this._frek);
+        const n = this._frek.length, minB = 2, maxB = Math.floor(n * 0.72);
+        for (let i = 0; i < N; i++) {
+          const a0 = Math.floor(minB * Math.pow(maxB / minB, i / N)), a1 = Math.max(a0 + 1, Math.floor(minB * Math.pow(maxB / minB, (i + 1) / N)));
+          let s = 0; for (let k = a0; k < a1; k++) s = Math.max(s, this._frek[k]);
+          const v = Math.pow(s / 255, 1.6);
+          simit[i] = v > simit[i] ? v : simit[i] * 0.88 + v * 0.12;
+          csucs[i] = Math.max(csucs[i] - 0.012, simit[i]);
+        }
+      }
+      const vis = this._c.visual, rw = W / N, bw = rw * 0.62;
+      if (vis !== "wave") {
+        for (let i = 0; i < N; i++) {
+          const x = i * rw + (rw - bw) / 2, h = Math.max(2, simit[i] * alap);
+          const gr = g.createLinearGradient(0, alap - h, 0, alap);
+          gr.addColorStop(0, "#ffe0a0"); gr.addColorStop(0.35, "#ffb020"); gr.addColorStop(1, "#9a4f12");
+          g.fillStyle = gr; g.shadowColor = "rgba(255,160,40,.55)"; g.shadowBlur = 12 * (W / 1152);
+          g.fillRect(x, alap - h, bw, h);
+          g.shadowBlur = 0;
+          g.fillStyle = "rgba(255,180,60,.16)"; g.fillRect(x, alap + 3, bw, h * 0.32);                  // tükörkép
+          g.fillStyle = "#fff1cf"; g.fillRect(x, alap - csucs[i] * alap - 4, bw, 2.5 * (W / 1152));       // csúcsjelző
+        }
+      }
+      if (vis !== "bars" && this._an && this._allapot === "playing") {
+        this._an.getByteTimeDomainData(this._ido);
+        g.beginPath();
+        const lepes = Math.max(1, Math.floor(this._ido.length / 512));
+        for (let k = 0, j = 0; k < this._ido.length; k += lepes, j++) {
+          const x = (k / (this._ido.length - 1)) * W, y = alap * 0.55 + ((this._ido[k] - 128) / 128) * alap * 0.45;
+          j ? g.lineTo(x, y) : g.moveTo(x, y);
+        }
+        g.strokeStyle = vis === "wave" ? "#ffcf7a" : "rgba(255,240,210,.55)"; g.lineWidth = (vis === "wave" ? 3 : 1.6) * (W / 1152);
+        g.shadowColor = "rgba(255,170,50,.8)"; g.shadowBlur = 10 * (W / 1152); g.stroke(); g.shadowBlur = 0;
+      }
+    };
+    kor();
+  }
+}
+
+// a hang, az elemző és a szóló szám az oldalhoz tartozik, nem a kártyapéldányhoz (lásd a BT kimenetnél is)
+const TV_KOZOS = {};
+["_a", "_ctx", "_an", "_frek", "_ido", "_src", "_meta", "_allapot", "_tv"].forEach((k) =>
+  Object.defineProperty(CantabileTv.prototype, k, { get() { return TV_KOZOS[k]; }, set(v) { TV_KOZOS[k] = v; }, configurable: true }));
+
+if (!customElements.get("cantabile-tv")) {
+  customElements.define("cantabile-tv", CantabileTv);
+  window.customCards = window.customCards || [];
+  window.customCards.push({ type: "cantabile-tv", name: "Cantabile TV", description: T("A Cantabile TV-oldala a Cast-os TV-re: equalizer, előadókép, a szám adatai és haladásjelző.") });
 }

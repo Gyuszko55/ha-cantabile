@@ -34,7 +34,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
-from . import atmeneti, halkitas, library, llm, lyrics, music, sonossor, streaming, tovabbito, vu
+from . import atmeneti, halkitas, library, llm, lyrics, music, sonossor, streaming, tovabbito, tv, vu
 from .const import (
     CARD_URL, CONF_DUCK_LEVEL, CONF_DUCK_SOURCES, CONF_LLM_API, DOMAIN, DUCK_LEVEL_DEFAULT, STATIC_URL, UID_NET, UID_ROUNDS,
     UID_SLEEP, VERSION,
@@ -43,7 +43,7 @@ from .runtime import Cantabile
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.NUMBER, Platform.SENSOR]
+PLATFORMS = [Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 type CantabileConfigEntry = ConfigEntry[Cantabile]
@@ -62,6 +62,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     atmeneti.regisztral(hass)
     streaming.regisztral(hass)
     vu.regisztral(hass)
+    tv.regisztral(hass)
 
     @websocket_api.websocket_command({vol.Required("type"): "cantabile/info"})
     @callback

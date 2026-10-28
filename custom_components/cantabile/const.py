@@ -19,6 +19,7 @@ CONF_SPOTIFY_ID = "spotify_client_id"      # Spotify-fejlesztői kulcs (kísérl
 CONF_SPOTIFY_SECRET = "spotify_client_secret"
 CONF_TIDAL_ID = "tidal_client_id"          # Tidal-fejlesztői kulcs (kísérleti TIDAL fül)
 CONF_TIDAL_SECRET = "tidal_client_secret"
+CONF_TV_PLAYERS = "tv_players"           # Cast-eszközök, amelyekhez Cantabile TV-lejátszó jön létre (tv.py)
 LLM_API_ID = "cantabile"
 
 # entitások egyedi azonosítói (a kártya a cantabile/info parancsból tudja meg az entity_id-kat)

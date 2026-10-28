@@ -26,14 +26,16 @@
           "spotify_client_id": "Spotify client ID (kísérleti)",
           "spotify_client_secret": "Spotify client secret",
           "tidal_client_id": "Tidal client ID (kísérleti)",
-          "tidal_client_secret": "Tidal client secret"
+          "tidal_client_secret": "Tidal client secret",
+          "tv_players": "TV-lejátszók (Cantabile TV)"
         },
         "data_description": {
           "llm_api": "Az LLM-es beszélgetőügynökök zenét és rádiót indíthatnak vele. Az ügynök beállításaiban is kapcsold be a „Cantabile”-t.",
           "duck_sources": "Assist-segédállomások (pl. Voice PE: amíg hallgat, gondolkodik vagy válaszol) és médialejátszók (amíg szöveget mondanak). Közben a szóló Sonos / WiiM hangszórók halkabban szólnak.",
           "duck_level": "Az eredeti hangerő százalékában; 0 = elnémul.",
           "spotify_client_id": "A developer.spotify.com → Dashboard → Create app oldalról. A SPOTIFY fülön a katalógus keresését engedi. Nem kell, ha be van kötve a Home Assistant Spotify-integrációja (azzal a saját listák is látszanak). Lejátszás: Sonoson a Sonos appba bekötött Spotify-jal, vagy Spotify Connect-hangszórón a Spotify-integráción át (Premium).",
-          "tidal_client_id": "A developer.tidal.com → Dashboard → Create app oldalról. A TIDAL fülön a katalógus keresését engedi; lejátszás Sonoson, a Sonos appba bekötött Tidallal."
+          "tidal_client_id": "A developer.tidal.com → Dashboard → Create app oldalról. A TIDAL fülön a katalógus keresését engedi; lejátszás Sonoson, a Sonos appba bekötött Tidallal.",
+          "tv_players": "Cast-eszközök (pl. TV-stick), amelyek Cantabile-hangszóróként szólnak, a képernyőn TV-oldallal: equalizer / hullámforma, előadókép, a szám adatai és haladásjelző. Kell hozzá a „cantabile-tv” vezérlőpult egy „tv” nézettel, benne a Cantabile TV kártyával (lásd README)."
         }
       }
     }

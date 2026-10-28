@@ -26,14 +26,16 @@
           "spotify_client_id": "Spotify client ID (experimental)",
           "spotify_client_secret": "Spotify client secret",
           "tidal_client_id": "Tidal client ID (experimental)",
-          "tidal_client_secret": "Tidal client secret"
+          "tidal_client_secret": "Tidal client secret",
+          "tv_players": "TV players (Cantabile TV)"
         },
         "data_description": {
           "llm_api": "Lets LLM-based conversation agents start music and radio. Turn on “Cantabile” in the agent's options as well.",
           "duck_sources": "Assist satellites (e.g. Voice PE: while listening, thinking or answering) and media players (while they say a TTS message). The playing Sonos / WiiM speakers are turned down meanwhile.",
           "duck_level": "Percentage of the original volume; 0 = muted.",
           "spotify_client_id": "From developer.spotify.com → Dashboard → Create app. Enables catalogue search on the SPOTIFY tab. Not needed if the Home Assistant Spotify integration is set up (that also shows your own playlists). Playback: on Sonos with Spotify linked in the Sonos app, or on Spotify Connect speakers via the Spotify integration (Premium).",
-          "tidal_client_id": "From developer.tidal.com → Dashboard → Create app. Enables catalogue search on the TIDAL tab; playback on Sonos with Tidal linked in the Sonos app."
+          "tidal_client_id": "From developer.tidal.com → Dashboard → Create app. Enables catalogue search on the TIDAL tab; playback on Sonos with Tidal linked in the Sonos app.",
+          "tv_players": "Cast devices (e.g. a TV stick) that become Cantabile speakers with a TV page: equalizer / waveform, artist image, track details and progress on the screen. Needs the “cantabile-tv” dashboard with a “tv” view holding the Cantabile TV card (see README)."
         }
       }
     }
