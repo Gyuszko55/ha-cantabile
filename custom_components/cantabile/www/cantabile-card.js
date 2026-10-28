@@ -2472,7 +2472,7 @@ class CantabileCard extends HTMLElement {
     }
     if (k === "ff" || k === "rew") {
       this._gyors(k === "rew");
-      if (szkriptes) {
+      if (szkriptes && !a.cue_tracks) {
         const i = this._szamIndex(kaz, a);
         const uj = Math.min(kaz.szamok.length - 1, Math.max(0, (i < 0 ? 0 : i) + (k === "ff" ? 1 : -1)));
         return this._sorozat(hsz, kaz.szamok, uj);
@@ -4227,12 +4227,14 @@ class CantabileTv extends HTMLElement {
       if (this._src && a.src && !a.ended && this._allapot !== "idle") {        // átvett, már szóló zene: azonnal mutatja
         this._mutat(this._meta || {});
         this._v.classList.toggle("szun", this._allapot === "paused");
+        this._jelent(null, true);                    // a (pl. újraindult) szerver így tudja, mi szól
       }
       return;
     }
     if (m.cmd === "play") {
       this._src = m.src;
       this._meta = m.meta || {};
+      this._cueI = this._meta.cue ? -1 : null;      // az első jelzés már kiírja az „1 / N” sorszámot
       this._mutat(this._meta);
       a.src = this._abs(m.src);
       this._allapot = "playing";
@@ -4246,11 +4248,27 @@ class CantabileTv extends HTMLElement {
     this._jelent();
   }
 
-  _jelent(hiba) {
+  _jelent(hiba, metaval) {
     if (!this._tv) return;
     const a = this._a, hossz = a && isFinite(a.duration) ? a.duration : null;
     this._h.callWS({ type: "cantabile/tv/report", tv: this._tv, state: this._allapot || "idle", position: a ? a.currentTime : null,
-      duration: hossz, src: this._src || null, ...(hiba ? { error: hiba } : {}) }).catch(() => {});
+      duration: hossz, src: this._src || null, ...(hiba ? { error: hiba } : {}), ...(this._cueI != null ? { track: this._cueI } : {}),
+      ...(metaval && this._meta ? { meta: this._meta } : {}) }).catch(() => {});
+  }
+
+  // CUE-s album (egyetlen fájl): melyik szám szól az idő alapján – címet, előadót, sorszámot cserél, jelenti a szervernek
+  _cueKovet() {
+    const cue = this._meta?.cue, a = this._a;
+    if (!cue || !a) return null;
+    let i = 0;
+    while (i + 1 < cue.length && a.currentTime >= cue[i + 1].start - 0.2) i++;
+    if (i !== this._cueI) {
+      this._cueI = i;
+      this._mutat({ ...this._meta, title: cue[i].title, artist: cue[i].performer || this._meta.artist, track: `${cue[i].n} / ${cue.length}` });
+      this._jelent();
+    }
+    const vege = i + 1 < cue.length ? cue[i + 1].start : (isFinite(a.duration) ? a.duration : 0);
+    return { kezd: cue[i].start, hossz: vege - cue[i].start };
   }
 
   // ---- megjelenítés ----
@@ -4265,7 +4283,7 @@ class CantabileTv extends HTMLElement {
       sr.querySelector(".elo").textContent = radio ? (m.title ? m.station : m.artist || "") : m.artist || "";
       sr.querySelector(".alb").textContent = [m.album, m.year].filter(Boolean).join("  ·  ");
       const khz = m.rate ? `${(m.rate / 1000).toLocaleString("en", { maximumFractionDigits: 1 })} kHz${m.bits ? ` / ${m.bits} bit` : ""}` : "";
-      const csip = [m.codec, khz, m.kbps ? `${m.kbps} kbps` : "", m.track ? `TRACK ${m.track}` : "", m.genre, radio ? "INTERNET RADIO" : ""].filter(Boolean);
+      const csip = [m.codec, khz, m.kbps ? `${m.kbps} kbps` : "", m.track ? `TRACK ${m.track}` : "", m.genre ? String(m.genre).split(" / ")[0] : "", radio ? "INTERNET RADIO" : ""].filter(Boolean);
       sr.querySelector(".csipek").innerHTML = csip.map((x) => `<span>${ESC(String(x).toUpperCase())}</span>`).join("");
       const bor = sr.querySelector(".bor"), kep = m.cover || (radio ? m.image : "") || "";
       bor.classList.toggle("ures", !kep);
@@ -4286,10 +4304,11 @@ class CantabileTv extends HTMLElement {
     const a = this._a, sr = this.shadowRoot;
     if (!a || !sr) return;
     const ido = (s) => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), p = Math.floor((s % 3600) / 60), mp = String(s % 60).padStart(2, "0"); return h ? `${h}:${String(p).padStart(2, "0")}:${mp}` : `${p}:${mp}`; };
-    const hossz = isFinite(a.duration) && a.duration > 0 ? a.duration : 0;
-    sr.querySelector(".most").textContent = ido(a.currentTime);
+    const cue = this._cueKovet();                  // CUE-s albumnál a szám saját ideje
+    const hossz = cue ? cue.hossz : isFinite(a.duration) && a.duration > 0 ? a.duration : 0, most = a.currentTime - (cue ? cue.kezd : 0);
+    sr.querySelector(".most").textContent = ido(most);
     sr.querySelector(".vege").textContent = hossz ? ido(hossz) : "";
-    const p = hossz ? Math.min(100, (a.currentTime / hossz) * 100) : 0;
+    const p = hossz ? Math.min(100, (most / hossz) * 100) : 0;
     sr.querySelector(".tel").style.width = `${p}%`; sr.querySelector(".gomb").style.left = `${p}%`;
   }
 
@@ -4343,7 +4362,7 @@ class CantabileTv extends HTMLElement {
 
 // a hang, az elemző és a szóló szám az oldalhoz tartozik, nem a kártyapéldányhoz (lásd a BT kimenetnél is)
 const TV_KOZOS = {};
-["_a", "_ctx", "_an", "_frek", "_ido", "_src", "_meta", "_allapot", "_tv"].forEach((k) =>
+["_a", "_ctx", "_an", "_frek", "_ido", "_src", "_meta", "_allapot", "_tv", "_cueI"].forEach((k) =>
   Object.defineProperty(CantabileTv.prototype, k, { get() { return TV_KOZOS[k]; }, set(v) { TV_KOZOS[k] = v; }, configurable: true }));
 
 if (!customElements.get("cantabile-tv")) {

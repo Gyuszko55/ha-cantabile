@@ -150,6 +150,14 @@ class TvKozpont:
         meta: dict[str, Any] = {k: v for k, v in (extra or {}).items() if v not in (None, "")}
         if fajl:
             meta = {**await self._cimkek(fajl), **meta}
+            if cue := await self.hass.async_add_executor_job(_cue, fajl):
+                # egyetlen fájlos album CUE-lappal: a számok listája (a TV-oldal az időből tudja, melyik szól)
+                meta["cue"] = cue["tracks"]
+                meta["album"] = cue.get("title") or meta.get("album")
+                meta["artist"] = cue.get("performer") or meta.get("artist")
+                meta["year"] = cue.get("date") or meta.get("year")
+                meta["genre"] = (cue.get("genre") or meta.get("genre") or "").split(" / ")[0]
+                meta["title"] = cue["tracks"][0]["title"]
             if not meta.get("cover"):
                 kep = await self.hass.async_add_executor_job(_mappakep, fajl)
                 if kep:
@@ -374,6 +382,62 @@ def _takarit(tar: str) -> None:
         pass
 
 
+def _cue(fajl: str) -> dict[str, Any] | None:
+    """A zenefájlhoz tartozó CUE-lap (azonos nevű, vagy a mappában az, amelyik erre a fájlra hivatkozik), feldolgozva:
+    {title, performer, date, genre, tracks: [{n, title, performer, start}]} – a start másodpercben (INDEX 01)."""
+    mappa, nev = os.path.dirname(fajl), os.path.basename(fajl)
+    try:
+        jeloltek = [n for n in os.listdir(mappa) if n.lower().endswith(".cue")]
+    except OSError:
+        return None
+    jeloltek.sort(key=lambda n: os.path.splitext(n)[0] != os.path.splitext(nev)[0])
+    for n in jeloltek:
+        try:
+            with open(os.path.join(mappa, n), "rb") as f:
+                nyers = f.read(200_000)
+        except OSError:
+            continue
+        for kod in ("utf-8-sig", "cp1250", "latin-1"):
+            try:
+                szoveg = nyers.decode(kod)
+                break
+            except UnicodeDecodeError:
+                continue
+        lap: dict[str, Any] = {"tracks": []}
+        fajlok, akt = [], None
+        for sor in szoveg.splitlines():
+            sor = sor.strip()
+            m = re.match(r'^(REM\s+)?(\w+)\s+(.*)$', sor)
+            if not m:
+                continue
+            kulcs, ertek = m.group(2).upper(), m.group(3).strip()
+            ertek_t = ertek[1:ertek.rfind('"')] if ertek.startswith('"') and '"' in ertek[1:] else ertek
+            if kulcs == "FILE":
+                fajlok.append(ertek_t)
+            elif kulcs == "TRACK":
+                akt = {"n": int(re.match(r"\d+", ertek).group(0)) if re.match(r"\d+", ertek) else len(lap["tracks"]) + 1}
+                lap["tracks"].append(akt)
+            elif kulcs == "INDEX" and akt is not None:
+                im = re.match(r"(\d+)\s+(\d+):(\d+):(\d+)", ertek)
+                if im and int(im.group(1)) == 1:
+                    akt["start"] = int(im.group(2)) * 60 + int(im.group(3)) + int(im.group(4)) / 75
+            elif kulcs in ("TITLE", "PERFORMER"):
+                (akt if akt is not None else lap)[kulcs.lower()] = ertek_t
+            elif kulcs in ("DATE", "GENRE") and akt is None:
+                lap[kulcs.lower()] = ertek_t
+        if len(fajlok) != 1 or os.path.basename(fajlok[0]).lower() != nev.lower():
+            continue                            # több fájlos vagy más fájlra szóló lap: nem ehhez a fájlhoz tartozik
+        szamok = [t for t in lap["tracks"] if "start" in t]
+        if len(szamok) < 2:
+            continue
+        for t in szamok:
+            t.setdefault("title", f"Track {t['n']}")
+            t.setdefault("performer", lap.get("performer", ""))
+        lap["tracks"] = szamok
+        return lap
+    return None
+
+
 def _olvas(ut: str) -> bytes | None:
     try:
         with open(ut, "rb") as f:
@@ -541,6 +605,7 @@ def ws_subscribe(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg:
     vol.Required("type"): "cantabile/tv/report", vol.Required("tv"): str, vol.Required("state"): vol.In(["playing", "paused", "idle"]),
     vol.Optional("position"): vol.Any(None, vol.Coerce(float)), vol.Optional("duration"): vol.Any(None, vol.Coerce(float)),
     vol.Optional("src"): vol.Any(None, str), vol.Optional("error"): vol.Any(None, str),
+    vol.Optional("track"): vol.Any(None, vol.Coerce(int)), vol.Optional("meta"): vol.Any(None, dict),
 })
 @callback
 def ws_report(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
