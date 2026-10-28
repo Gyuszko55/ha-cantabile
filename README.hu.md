@@ -84,6 +84,62 @@ Az előlapok feliratai mindig angolok, mint egy igazi régi hi-fin; a beállít�
   mérők élethű utánzatot mutatnak).
 - A Deezer lejátszásához a Sonos appban be kell kötni a Deezert. A Deezer-kereséshez nem kell fiók.
 
+## Mit kell telepíteni – és mit hoz magával a Cantabile
+
+### A Cantabile része (nem kell hozzá semmit telepíteni)
+
+| Rész | Megjegyzés |
+|---|---|
+| A kártya | Az integráció szolgálja ki, és magától felveszi a vezérlőpult-erőforrások közé (YAML-módú erőforrásoknál a `/cantabile_static/cantabile-card.js`-t *module*-ként neked kell felvenni). |
+| Betűk | *Great Vibes*, *Michroma*, *Exo 2* – mellékelve, helyből töltődnek (SIL OFL), a Google-tól semmi nem jön. |
+| `async-upnp-client` Python-csomag | A Home Assistant a manifestből telepíti (általában már megvan); a hézagmentes lejátszáshoz kell DLNA / WiiM / LinkPlay lejátszón. |
+| Entitások és szolgáltatások | Ismétlésszám, alvásidőzítő, hanggal indított adó; `cantabile.play`, `cantabile.sleep_timer` … (lásd *Entitások és szolgáltatások*). |
+| Assist-eszköz | A *Cantabile* LLM API a hangvezérléshez – a beszélgetőügynök beállításaiban jelenik meg. |
+| Ingyenes online források (fiók és kulcs nélkül) | [Radio Browser](https://www.radio-browser.info) (adók), a Deezer nyilvános katalógus-API-ja (keresés), [LRCLIB](https://lrclib.net) (dalszöveg). |
+
+### Amit neked kell telepíteni vagy beállítani
+
+| Mit | Mihez kell | Hogyan |
+|---|---|---|
+| Home Assistant **2025.1+** | mindenhez | – |
+| A hangszóróid integrációja | lejátszás | **Beállítások → Eszközök és szolgáltatások → Integráció hozzáadása**: *Sonos*, *WiiM*, *LinkPlay*, *DLNA Digital Media Renderer*, *Google Cast*, *Music Assistant*, *Squeezebox*… (a Home Assistant saját integrációi, nem a Cantabile részei). |
+| `ffmpeg` a gazdagépen | valódi VU-jel (elhagyható) | A Home Assistant OS-ben és a konténer-képben benne van. Python-venv-es (Core) telepítésnél a rendszer csomagkezelőjével tedd fel. Nélküle a mérők utánoznak. |
+| Zenemappa | NAS / PHONE fül (elhagyható) | Lásd lent: *Zenetár (NAS) csatolása*. |
+| Beszélgetőügynök | hangvezérlés (elhagyható) | Pl. *Google Gemini*, *OpenAI*, *Anthropic*, *Ollama*; utána a beállításaiban kapcsold be a **Cantabile**-t (lásd *Hangvezérlés*). |
+| Streaming-fiókok / kulcsok | DEEZER, SPOTIFY, TIDAL (elhagyható) | Lásd a következő részt. |
+
+### Streaming-szolgáltatók
+
+| Szolgáltatás | Mi kell hozzá | Mit tud | Hol szól |
+|---|---|---|---|
+| **Sonos-kedvencek** | A Sonos appban elmentett kedvencek | A mentett listák, albumok, adók a STREAMING fülön, hanggal is | Sonos |
+| **Deezer** | A **Sonos appban** bekötött Deezer-előfizetés (*Beállítások → Szolgáltatások és hang → Szolgáltatás hozzáadása*). A kereséshez nem kell fiók. | Toplisták, keresés, előadó-oldalak, albumok, számok; hanggal (*„… a Deezerről”*); ami a zenemappában nincs meg, azt itt keresi | Sonos |
+| **Spotify** *(kísérleti)* | 1. A Home Assistant **Spotify** integrációja – saját Spotify fejlesztői appal; átirányítási cím `https://my.home-assistant.io/redirect/oauth`; a lejátszáshoz **Premium**. 2. Elhagyható: Spotify fejlesztői kulcs (client ID / secret) a **Cantabile beállításaiban** a katalógus-kereséshez (nélküle a Spotify-integráció munkamenetét használja). 3. Sonoshoz: a Sonos appban bekötött Spotify. | Keresés, előadó-oldalak, albumok, a saját listáid és könyvtárad; hanggal (*„… a Spotifyról”*) | Sonos (linkkel), bármely **Spotify Connect** hangszóró (pl. WiiM) |
+| **Tidal** *(kísérleti)* | Tidal fejlesztői kulcs (developer.tidal.com, client ID / secret) a Cantabile beállításaiban; a Sonos appban bekötött Tidal | Keresés, előadók, albumok, listák; hanggal (*„… a Tidalról”*) | Sonos |
+
+**Mire figyelj**
+- A streaming-szolgáltatások magán a hangszórón szólnak, ezért a VU-mérők **utánoznak**, és bitráta / kódolás sem látszik (a hangszóró nem adja meg).
+- A Deezer, a Tidal és a Sonos-kedvencek **csak Sonoson** szólnak – más hangszóró választásakor üzenet jön, és a zene a helyén marad.
+- **A Spotify fejlesztői appok „fejlesztői módban” futnak**, szigorúbb korlátokkal; a Cantabile ezeken belül működik: típusonként 10 találat, az előadó albumai tízesével, „legnépszerűbb számok” nincs (helyette szűrt keresés), mások listái elindíthatók, de számonként nem listázhatók.
+- A Spotify-könyvtárad csak akkor böngészhető, ha épp szól valami a Spotifyon (a Home Assistant Spotify-lejátszójának korlátja); különben a fül megkérdezi, mit keressen.
+- Spotify Connect: egy hangszóró hiányozhat a Spotify eszközlistájáról, amíg egyszer nem játszott Spotifyt – nyisd meg rajta a Spotify appot, vagy add meg a hangszórónál: `spotify_device: <ahogy a Spotify mutatja>`.
+- A kulcsok és tokenek a szerveren maradnak; a kártya csak olvasó katalógus-hívásokat kér az integrációtól.
+- A Tidal-támogatás új, élő fiókkal még nem volt kipróbálva.
+
+### Zenetár (NAS) csatolása
+
+1. A NAS-on oszd meg a zenemappát **SMB**-n (vagy NFS-en) – az olvasási jog elég; írás csak akkor kell, ha a PHONE fülről véglegesen is fel akarsz tölteni.
+2. **Beállítások → Rendszer → Tárhely → Hálózati tárhely hozzáadása**: név (pl. `Zene`), felhasználás **Média**, protokoll, szervercím, megosztás neve, felhasználó / jelszó.
+3. Nyisd meg az oldalsáv **Média** menüjét: a megosztás a *Saját médiák* alatt jelenik meg. Az útvonala `media-source://media_source/local/<név>`, pl. `media-source://media_source/local/Zene`.
+4. A kártyán: **⚙ → Zenemappa** → illeszd be az útvonalat → *Mentés*. A NAS fülön megjelennek az előadók → albumok → számok.
+
+- Elvárt szerkezet: `<előadó>/<album>/<számok>` (MP3, FLAC, AAC/M4A, OGG… – amit a hangszóróid lejátszanak).
+- **A Sonos legfeljebb 48 kHz-et játszik**: a hi-res albumok 48 kHz-es másolatait tartsd külön mappában, és add meg a *48 kHz-es másolatok mappáját* (`hires_folder`); Sonoson a Cantabile a másolatot játssza, máshol az eredetit.
+- A PHONE-feltöltések a zenemappán belüli *Feltöltések mappájába* kerülnek (`upload_folder`, alapból `Cantabile`) – ehhez írási jog és rendszergazda felhasználó kell.
+- Az első keresés végigolvassa a mappát (30 percig tárolja); nagyon nagy zenetárnál ez néhány másodperc.
+- Jellyfin- vagy DLNA-szerveres zenetár is jó (a médiaforrás-útvonalával); a Plex nem médiaforrás a Home Assistantban.
+- A `..`-t tartalmazó fájlneveket a Home Assistant médiaforrása nem tudja lejátszani, ezeket kihagyja.
+
 ## Telepítés
 
 ### HACS (egyéni tároló)

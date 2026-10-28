@@ -84,6 +84,62 @@ Front-panel labels are always English, like on a real old hi-fi; settings, messa
   without it the meters show a realistic simulation).
 - Deezer playback needs the Deezer service added to your Sonos app. Searching Deezer needs no account.
 
+## What to install – and what Cantabile brings
+
+### Comes with Cantabile (nothing to install)
+
+| Part | Notes |
+|---|---|
+| The card | Served by the integration and registered as a dashboard resource automatically (YAML-mode resources: add `/cantabile_static/cantabile-card.js` as a *module* yourself). |
+| Fonts | *Great Vibes*, *Michroma*, *Exo 2* – bundled and served locally (SIL OFL), nothing is loaded from Google. |
+| Python package `async-upnp-client` | Installed by Home Assistant from the manifest (normally already present); used for gapless playback on DLNA / WiiM / LinkPlay. |
+| Entities and services | Repeat rounds, sleep timer, voice-started station; `cantabile.play`, `cantabile.sleep_timer` … (see *Entities and services*). |
+| Assist tool | The *Cantabile* LLM API for voice control – appears in your conversation agent's options. |
+| Free online sources (no account, no key) | [Radio Browser](https://www.radio-browser.info) (stations), the public Deezer catalogue API (search), [LRCLIB](https://lrclib.net) (lyrics). |
+
+### What you install or set up yourself
+
+| What | Needed for | How |
+|---|---|---|
+| Home Assistant **2025.1+** | everything | – |
+| Your speakers' integration | playback | **Settings → Devices & services → Add integration**: *Sonos*, *WiiM*, *LinkPlay*, *DLNA Digital Media Renderer*, *Google Cast*, *Music Assistant*, *Squeezebox*… (Home Assistant's own integrations, not part of Cantabile). |
+| `ffmpeg` on the host | the real VU signal (optional) | Included in Home Assistant OS and the container image. On a Python-venv (Core) install, install it with the system package manager. Without it the meters simulate. |
+| A music folder | NAS / PHONE tabs (optional) | See *Connecting a music library (NAS)* below. |
+| A conversation agent | voice control (optional) | E.g. *Google Gemini*, *OpenAI*, *Anthropic*, *Ollama*; then turn on **Cantabile** in its options (see *Voice control*). |
+| Streaming accounts / keys | DEEZER, SPOTIFY, TIDAL (optional) | See the next section. |
+
+### Streaming services
+
+| Service | What you need | What you get | Plays on |
+|---|---|---|---|
+| **Sonos favourites** | Favourites saved in the Sonos app | Your saved playlists, albums and stations on the STREAMING tab, by voice too | Sonos |
+| **Deezer** | A Deezer subscription linked in the **Sonos app** (*Settings → Services & voice → Add a service*). Searching needs no account. | Charts, search, artist pages, albums, tracks; voice (*“… from Deezer”*); anything not in your music folder is looked up here | Sonos |
+| **Spotify** *(experimental)* | 1. The Home Assistant **Spotify** integration – with your own Spotify developer app; redirect URI `https://my.home-assistant.io/redirect/oauth`; **Premium** for playback. 2. Optional: a Spotify developer key (client ID / secret) in the **Cantabile options** for catalogue search (without it the Spotify integration's session is used). 3. For Sonos: Spotify linked in the Sonos app. | Search, artist pages, albums, your playlists and library; voice (*“… from Spotify”*) | Sonos (link), any **Spotify Connect** speaker (e.g. WiiM) |
+| **Tidal** *(experimental)* | A Tidal developer key (developer.tidal.com, client ID / secret) in the Cantabile options; Tidal linked in the Sonos app | Search, artists, albums, playlists; voice (*“… from Tidal”*) | Sonos |
+
+**Watch out**
+- Streaming services play on the speaker itself, so the VU meters **simulate** and no bitrate / codec is shown (the speaker doesn't report them).
+- Deezer, Tidal and the Sonos favourites are **Sonos only** – choosing another speaker shows a message and keeps the music where it is.
+- **Spotify developer apps run in “development mode”** with stricter limits, and Cantabile works within them: 10 search results per type, artist albums 10 at a time, no “top tracks” (a filtered search is used instead), and other people's playlists can be started but not listed track by track.
+- Your Spotify library can only be browsed while something is playing on Spotify (a limit of the Home Assistant Spotify player); otherwise the tab asks what to search for.
+- Spotify Connect: a speaker may be missing from Spotify's device list until it has played Spotify once – open the Spotify app on it, or set `spotify_device: <name as Spotify shows it>` on the speaker.
+- Keys and tokens stay on the server; the card only asks the integration for read-only catalogue calls.
+- Tidal support is new and has not been tested with a live account yet.
+
+### Connecting a music library (NAS)
+
+1. On the NAS, share the music folder over **SMB** (or NFS) – read access is enough; write access only if you want to upload from the PHONE tab for good.
+2. **Settings → System → Storage → Add network storage**: a name (e.g. `Music`), usage **Media**, protocol, server address, share name, user / password.
+3. Open **Media** in the sidebar: the share appears under *My media*. Its path is `media-source://media_source/local/<name>`, e.g. `media-source://media_source/local/Music`.
+4. On the card: **⚙ → Music folder** → paste the path → *Save*. The NAS tab now lists artists → albums → tracks.
+
+- Expected layout: `<artist>/<album>/<tracks>` (MP3, FLAC, AAC/M4A, OGG… – whatever your speakers play).
+- **Sonos plays at most 48 kHz**: for hi-res albums keep 48 kHz copies in a separate folder and set *Folder of 48 kHz copies* (`hires_folder`); Cantabile picks the copy on Sonos and the original elsewhere.
+- PHONE uploads go into the *Uploads folder* (`upload_folder`, default `Cantabile`) inside the music folder – this needs write access and an administrator user.
+- The first search scans the folder (cached for 30 minutes); very large libraries take a few seconds.
+- A Jellyfin or DLNA-server library works too (its media-source path); Plex is not a media source in Home Assistant.
+- File names containing `..` can't be played by Home Assistant's media source and are skipped.
+
 ## Installation
 
 ### HACS (custom repository)

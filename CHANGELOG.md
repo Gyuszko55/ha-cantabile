@@ -3,6 +3,7 @@
 ## 1.11.1 – 2026-10-28
 
 - Wording: "old hi-fi" instead of "1970s" (card picker description, README); the card description now also mentions the black front, Spotify and Tidal.
+- README: new chapter *What to install – and what Cantabile brings*: what comes with Cantabile, what you install yourself, the streaming services (what they need, what they can do, where they play, what to watch out for) and connecting a NAS music library step by step.
 - README: new black cassette-deck picture, refreshed radio / tape / phone pictures (lamps at the selector ticks), new sections on the front panels, card names and messages, Spotify / Tidal voice examples and a voice troubleshooting row.
 
 ## 1.11.0 – 2026-10-28
