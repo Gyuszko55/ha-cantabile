@@ -75,9 +75,14 @@ async def x264_van() -> bool:
         try:
             p = await asyncio.create_subprocess_exec("ffmpeg", "-hide_banner", "-encoders",
                                                      stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
-            ki, _ = await asyncio.wait_for(p.communicate(), 10)
+            try:
+                ki, _ = await asyncio.wait_for(p.communicate(), 10)
+            except TimeoutError:
+                with contextlib.suppress(ProcessLookupError):
+                    p.kill()
+                return False                    # most lassú volt: nem jegyzi meg, legközelebb újra megnézi
             _x264 = b"libx264" in ki
-        except (OSError, TimeoutError):
+        except OSError:
             _x264 = False
     return _x264
 
@@ -267,7 +272,7 @@ class TvKozpont:
             a = os.path.normpath(os.path.abspath(alap))
             if fajl.startswith(a + os.sep):
                 resz = [x for x in os.path.relpath(os.path.dirname(fajl), a).split(os.sep) if x and x != "."]
-                if resz and os.path.ismount(os.path.join(a, resz[0])):
+                if resz and os.path.ismount(os.path.realpath(os.path.join(a, resz[0]))):   # szimbolikus linken át is
                     resz = resz[1:]                                  # a csatolt megosztás (pl. NAS310) nem előadó
                 return resz
         return []
@@ -502,11 +507,25 @@ async def beagyazott(hass: HomeAssistant, ut: str) -> str | None:
         if not await ffmpeg_van(hass):
             return None
         await hass.async_add_executor_job(lambda: os.makedirs(tar, exist_ok=True))
+        # ideiglenes fájlba, és csak a kész kép kerül a helyére (félkész kép ne maradjon a tárban)
+        ideig = f"{cel}.{os.getpid()}.{id(asyncio.current_task())}.tmp.jpg"
         p = await asyncio.create_subprocess_exec(
-            "ffmpeg", "-v", "error", "-y", "-i", ut, "-an", "-frames:v", "1", "-vf", "scale='min(800,iw)':-2", cel,
+            "ffmpeg", "-v", "error", "-y", "-i", ut, "-an", "-frames:v", "1", "-vf", "scale='min(800,iw)':-2", ideig,
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
-        with contextlib.suppress(TimeoutError):
+        try:
             await asyncio.wait_for(p.wait(), 20)
+        except TimeoutError:
+            with contextlib.suppress(ProcessLookupError):
+                p.kill()
+            await p.wait()
+
+        def helyere() -> None:
+            if p.returncode == 0 and os.path.exists(ideig):
+                os.replace(ideig, cel)
+            elif os.path.exists(ideig):
+                os.remove(ideig)
+
+        await hass.async_add_executor_job(helyere)
         await hass.async_add_executor_job(_takarit, tar)
     return cel if os.path.exists(cel) else None
 
@@ -647,7 +666,7 @@ class TvElo(HomeAssistantView):
         try:
             while darab := await p.stdout.read(32768):
                 await ki.write(darab)
-        except (ConnectionResetError, asyncio.CancelledError):
+        except ConnectionResetError:
             pass                                # a TV leállt / másra váltott
         finally:
             if p.returncode is None:

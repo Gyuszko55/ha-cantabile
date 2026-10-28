@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.12.7 – unreleased
+
+Fixes from a full review of the integration:
+
+- Stream relay, for users who are not administrators: requests now go through a resolver that only connects to public addresses outside Home Assistant's own networks (a home network with global IPv6 addresses is covered too), so redirects and DNS tricks can't reach the local network, and names that can't be resolved are refused. Addresses given as IPs are checked at every redirect. A station that drops mid-stream ends the stream cleanly; malformed addresses give 400 instead of 500.
+- Track-by-track playback on players that show their own track IDs (Music Assistant, Squeezebox): the new track is recognised by an ID that differs from what played before (waiting up to 10 s), so skipping or a slow start no longer stops the tape; players that show the file name still notice when something else starts.
+- ⚙: the frequency hint shows the band (it showed program text); after Save or a change in the card editor the card keeps the chosen speaker and mode right away; the DEEZER tab can be switched back on; a failed save on the default dashboard names it.
+- Card editor: `fm_band: japan` / `auto` handled, the display key is only written when needed, the form isn't rebuilt on every state change.
+- Japanese band: tuning starts mid-band. SPEAKERS label sizing is right on the first pass on text-zoomed phones.
+- Cantabile TV page: restarting after the page was left can't start a second drawing loop or a second subscription.
+- Reloading the integration stops the Sonos queue fill and the station watchers of the old instance.
+- Embedded covers are extracted to a temporary file (no half-written covers), a slow ffmpeg check isn't remembered as "no libx264", interrupted uploads leave no partial files, symlinked NAS shares are recognised as mounts, and the Radio Browser mirror list is refreshed daily (and not re-fetched on every request after a failure).
+
 ## 1.12.6 – 2026-10-28
 
 - Phone radio laid out like the phone tape deck: NET · SLEEP · BT right under the station buttons, then the volume knob with the SPEAKERS selector beside it, and at the bottom POWER in the left corner with the horizontal RADIO / TAPE switch in the middle.

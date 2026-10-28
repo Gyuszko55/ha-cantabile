@@ -212,6 +212,8 @@ class Cantabile:
                 sorrend.most = id_
                 fajl = id_.rsplit("/", 1)[-1]
                 valtozatok = {fajl, quote(fajl), quote_plus(fajl)}
+                elozo = self.hass.states.get(entity_id)
+                elotte = str(elozo.attributes.get("media_content_id") or "") if elozo else ""   # ami eddig szólt
                 await self.hass.services.async_call(
                     "media_player", "play_media",
                     {"entity_id": entity_id, "media_content_id": id_, "media_content_type": "music"}, blocking=True,
@@ -219,8 +221,8 @@ class Cantabile:
                 if not await var(self.hass, entity_id, lambda st: bool(st and st.state == "playing"), 30):
                     return
                 # addig vár, amíg ez a szám szól vagy szünetel. A WiiM a címbe a fájl URL-jét írja; más lejátszó (pl. Music
-                # Assistant, Squeezebox) saját azonosítót és a címkéből vett címet ad – ott a kezdés után kicsit később
-                # kialakuló azonosító + cím a „lenyomat”, és ha az változik, más szól.
+                # Assistant, Squeezebox) saját azonosítót ad – ott az indítás után megjelenő ÚJ azonosító (ami eltér az előtte
+                # szólótól) a „lenyomat”, és ha az később változik, más szól. Ha nem derül ki, csak a leállás ér véget.
                 def sajat(st: State) -> bool:
                     most = f"{st.attributes.get('media_title') or ''} {st.attributes.get('media_content_id') or ''}"
                     return any(v in most for v in valtozatok)
@@ -229,18 +231,20 @@ class Cantabile:
                     return str(st.attributes.get("media_content_id") or "") if st else ""
 
                 st = self.hass.states.get(entity_id)
-                alap = None
-                if st and not sajat(st):
-                    await asyncio.sleep(3)           # a cím / azonosító néha csak a kezdés után frissül
-                    st = self.hass.states.get(entity_id)
-                    alap = lenyomat(st) if st and st.state in AKTIV and not sajat(st) else None
+                fajlos, alap = bool(st and sajat(st)), None
+                if not fajlos:
+                    # az azonosító néha csak a kezdés után frissül (lassú NAS): legfeljebb 10 mp-ig várja az újat
+                    if await var(self.hass, entity_id, lambda s: bool(s) and (sajat(s) or lenyomat(s) not in ("", elotte)), 10):
+                        st = self.hass.states.get(entity_id)
+                        fajlos = bool(st and sajat(st))
+                        alap = None if fajlos or not st else lenyomat(st)
 
                 def masik(st: State | None) -> bool:
                     if not st or st.state not in AKTIV:
                         return True
-                    if sajat(st):
-                        return False
-                    return alap is None or lenyomat(st) != alap
+                    if fajlos:                       # a lejátszó a fájl nevét mutatja: ha már nem ezt, más szól
+                        return not sajat(st)
+                    return alap is not None and lenyomat(st) != alap
 
                 await var(self.hass, entity_id, masik)
                 st = self.hass.states.get(entity_id)

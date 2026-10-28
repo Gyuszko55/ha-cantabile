@@ -12,7 +12,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Iterator
-from typing import Any
 from urllib.parse import unquote, urlsplit
 
 from async_upnp_client.aiohttp import AiohttpSessionRequester

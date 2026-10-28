@@ -145,6 +145,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CantabileConfigEntry) ->
     entry.runtime_data = rt
     rt.start()
     zene = music.regisztral(hass, rt)
+    entry.async_on_unload(zene.stop)
 
     async def play_tracks(call: ServiceCall) -> None:
         for e in call.data["entity_id"]:

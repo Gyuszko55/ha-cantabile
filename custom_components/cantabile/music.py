@@ -43,6 +43,7 @@ _LOGGER = logging.getLogger(__name__)
 # Radio Browser: a tükörszerverek listáját a szolgáltatótól kéri (a szerverek cserélődnek), tartaléknak az ismertek
 RB_ALAP = [f"https://{x}.api.radio-browser.info" for x in ("de1", "de2")]
 _rb_lista: list[str] = []
+_rb_ido = 0.0          # mikor kérte le utoljára a tükörszerverek listáját (sikertelenül is: 10 percig nem próbálja újra)
 KARTYAK = ("custom:cantabile-card", "custom:tablet-radio")
 FELTOLTES_ALAP = "Cantabile"                 # a kártya TELEFON fülének feltöltő mappája, ha nincs megadva
 ALBUM_MAX, ELOADO_MAX = 80, 60               # ennyi szám kerül a sorba (a kártya is 80-at tölt be albumból)
@@ -312,6 +313,14 @@ class Zene:
         self._hatter: dict[str, asyncio.Task] = {}      # Sonos-sor háttérbeli feltöltése, vezető hangszórónként
         self._alias_le: list = []
 
+    @callback
+    def stop(self) -> None:
+        """Az integráció leállásakor / újratöltésekor: a háttérben futó sorfeltöltések és figyelők leállnak."""
+        self._hatter_le(list(self._hatter))
+        for le in self._alias_le:
+            le()
+        self._alias_le = []
+
     def _hatter_le(self, tagok: list[str]) -> None:
         """Ezeknek a hangszóróknak a futó sorfeltöltése leáll; a többi hangszóró sora tovább töltődik."""
         for eid in tagok:
@@ -427,15 +436,17 @@ class Zene:
     async def rb(self, ut: str) -> Any:
         sess = async_get_clientsession(self.hass)
         hiba: Exception | None = None
-        if not _rb_lista:
+        global _rb_ido
+        if time.monotonic() - _rb_ido > (86400 if _rb_lista else 600):     # naponta frissíti (hiba után 10 perc múlva)
+            _rb_ido = time.monotonic()
             with contextlib.suppress(Exception):
-                async with asyncio.timeout(5):
-                    r = await sess.get("https://all.api.radio-browser.info/json/servers", headers={"User-Agent": "Cantabile/1.0 (Home Assistant)"})
-                    _rb_lista.extend(dict.fromkeys([f"https://{x['name']}" for x in await r.json()] + RB_ALAP))
+                async with asyncio.timeout(5), sess.get("https://all.api.radio-browser.info/json/servers",
+                                                        headers={"User-Agent": "Cantabile/1.0 (Home Assistant)"}) as r:
+                    uj = list(dict.fromkeys([f"https://{x['name']}" for x in await r.json()] + RB_ALAP))
+                    _rb_lista[:] = uj
         for sz in _rb_lista or RB_ALAP:
             try:
-                async with asyncio.timeout(8):
-                    r = await sess.get(f"{sz}{ut}", headers={"User-Agent": "Cantabile/1.0 (Home Assistant)"})
+                async with asyncio.timeout(8), sess.get(f"{sz}{ut}", headers={"User-Agent": "Cantabile/1.0 (Home Assistant)"}) as r:
                     r.raise_for_status()
                     return await r.json()
             except Exception as e:  # noqa: BLE001 – a következő tükrözött szerver

@@ -461,7 +461,8 @@ class CantabileCard extends HTMLElement {
     if (!Array.isArray(config.hangszorok) || !config.hangszorok.length) throw new Error(T("Adj meg legalább egy hangszórót (speakers)."));
     // frekvencia nélküli (csak internetes) adók: a skálán egyenletesen elosztva, a gombon WEB felirattal
     const adok = [...(config.adok || [])].filter((a) => a && a.url).map((a) => ({ ...a }));
-    const savK = config.fm_band === "jp" || config.fm_band === "japan" || (!config.fm_band && this._hass?.config?.country === "JP") ? "jp" : "std";
+    const fb = config.fm_band && config.fm_band !== "auto" ? config.fm_band : null;
+    const savK = fb === "jp" || fb === "japan" || (!fb && this._hass?.config?.country === "JP") ? "jp" : "std";
     const [MIN_F, MAX_F] = this._sav = SAVOK[savK];
     const nincsF = adok.filter((a) => !(Number(a.frekvencia) >= MIN_F && Number(a.frekvencia) <= MAX_F));
     nincsF.forEach((a, k) => { a.frekvencia = Math.round((MIN_F + 1 + ((k + 1) * (MAX_F - MIN_F - 1.5)) / (nincsF.length + 1)) * 10) / 10; a.virt = true; });
@@ -482,6 +483,9 @@ class CantabileCard extends HTMLElement {
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     BETU();
     this._epit();
+    // új beállítás (⚙ Mentés, szerkesztő): azonnal a tárolt hangszóróval és móddal rajzol (ne várja meg a következő változást)
+    this._utolsoNy = null;
+    if (this._hass) this.hass = this._hass;
   }
 
   set hass(hass) {
@@ -490,7 +494,7 @@ class CantabileCard extends HTMLElement {
     // a típus nélküli hangszórók a platformból kapják meg (ehhez a hass kell): újraépítés egyszer
     if (elso && this._autoMod) { this._autoMod = false; this.setConfig(this._eredetiCfg); }
     // Japánban (ha a kártyán nincs megadva fm_band) a japán FM-sáv: ehhez is a hass kell, újraépítés egyszer
-    else if (elso && !this._config?.fm_band && hass.config?.country === "JP" && this._sav !== SAVOK.jp) this.setConfig(this._eredetiCfg);
+    else if (elso && [undefined, "auto"].includes(this._config?.fm_band) && hass.config?.country === "JP" && this._sav !== SAVOK.jp) this.setConfig(this._eredetiCfg);
     if (elso) this._infoKer();
     if (this._hsz == null) this._hsz = this._kezdoHangszoro();
     if (this._mod == null) this._mod = this._kezdoMod();
@@ -2230,7 +2234,7 @@ class CantabileCard extends HTMLElement {
     const indul = () => {
       if (!this._hangolo) {
         const c = this._config, i = this._radioAll?.i;
-        this._hangolo = { f: c.adok[i >= 0 ? i : this._utolso ?? 0]?.frekvencia ?? 98 };
+        this._hangolo = { f: c.adok[i >= 0 ? i : this._utolso ?? 0]?.frekvencia ?? this._savKozep() };
       }
       clearTimeout(this._hangoloIdo);
       this.shadowRoot.getElementById("elo").classList.add("kezi");
@@ -2343,7 +2347,7 @@ class CantabileCard extends HTMLElement {
         </section>
         <section class="bresz"><h3>${T("Rádióadók")} <button class="bgomb" data-a="ujado">${T("+ Új adó")}</button></h3>
           <div class="bfejlec ado"><span>${T("NÉV")}</span><span>${T("GOMBON")}</span><span>MHZ</span><span>${T("STREAM-CÍM")}</span><span></span><span></span></div>
-          ${sz.adok.map((a, i) => `<div class="bsor ado">${be("adok", i, "nev", a.nev, `placeholder="${T("Név")}"`)}${be("adok", i, "rovid", a.rovid, `placeholder="${T("(a név)")}"`)}${be("adok", i, "frekvencia", a.frekvencia, 'inputmode="decimal" placeholder="${MHZ(this._sav[0])}–${MHZ(this._sav[1])}"')}${be("adok", i, "url", a.url, 'placeholder="https://…"')}<button class="bproba" data-a="proba" data-i="${i}" title="${T("Lejátszás a választott hangszórón")}">${T("▶ Próba")}</button><button class="bx" data-a="torol" data-l="adok" data-i="${i}" title="${T("Törlés")}">×</button></div>`).join("")}
+          ${sz.adok.map((a, i) => `<div class="bsor ado">${be("adok", i, "nev", a.nev, `placeholder="${T("Név")}"`)}${be("adok", i, "rovid", a.rovid, `placeholder="${T("(a név)")}"`)}${be("adok", i, "frekvencia", a.frekvencia, `inputmode="decimal" placeholder="${MHZ(this._sav[0])}–${MHZ(this._sav[1])}"`)}${be("adok", i, "url", a.url, 'placeholder="https://…"')}<button class="bproba" data-a="proba" data-i="${i}" title="${T("Lejátszás a választott hangszórón")}">${T("▶ Próba")}</button><button class="bx" data-a="torol" data-l="adok" data-i="${i}" title="${T("Törlés")}">×</button></div>`).join("")}
           <p class="bmeg">${T("A gombok frekvencia szerint rendeződnek, 12 hely van. A frekvencia elhagyható (csak internetes adó: a skálán egyenletesen elosztva, a gombon WEB). Sonosnál a furcsa portos https-cím helyett próbáld http-vel.")}</p>
           <div class="bker"><input id="bkeres" placeholder="${T("Adó keresése név szerint (Radio Browser), pl. Kossuth, Jazzy, Rock FM")}" value="${ESC(this._keresett || "")}"><button class="bgomb" data-a="keres">${T("Keresés")}</button></div>
           <div class="btalalat">${(this._talalatok || []).map((t, i) => `<div><em>${ESC(t.name)}</em><small>${ESC([t.codec, t.bitrate ? t.bitrate + " kbps" : "", t.countrycode].filter(Boolean).join(" · "))}</small><button class="bgomb" data-a="felvesz" data-i="${i}">${T("+ Felvesz")}</button></div>`).join("")}</div>
@@ -2462,7 +2466,8 @@ class CantabileCard extends HTMLElement {
         const ir = (y) => {
           const angol = !!(y.speakers || y.stations || y.tape || y.brand);
           const ki = angol ? ATKULCS({ ...uj, magno: { ...uj.magno, ...(uj.magno.vu_kijelzo ? { vu_kijelzo: KIJELZO_KI[uj.magno.vu_kijelzo] || uj.magno.vu_kijelzo } : {}) } }, VISSZA) : uj;
-          const regi = Object.fromEntries(Object.entries(y).filter(([k]) => !(k in KULCS) && !(k in VISSZA)));
+          // a ⚙ által kezelt, de KULCS-ban nem szereplő kulcs (deezer) a régiből nem marad meg (különben nem lehetne visszakapcsolni)
+          const regi = Object.fromEntries(Object.entries(y).filter(([k]) => !(k in KULCS) && !(k in VISSZA) && k !== "deezer"));
           return { ...regi, ...ki };
         };
         const bejar = (x) => {
@@ -2483,7 +2488,7 @@ class CantabileCard extends HTMLElement {
       }
       this._beallZar();
       const nevek = mentve.map((u) => lista.find((d) => d.url_path === u)?.title || u || T("Áttekintés")).join(", ");
-      this._uzen(T("Beállítások elmentve: {n}.", { n: nevek }) + (hibas.length ? " " + T("Nem sikerült: {h}.", { h: hibas.join(", ") }) : ""));
+      this._uzen(T("Beállítások elmentve: {n}.", { n: nevek }) + (hibas.length ? " " + T("Nem sikerült: {h}.", { h: hibas.map((u) => lista.find((d) => d.url_path === u)?.title || u || T("Áttekintés")).join(", ") }) : ""));
     } catch (err) {
       const m = String(err?.message || err?.code || err);
       this._beallRajz(/unauthorized|admin/i.test(m) ? T("A mentéshez rendszergazdai felhasználó kell.") : T("A mentés nem sikerült: {h}", { h: m }));
@@ -3856,7 +3861,7 @@ class CantabileCard extends HTMLElement {
     sr?.querySelectorAll(".valaszto small").forEach((s) => {
       const h = s.closest(".elo")?.querySelector(".hcim"), hv = h?.getBoundingClientRect().height, sv = s.getBoundingClientRect().height;
       if (!hv || !sv) return;
-      const most = parseFloat(s.style.fontSize) || 7, uj = (most * hv) / sv;
+      const most = parseFloat(s.style.fontSize) || parseFloat(getComputedStyle(s).fontSize) || 7, uj = (most * hv) / sv;
       if (Math.abs(uj - most) > 0.05) s.style.fontSize = `${uj.toFixed(2)}px`;
     });
     const parok = [[".mjobb > .hangero", ".mkij", "--hgy"], [".mjobb > .forgo", ".msor", "--fgy"]];
@@ -4153,11 +4158,11 @@ const HELYI_KOZOS = {};
 // vizuális kártyaszerkesztő (a HA kártyaválasztójában): hangszórók, márkanév, előlap, kijelző, zenemappa, FM-sáv – a
 // beállítás nyelvét (angol / magyar kulcsok) megtartja; az adók és a nevek a kártya ⚙ gombjával szerkeszthetők
 class CantabileCardEditor extends HTMLElement {
-  setConfig(c) { this._c = c; this._rajz(); }
-  set hass(h) { this._h = h; this._rajz(); }
+  setConfig(c) { this._c = c; this._adat = null; this._rajz(); }
+  set hass(h) { this._h = h; if (this._f) this._f.hass = h; this._rajz(); }
 
   _rajz() {
-    if (!this._h || !this._c) return;
+    if (!this._h || !this._c || this._adat) return;   // az űrlapot csak új beállításra tölti újra (nem minden állapotváltozásra)
     if (!this._f) {
       const p = document.createElement("p");
       p.style.cssText = "margin:0 0 12px;color:var(--secondary-text-color)";
@@ -4178,8 +4183,8 @@ class CantabileCardEditor extends HTMLElement {
       { name: "media_folder", selector: { text: {} } },
       { name: "fm_band", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: T("Az ország szerint") }, { value: "std", label: "87,5–108 MHz" }, { value: "jp", label: T("Japán (76–95 MHz)") }] } } },
     ];
-    this._f.data = { speakers: (b.hangszorok || []).map((h) => h?.entity).filter(Boolean), brand: b.marka || "", finish: b.felulet === "black" ? "black" : "silver",
-      display: KIJELZO_KI[kij] || kij || "vu", media_folder: b.magno?.nas || "", fm_band: b.fm_band || "auto" };
+    this._f.data = this._adat = { speakers: (b.hangszorok || []).map((h) => h?.entity).filter(Boolean), brand: b.marka || "", finish: b.felulet === "black" ? "black" : "silver",
+      display: KIJELZO_KI[kij] || kij || "vu", media_folder: b.magno?.nas || "", fm_band: b.fm_band === "japan" ? "jp" : b.fm_band || "auto" };
   }
 
   _valt(v) {
@@ -4188,12 +4193,15 @@ class CantabileCardEditor extends HTMLElement {
     b.hangszorok = (v.speakers || []).map((e) => regi.get(e) || { nev: this._h.states[e]?.attributes?.friendly_name || e.split(".")[1], entity: e });
     if (v.brand) b.marka = v.brand; else delete b.marka;
     if (v.finish === "black") b.felulet = "black"; else delete b.felulet;
-    b.magno = { ...(b.magno || {}), vu_kijelzo: KIJELZO_BE[v.display] || "deprez" };
+    b.magno = { ...(b.magno || {}) };
+    // a kijelző csak akkor kerül a beállításba, ha már benne volt, vagy nem az alap (VU)
+    if (b.magno.vu_kijelzo || (v.display && v.display !== "vu")) b.magno.vu_kijelzo = KIJELZO_BE[v.display] || "deprez";
     if (v.media_folder) b.magno.nas = v.media_folder; else delete b.magno.nas;
+    if (!Object.keys(b.magno).length) delete b.magno;
     if (v.fm_band && v.fm_band !== "auto") b.fm_band = v.fm_band; else delete b.fm_band;
     const angol = !!(this._c.speakers || this._c.stations || this._c.tape || this._c.brand);
-    const uj = angol ? ATKULCS({ ...b, magno: { ...b.magno, vu_kijelzo: KIJELZO_KI[b.magno.vu_kijelzo] } }, VISSZA) : b;
-    this._c = uj;
+    const uj = angol ? ATKULCS({ ...b, ...(b.magno ? { magno: { ...b.magno, ...(b.magno.vu_kijelzo ? { vu_kijelzo: KIJELZO_KI[b.magno.vu_kijelzo] } : {}) } } : {}) }, VISSZA) : b;
+    this._c = uj; this._adat = v;
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: uj }, bubbles: true, composed: true }));
   }
 }
@@ -4250,7 +4258,7 @@ class CantabileTv extends HTMLElement {
   // elrejti magát és nem kapcsolódik újra; a lekerült példány elengedi a kapcsolatot
   connectedCallback() {
     clearTimeout(this._levesz);
-    if (this._le) { this._indit(); this._feliratkozik(); }   // visszakerült (pl. visszanavigáltak a nézetre)
+    if (this._le && this._cv) { this._indit(); this._feliratkozik(); }   // visszakerült (pl. visszanavigáltak a nézetre)
   }
   disconnectedCallback() {
     this._levesz = setTimeout(() => this._elenged(), 3000);
@@ -4268,6 +4276,8 @@ class CantabileTv extends HTMLElement {
     if (this.isConnected) return;
     this._le = true;
     (this._orak || []).forEach(clearInterval); this._orak = null;
+    clearInterval(this._jelIdo); this._jelIdo = null;
+    clearTimeout(this._ujraIdo);
     if (this._leir) { this._leir(); this._leir = null; }
     if (window._cantabileTv === this) window._cantabileTv = null;
   }
@@ -4395,6 +4405,8 @@ class CantabileTv extends HTMLElement {
   }
 
   _feliratkozik() {
+    clearTimeout(this._ujraIdo);
+    if (this._leir) return;                          // már fel van iratkozva (ne legyen két előfizetés)
     this._msg = { type: "cantabile/tv/subscribe" };
     if (this._c.tv || this._tv) this._msg.tv = this._c.tv || this._tv;    // a lecserélt példány utódja azonnal átveszi a lejátszót
     this._h.connection.subscribeMessage((m) => this._parancs(m), this._msg)
@@ -4408,8 +4420,8 @@ class CantabileTv extends HTMLElement {
       .catch(() => {
         const akt = window._cantabileTv;
         if (akt && akt !== this && akt.isConnected) { this.style.display = "none"; return; }
-        if (akt && akt !== this) { clearTimeout(akt._levesz); akt._elenged(); setTimeout(() => this._feliratkozik(), 800); return; }   // a régi, lekerült példány tartotta
-        setTimeout(() => this._feliratkozik(), 10000);               // még nincs hozzárendelhető lejátszó
+        if (akt && akt !== this) { clearTimeout(akt._levesz); akt._elenged(); this._ujraIdo = setTimeout(() => this._feliratkozik(), 800); return; }   // a régi, lekerült példány tartotta
+        this._ujraIdo = setTimeout(() => this._feliratkozik(), 10000);               // még nincs hozzárendelhető lejátszó
       });
     if (!this._jelIdo) this._jelIdo = setInterval(() => { if (this._allapot === "playing" && window._cantabileTv === this) this._jelent(); }, 2000);
   }
@@ -4518,8 +4530,9 @@ class CantabileTv extends HTMLElement {
   _rajzol() {
     const g = this._cv.getContext("2d"), N = 56, csucs = new Array(N).fill(0), simit = new Array(N).fill(0);
     let nyugszik = "";
+    const gen = this._gen = (this._gen || 0) + 1;   // újraindításkor a régi ciklus magától leáll (ne fusson kettő)
     const kor = () => {
-      if (this._le) return;                        // a lekerült példány rajzolása leáll (az új példány rajzol)
+      if (this._le || gen !== this._gen) return;    // a lekerült példány rajzolása leáll (az új példány rajzol)
       requestAnimationFrame(kor);
       const W = this._cv.width, H = this._cv.height, alap = H * 0.72;
       if (!this._an || this._allapot !== "playing") {

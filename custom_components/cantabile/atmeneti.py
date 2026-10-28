@@ -120,18 +120,19 @@ class Feltolto(HomeAssistantView):
         except OSError as err:                  # pl. csak olvasható médiamappa
             _LOGGER.warning("Cantabile: upload folder not writable (%s): %s", mappa, err)
             return web.json_response({"error": szoveg(self.hass, "upload_not_writable")}, status=507)
-        meret = 0
+        meret, kesz = 0, False
         try:
             while darab := await mezo.read_chunk(1024 * 1024):
                 meret += len(darab)
                 if meret > MAX_MERET:
                     raise ValueError("túl nagy")
                 await self.hass.async_add_executor_job(fajl.write, darab)
+            kesz = True
         except ValueError:
-            await self.hass.async_add_executor_job(fajl.close)
-            await self.hass.async_add_executor_job(cel.unlink, True)
             return web.json_response({"error": szoveg(self.hass, "upload_too_big")}, status=413)
         finally:
             if not fajl.closed:
                 await self.hass.async_add_executor_job(fajl.close)
+            if not kesz:                        # túl nagy, megszakadt vagy leállított feltöltés: a félkész fájl törlődik
+                await self.hass.async_add_executor_job(cel.unlink, True)
         return web.json_response({"media_content_id": f"media-source://media_source/{kulcs}/{MAPPA}/{cel.name}"})
