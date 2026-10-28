@@ -99,6 +99,11 @@ class TvKozpont:
             raise HomeAssistantError(f"{lj.name}: a Cast-eszköz ({lj.cast}) nem érhető el")
         self._var = lj
         lj.oldal_jott.clear()
+        if not lj.dlna and st.attributes.get("app_name") == "Home Assistant Lovelace":
+            # a TV-n még a HA fut, de nincs bejelentkezett TV-oldal (pl. HA-újraindítás után a régi munkamenet nem kapcsolódott
+            # vissza): előbb bezárjuk, különben a Cast-vevő nem tölti be újra az oldalt
+            await self.hass.services.async_call("media_player", "turn_off", {"entity_id": lj.cast}, blocking=True)
+            await asyncio.sleep(3)
         await self.hass.services.async_call("cast", "show_lovelace_view", {
             "entity_id": lj.cast, "dashboard_path": lj.dashboard, "view_path": lj.view}, blocking=True)
         try:

@@ -5,6 +5,7 @@
 - Cantabile TV, single-file albums with a CUE sheet (e.g. `Album.flac` + `Album.cue`): the TV page and the card show the track actually playing – title, artist, “TRACK 3 / 10”, and the track's own time and length instead of the whole file's; next / previous jump within the file (Cast). On DLNA TVs the current track follows the TV's playback position.
 - Cantabile TV players report a web address for music-folder files (like WiiM does), so the cassette recognises the NAS tape and the track number, and the VU meters analyse the real signal instead of simulating.
 - After a Home Assistant restart a still-playing TV page tells the player what it plays, so the cassette is not left empty.
+- If the Home Assistant app still runs on a Cast TV but its page lost the connection (e.g. after a restart), the player closes it and casts the TV page anew instead of waiting in vain.
 
 ## 1.12.0 – 2026-10-28
 
