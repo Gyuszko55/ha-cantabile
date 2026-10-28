@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import re
+import shutil
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote, urlsplit
@@ -40,13 +41,46 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN
+from .const import DOMAIN, szoveg
 from .library import media_ut
 
 if TYPE_CHECKING:
     from .media_player import CantabileTv
 
 _LOGGER = logging.getLogger(__name__)
+
+_ffmpeg: bool | None = None
+
+
+async def ffmpeg_van(hass: HomeAssistant) -> bool:
+    """Van-e ffmpeg a gépen (HA OS-en és a hivatalos konténerben van; Core/venv telepítésen nem mindig). Ha nincs,
+    egyszer figyelmeztet: a VU szimulált, a DLNA-s TV videó helyett a zenét és a borítóképet kapja."""
+    global _ffmpeg
+    if _ffmpeg is None:
+        _ffmpeg = await hass.async_add_executor_job(shutil.which, "ffmpeg") is not None
+        if not _ffmpeg:
+            _LOGGER.warning("Cantabile: ffmpeg not found – the VU meters are simulated, and DLNA TVs get the music and the "
+                            "cover only, without the track card video; install ffmpeg (it comes with Home Assistant OS and "
+                            "the official container) to get them")
+    return _ffmpeg
+
+
+_x264: bool | None = None
+
+
+async def x264_van() -> bool:
+    """Tud-e az ffmpeg libx264-gyel kódolni (egyes Core/venv telepítéseken nem; ott az mpeg4 a tartalék)."""
+    global _x264
+    if _x264 is None:
+        try:
+            p = await asyncio.create_subprocess_exec("ffmpeg", "-hide_banner", "-encoders",
+                                                     stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+            ki, _ = await asyncio.wait_for(p.communicate(), 10)
+            _x264 = b"libx264" in ki
+        except (OSError, TimeoutError):
+            _x264 = False
+    return _x264
+
 
 TV_DASHBOARD = "cantabile-tv"
 TV_VIEW = "tv"
@@ -100,7 +134,7 @@ class TvKozpont:
             return
         st = self.hass.states.get(lj.cast)
         if st is None or st.state == "unavailable":
-            raise HomeAssistantError(f"{lj.name}: a Cast-eszköz ({lj.cast}) nem érhető el")
+            raise HomeAssistantError(szoveg(self.hass, "cast_unavailable", nev=lj.name, cast=lj.cast))
         self._var = lj
         lj.oldal_jott.clear()
         if not lj.dlna and st.attributes.get("app_name") == "Home Assistant Lovelace":
@@ -114,7 +148,7 @@ class TvKozpont:
             async with asyncio.timeout(OLDAL_VARAS):
                 await lj.oldal_jott.wait()
         except TimeoutError as err:
-            raise HomeAssistantError(f"{lj.name}: a TV-oldal nem jelentkezett be ({lj.dashboard}/{lj.view})") from err
+            raise HomeAssistantError(szoveg(self.hass, "tv_page_missing", nev=lj.name, oldal=f"{lj.dashboard}/{lj.view}")) from err
         finally:
             if self._var is lj:
                 self._var = None
@@ -286,6 +320,8 @@ class TvKozpont:
     async def dlna_video(self, meta: dict[str, Any], fajl: str) -> str | None:
         """A szám „videóként”: egyetlen álló képkocka (az adatlap) + a zene, MP4-be (a tárba). A Samsung és más DLNA-s TV-k
         így teljes képernyőn mutatják az adatlapot, a saját haladásjelzőjükkel; a fájl tekerhető. Aláírt belső cím, vagy None."""
+        if not await ffmpeg_van(self.hass):
+            return None
         kep = await self.dlna_kepfajl(meta)
         if not kep:
             return None
@@ -326,6 +362,8 @@ class TvKozpont:
 
     async def dlna_elo(self, meta: dict[str, Any], url: str) -> str | None:
         """Webes adó „élő videóként” (az adatlap + az adó hangja, menet közben kódolva, MPEG-TS); aláírt belső cím."""
+        if not await ffmpeg_van(self.hass):
+            return None
         kep = await self.dlna_kepfajl(meta)
         if not kep:
             return None
@@ -458,6 +496,8 @@ async def beagyazott(hass: HomeAssistant, ut: str) -> str | None:
     tar = hass.config.path(".cache", "cantabile_tv")
     cel = os.path.join(tar, hashlib.sha1(ut.encode()).hexdigest() + ".jpg")
     if not os.path.exists(cel):
+        if not await ffmpeg_van(hass):
+            return None
         await hass.async_add_executor_job(lambda: os.makedirs(tar, exist_ok=True))
         p = await asyncio.create_subprocess_exec(
             "ffmpeg", "-v", "error", "-y", "-i", ut, "-an", "-frames:v", "1", "-vf", "scale='min(800,iw)':-2", cel,
@@ -572,12 +612,15 @@ class TvElo(HomeAssistantView):
         if not cel:
             return web.Response(status=404)
         kep, url = cel
-        p = await asyncio.create_subprocess_exec(
-            "ffmpeg", "-v", "error", "-loop", "1", "-framerate", "1", "-i", kep, "-user_agent", "Cantabile (Home Assistant)",
-            "-reconnect", "1", "-reconnect_streamed", "1", "-i", url, "-map", "0:v", "-map", "1:a", "-vf", "scale=1280:720",
-            "-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage", "-pix_fmt", "yuv420p", "-r", "1", "-g", "4",
-            "-c:a", "aac", "-b:a", "192k", "-f", "mpegts", "pipe:1",
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        kodolo = ["-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage"] if await x264_van() else ["-c:v", "mpeg4", "-q:v", "3"]
+        try:
+            p = await asyncio.create_subprocess_exec(
+                "ffmpeg", "-v", "error", "-loop", "1", "-framerate", "1", "-i", kep, "-user_agent", "Cantabile (Home Assistant)",
+                "-reconnect", "1", "-reconnect_streamed", "1", "-i", url, "-map", "0:v", "-map", "1:a", "-vf", "scale=1280:720",
+                *kodolo, "-pix_fmt", "yuv420p", "-r", "1", "-g", "4", "-c:a", "aac", "-b:a", "192k", "-f", "mpegts", "pipe:1",
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        except OSError:
+            return web.Response(status=503)
         ki = web.StreamResponse(status=200, headers={"Content-Type": "video/mp2t", "Cache-Control": "no-cache",
                                                      "transferMode.dlna.org": "Streaming", "contentFeatures.dlna.org": "DLNA.ORG_OP=00;DLNA.ORG_CI=1"})
         await ki.prepare(request)
@@ -600,7 +643,7 @@ def ws_subscribe(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg:
     """A TV-oldal bejelentkezése: innentől ezen az előfizetésen kapja a parancsokat."""
     lj = kozpont(hass).bejelentkezik(conn, msg["id"], msg.get("tv"))
     if lj is None:
-        conn.send_error(msg["id"], "no_tv", "Nincs ehhez az oldalhoz rendelhető Cantabile TV-lejátszó")
+        conn.send_error(msg["id"], "no_tv", szoveg(hass, "no_tv"))
         return
     tv_id = lj.entity_id
     conn.subscriptions[msg["id"]] = lambda: (kozpont(hass).lejatszok.get(tv_id) or lj).oldal_ki(conn, msg["id"])

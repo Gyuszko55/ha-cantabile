@@ -21,7 +21,7 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import VERSION
+from .const import VERSION, szoveg
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -134,7 +134,7 @@ def regisztral(hass: HomeAssistant) -> None:
             eredmeny = await keres(hass, eloado, cim, msg.get("album"), msg.get("duration"))
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.debug("LRCLIB: %s", err)
-            connection.send_error(msg["id"], "nem_elerheto", "A dalszöveg-szolgáltatás nem érhető el.")
+            connection.send_error(msg["id"], "nem_elerheto", szoveg(hass, "lyrics_down"))
             return
         connection.send_result(msg["id"], eredmeny)
 

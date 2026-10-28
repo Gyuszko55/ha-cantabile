@@ -7,6 +7,9 @@
 - ⚙ Save only updates the cards that had the same speakers and stations as this one (e.g. the same radio on a tablet and a phone dashboard); cards set up differently – say, one per room – are left alone instead of being overwritten.
 - Voice and `cantabile.play` find artists, albums, tracks, stations and speakers written in non-Latin scripts (Cyrillic, Greek, CJK…); before, these names were ignored.
 - Music folders reached through a symbolic link inside the media folder (e.g. `/media/Music` → a mounted NAS share) work for the tape search, the real VU signal and Cantabile TV; before they were refused as “outside the media folder”. Linked subfolders are followed, loops are skipped.
+- Starting music on a second Sonos speaker no longer stops the first one's queue from filling up in the background (it used to stop after the first few tracks).
+- Without ffmpeg (some Core / venv installs) DLNA TVs fall back to the music and the cover instead of failing, and a single warning in the log says why; the VU meters are simulated as before. If ffmpeg lacks libx264, live radio on DLNA TVs uses the mpeg4 encoder.
+- Error messages from the server (music folder, lyrics, Spotify / Tidal, Sonos, Cantabile TV, uploads) follow Home Assistant's language – English unless it is Hungarian – instead of always being Hungarian.
 
 ## 1.12.2 – 2026-10-28
 

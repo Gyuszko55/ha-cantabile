@@ -211,7 +211,13 @@ class Figyelo:
         }
 
     async def _elemez(self, kulcs: tuple[str, str], poz: float) -> None:
+        from .tv import ffmpeg_van
+
         fajta, cim = kulcs
+        if not await ffmpeg_van(self.hass):
+            if self._kulcs == kulcs:
+                self._jelez("nincs")
+            return
         with contextlib.suppress(Exception):
             formatum = await self._vizsgal(cim)
             if formatum and self._kulcs == kulcs:

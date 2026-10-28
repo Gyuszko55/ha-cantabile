@@ -41,16 +41,16 @@ class Tovabbito(HomeAssistantView):
     async def get(self, request: web.Request) -> web.StreamResponse:
         cel = request.query.get("url", "")
         if not cel.lower().startswith(("http://", "https://")):
-            return web.Response(status=400, text="csak http(s) adó")
+            return web.Response(status=400, text="only http(s) stations")
         sess = async_get_clientsession(self.hass)
         try:
             async with sess.get(cel, headers={"User-Agent": UA, "Icy-MetaData": "0"},
                                 timeout=aiohttp.ClientTimeout(total=None, sock_connect=10, sock_read=30)) as be:
                 if be.status >= 400:
-                    return web.Response(status=502, text=f"az adó válasza: {be.status}")
+                    return web.Response(status=502, text=f"station replied {be.status}")
                 tipus = be.headers.get("Content-Type", "").split(";")[0].strip().lower()
                 if tipus and not (tipus.startswith("audio/") or tipus in HANG_TIPUSOK):
-                    return web.Response(status=415, text="nem hangfolyam")
+                    return web.Response(status=415, text="not an audio stream")
                 ki = web.StreamResponse(status=200, headers={
                     "Content-Type": be.headers.get("Content-Type", "audio/mpeg"),
                     "Cache-Control": "no-cache, no-store",
@@ -66,4 +66,4 @@ class Tovabbito(HomeAssistantView):
             raise
         except (aiohttp.ClientError, TimeoutError) as err:
             _LOGGER.debug("Cantabile-továbbító: %s – %s", cel, err)
-            return web.Response(status=502, text="az adó nem érhető el")
+            return web.Response(status=502, text="station not reachable")

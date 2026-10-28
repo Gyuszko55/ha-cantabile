@@ -283,8 +283,14 @@ class Zene:
     def __init__(self, hass: HomeAssistant, rt: Cantabile) -> None:
         self.hass = hass
         self.rt = rt
-        self._hatter: asyncio.Task | None = None
+        self._hatter: dict[str, asyncio.Task] = {}      # Sonos-sor háttérbeli feltöltése, vezető hangszórónként
         self._alias_le: list = []
+
+    def _hatter_le(self, tagok: list[str]) -> None:
+        """Ezeknek a hangszóróknak a futó sorfeltöltése leáll; a többi hangszóró sora tovább töltődik."""
+        for eid in tagok:
+            if (t := self._hatter.pop(eid, None)) and not t.done():
+                t.cancel()
 
     async def hiv(self, domain: str, service: str, data: dict[str, Any]) -> None:
         await self.hass.services.async_call(domain, service, data, blocking=True)
@@ -528,8 +534,7 @@ class Zene:
         if keverve and kezdo == 0:
             szamok = szamok[:]
             random.shuffle(szamok)
-        if self._hatter and not self._hatter.done():
-            self._hatter.cancel()
+        self._hatter_le(tagok)
         if mod != "sonos":
             # sor nélküli lejátszó: a beépített sorozatlejátszó (vagy a kártyán megadott saját szkript)
             ids = [f"{nas}/{x}" for x in szamok]
@@ -544,8 +549,7 @@ class Zene:
     async def sonos_sor(self, tagok: list[str], ids: list[str], kezdo: int, keverve: bool, poz: int | None = None) -> None:
         """Sonos-sor: kiürít, az első számok azonnal, a többi a háttérben; `keverve`: a végén Sonos-keverés. `poz`: a sor indulóhelye, ha nem az ids indexe
         (pl. egy Deezer-album linkje több számot tesz a sorba)."""
-        if self._hatter and not self._hatter.done():
-            self._hatter.cancel()
+        self._hatter_le(tagok)
         await self.csoport(tagok)
         e = {"entity_id": tagok[0]}
         kor = self.rt.rounds
@@ -575,12 +579,11 @@ class Zene:
             if keverve:   # a sor betöltése után a Sonos keveri (a szóló szám marad)
                 await self.hiv("media_player", "shuffle_set", {**e, "shuffle": True})
 
-        self._hatter = self.hass.async_create_background_task(maradek(), "cantabile queue fill")
+        self._hatter[tagok[0]] = self.hass.async_create_background_task(maradek(), f"cantabile queue fill {tagok[0]}")
 
     async def radio_indit(self, c: dict[str, Any], hsz: tuple[str, list[str], str], ado: dict[str, Any]) -> None:
         _, tagok, mod = hsz
-        if self._hatter and not self._hatter.done():
-            self._hatter.cancel()
+        self._hatter_le(tagok)
         if mod != "sonos":
             self.rt.stop_tracks(tagok[0])
             if szkript := (c.get("magno") or {}).get("szkript"):
@@ -703,7 +706,7 @@ class Zene:
         try:
             t = await self.szolg_talalat(szolg, mit, fajta, eloado)
         except streaming.StreamHiba as e:
-            raise HibaUzenet("stream_error", szolg=szolg.capitalize(), hiba=str(e)) from e
+            raise HibaUzenet("stream_error", szolg=szolg.capitalize(), hiba=e.szoveg(self.hass)) from e
         if not t:
             raise HibaUzenet("not_found_service", szolg=szolg.capitalize(), mit=mit)
         kev = keverve if keverve is not None else t["tipus"] == "eloado"

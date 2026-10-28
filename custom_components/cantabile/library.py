@@ -17,6 +17,8 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 
+from .const import szoveg
+
 ELOTAG = "media-source://media_source/"
 HANGFAJL = (".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wav", ".wma")
 ERVENYES = 30 * 60
@@ -68,23 +70,23 @@ def regisztral(hass: HomeAssistant) -> None:
     async def ws_nas_lista(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
         mappa: str = msg["mappa"].rstrip("/")
         if not mappa.startswith(ELOTAG):
-            connection.send_error(msg["id"], "rossz_mappa", "Csak media-source mappa adható meg.")
+            connection.send_error(msg["id"], "rossz_mappa", szoveg(hass, "folder_not_source"))
             return
         forras, _, rel = mappa[len(ELOTAG):].partition("/")
         alap = hass.config.media_dirs.get(forras)
         if not alap:
-            connection.send_error(msg["id"], "rossz_mappa", f"Ismeretlen média-forrás: {forras}")
+            connection.send_error(msg["id"], "rossz_mappa", szoveg(hass, "folder_unknown_source", forras=forras))
             return
         gyoker = media_ut(alap, rel)
         if gyoker is None:
-            connection.send_error(msg["id"], "rossz_mappa", "A mappa a média-mappán kívül van.")
+            connection.send_error(msg["id"], "rossz_mappa", szoveg(hass, "folder_outside"))
             return
         tarolt = _tar.get(gyoker)
         if tarolt and not msg["frissit"] and time.monotonic() - tarolt[0] < ERVENYES:
             connection.send_result(msg["id"], tarolt[1])
             return
         if not os.path.isdir(gyoker):
-            connection.send_error(msg["id"], "nincs_mappa", "A mappa nem érhető el.")
+            connection.send_error(msg["id"], "nincs_mappa", szoveg(hass, "folder_unavailable"))
             return
         eredmeny = await hass.async_add_executor_job(_bejar, gyoker)
         _tar[gyoker] = (time.monotonic(), eredmeny)

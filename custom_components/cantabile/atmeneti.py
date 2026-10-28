@@ -24,6 +24,8 @@ from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
 
+from .const import szoveg
+
 _LOGGER = logging.getLogger(__name__)
 
 MAPPA = ".cantabile_atmeneti"
@@ -94,16 +96,16 @@ class Feltolto(HomeAssistantView):
         request._client_max_size = MAX_MERET  # noqa: SLF001
         kulcs, mappa = _forras(self.hass)
         if not kulcs:
-            return web.json_response({"error": "nincs médiamappa"}, status=400)
+            return web.json_response({"error": szoveg(self.hass, "upload_no_folder")}, status=400)
         try:
             olvaso = await request.multipart()
             mezo = await olvaso.next()
             while mezo is not None and mezo.name != "file":
                 mezo = await olvaso.next()
         except ValueError:
-            return web.json_response({"error": "hibás kérés"}, status=400)
+            return web.json_response({"error": szoveg(self.hass, "upload_bad_request")}, status=400)
         if mezo is None or not mezo.filename:
-            return web.json_response({"error": "nincs fájl"}, status=400)
+            return web.json_response({"error": szoveg(self.hass, "upload_no_file")}, status=400)
         nev = _NEM_JO.sub("_", os.path.basename(mezo.filename)).strip(" ._") or "zene"
         cel = mappa / f"{int(time.time() * 1000)}_{nev}"
         await self.hass.async_add_executor_job(lambda: mappa.mkdir(parents=True, exist_ok=True))
@@ -119,7 +121,7 @@ class Feltolto(HomeAssistantView):
         except ValueError:
             await self.hass.async_add_executor_job(fajl.close)
             await self.hass.async_add_executor_job(cel.unlink, True)
-            return web.json_response({"error": "a fájl túl nagy (legfeljebb 300 MB)"}, status=413)
+            return web.json_response({"error": szoveg(self.hass, "upload_too_big")}, status=413)
         finally:
             if not fajl.closed:
                 await self.hass.async_add_executor_job(fajl.close)

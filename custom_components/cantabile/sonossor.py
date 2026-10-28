@@ -27,6 +27,8 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 
+from .const import szoveg
+
 _LOGGER = logging.getLogger(__name__)
 
 _MEDIA = re.compile(r"/media/([^/?#]+)/([^?#]+)")
@@ -194,7 +196,7 @@ def _soco_halozatrol(uid: str) -> Any:
 async def _soco(hass: HomeAssistant, entity_id: str) -> Any:
     ent = er.async_get(hass).async_get(entity_id)
     if not ent or ent.platform != "sonos":
-        raise HomeAssistantError(f"{entity_id} nem Sonos-lejátszó")
+        raise HomeAssistantError(szoveg(hass, "not_sonos", entity=entity_id))
     # elsőként a HA Sonos-integrációjának saját példánya (gyors, és a HA is ezt használja)
     try:
         for bej in hass.config_entries.async_entries("sonos"):
@@ -218,9 +220,9 @@ async def _soco(hass: HomeAssistant, entity_id: str) -> Any:
     try:
         z = await hass.async_add_executor_job(_soco_halozatrol, ent.unique_id)
     except ImportError as err:
-        raise HomeAssistantError("a SoCo könyvtár nem érhető el") from err
+        raise HomeAssistantError(szoveg(hass, "soco_missing")) from err
     if z is None:
-        raise HomeAssistantError(f"{entity_id}: a Sonos-hangszóró nem érhető el")
+        raise HomeAssistantError(szoveg(hass, "sonos_unavailable", entity=entity_id))
     return z
 
 

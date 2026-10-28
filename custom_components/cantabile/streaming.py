@@ -24,7 +24,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import CONF_SPOTIFY_ID, CONF_SPOTIFY_SECRET, CONF_TIDAL_ID, CONF_TIDAL_SECRET, DOMAIN
+from .const import CONF_SPOTIFY_ID, CONF_SPOTIFY_SECRET, CONF_TIDAL_ID, CONF_TIDAL_SECRET, DOMAIN, szoveg
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,7 +45,14 @@ _tar: dict[str, tuple[float, Any]] = {}
 
 
 class StreamHiba(Exception):
-    """Kimondható hiba (a kártya megjeleníti)."""
+    """Kimondható hiba (a kártya megjeleníti): üzenetkulcs (const._TEXT) és a behelyettesítendő értékek."""
+
+    def __init__(self, kulcs: str, **kw: Any) -> None:
+        super().__init__(kulcs)
+        self.kulcs, self.kw = kulcs, kw
+
+    def szoveg(self, hass: HomeAssistant) -> str:
+        return szoveg(hass, self.kulcs, **self.kw)
 
 
 def _opciok(hass: HomeAssistant) -> dict[str, Any]:
@@ -81,7 +88,7 @@ async def _ugyfel_token(hass: HomeAssistant, nev: str, cim: str, azon: str, tito
     async with sess.post(cim, data={"grant_type": "client_credentials"}, auth=aiohttp.BasicAuth(azon, titok),
                          timeout=aiohttp.ClientTimeout(total=10)) as v:
         if v.status in (400, 401):
-            raise StreamHiba("hibás fejlesztői kulcs (client ID / secret)")
+            raise StreamHiba("svc_bad_key")
         v.raise_for_status()
         j = await v.json()
     _token[nev] = (time.monotonic() + int(j.get("expires_in", 3600)) - 60, j["access_token"])
@@ -101,8 +108,8 @@ async def _spotify_token(hass: HomeAssistant) -> str:
                 return sess.token["access_token"]
             except Exception as err:  # noqa: BLE001
                 _LOGGER.debug("Cantabile: a Spotify-integráció tokenje nem érhető el", exc_info=True)
-                raise StreamHiba("a Spotify-integráció bejelentkezése nem érhető el") from err
-    raise StreamHiba("nincs Spotify-kulcs és nincs Spotify-integráció")
+                raise StreamHiba("spotify_login_down") from err
+    raise StreamHiba("spotify_no_key")
 
 
 async def _ker(hass: HomeAssistant, kulcs: str, url: str, token: str, fej: dict[str, str]) -> Any:
@@ -113,11 +120,11 @@ async def _ker(hass: HomeAssistant, kulcs: str, url: str, token: str, fej: dict[
     async with sess.get(url, headers={"Authorization": f"Bearer {token}", **fej}, timeout=aiohttp.ClientTimeout(total=12)) as v:
         if v.status == 401:
             _token.clear()
-            raise StreamHiba("a bejelentkezés lejárt – próbáld újra")
+            raise StreamHiba("svc_login_expired")
         if v.status == 429:
-            raise StreamHiba("túl sok kérés – várj egy kicsit")
+            raise StreamHiba("svc_rate_limit")
         if v.status >= 400:
-            raise StreamHiba(f"a szolgáltatás hibát adott ({v.status})")
+            raise StreamHiba("svc_status", status=v.status)
         j = await v.json(content_type=None)
     if len(_tar) > 300:
         _tar.clear()
@@ -127,17 +134,17 @@ async def _ker(hass: HomeAssistant, kulcs: str, url: str, token: str, fej: dict[
 
 async def spotify(hass: HomeAssistant, ut: str) -> Any:
     if not SPOTIFY_UT.match(ut):
-        raise StreamHiba("ilyen Spotify-kérés nem engedélyezett")
+        raise StreamHiba("svc_denied", szolg="Spotify")
     tok = await _spotify_token(hass)
     return await _ker(hass, "s" + ut, SPOTIFY_API + ut, tok, {"Accept-Language": str(hass.config.language or "en")})
 
 
 async def tidal(hass: HomeAssistant, ut: str) -> Any:
     if not TIDAL_UT.match(ut):
-        raise StreamHiba("ilyen Tidal-kérés nem engedélyezett")
+        raise StreamHiba("svc_denied", szolg="Tidal")
     o = _opciok(hass)
     if not (o.get(CONF_TIDAL_ID) and o.get(CONF_TIDAL_SECRET)):
-        raise StreamHiba("nincs Tidal-kulcs a Cantabile beállításaiban")
+        raise StreamHiba("tidal_no_key")
     tok = await _ugyfel_token(hass, "tidal", TIDAL_TOKEN, o[CONF_TIDAL_ID], o[CONF_TIDAL_SECRET])
     return await _ker(hass, "t" + ut, TIDAL_API + ut, tok, {"Accept": "application/vnd.api+json"})
 
@@ -153,9 +160,9 @@ def regisztral(hass: HomeAssistant) -> None:
                 try:
                     connection.send_result(msg["id"], await fv(hass, msg["ut"]))
                 except StreamHiba as e:
-                    connection.send_error(msg["id"], nev, str(e))
+                    connection.send_error(msg["id"], nev, e.szoveg(hass))
                 except (aiohttp.ClientError, TimeoutError) as e:
-                    connection.send_error(msg["id"], nev, f"a szolgáltatás nem érhető el ({e})")
+                    connection.send_error(msg["id"], nev, szoveg(hass, "svc_down", hiba=e))
 
             return ws
 
