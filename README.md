@@ -263,10 +263,13 @@ After setting up the integration, open your conversation agent's options (e.g. *
 
 ## Card configuration (YAML)
 
+The card editor (✎ on the dashboard) sets the speakers, brand, front panel, display, music folder and FM band without YAML; stations, speaker names and the short names on the card are set with the card's own ⚙ button. The full YAML:
+
 ```yaml
 type: custom:cantabile-card
 brand: Cantabile                 # optional
 finish: silver                   # silver (brushed aluminium) | black (nineties black brushed front)
+fm_band: jp                      # optional: jp = Japanese FM band 76–95 MHz (automatic when Home Assistant's country is Japan)
 bt: true                         # BT output on this device; false = hidden
 speakers:
   - name: Living room            # full name – voice control uses this
@@ -279,7 +282,7 @@ speakers:
 stations:                        # optional – NET finds more
   - name: Radio Paradise
     short: Paradise              # text on the button
-    frequency: 94.8              # position on the dial (87.5–108)
+    frequency: 94.8              # position on the dial (87.5–108; Japan 76–95)
     url: http://stream.radioparadise.com/mp3-192
 tape:
   media_folder: media-source://media_source/local/Music   # artist/album/track

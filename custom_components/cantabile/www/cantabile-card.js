@@ -102,6 +102,10 @@ const EN = {
   "(beépített)": "(built-in)",
   "Kijelző": "Display",
   "Előlap": "Front panel",
+  "FM-sáv": "FM band",
+  "Az ország szerint": "By country",
+  "Japán (76–95 MHz)": "Japan (76–95 MHz)",
+  "A rádióadókat, a hangszórók nevét és a kártyán megjelenő rövid nevet a kártya ⚙ gombjával állíthatod be.": "Set up radio stations, speaker names and the short names shown on the card with the card's ⚙ button.",
   "Ez a TV saját lejátszója: csak a hang megy át. A képernyőhöz válaszd a(z) „{n}” lejátszót.": "This is the TV's own player: only the sound gets through. For the screen, choose “{n}”.",
   "Átállítás": "Switch",
   "Tipp: ha ennek az eszköznek van képernyője, a Cantabile integráció beállításaiban (TV-lejátszók) felvéve a szám a képernyőn is megjelenik.": "Tip: if this device has a screen, add it under TV players in the Cantabile integration options to show the track on screen.",
@@ -120,7 +124,6 @@ const EN = {
   "Nincs találat – próbáld másképp írva (ékezet nélkül is).": "No results – try another spelling.",
   "A keresés nem sikerült: {h}": "Search failed: {h}",
   "{n}. adó: hiányzik a név": "Station {n}: name is missing",
-  "{n}: a frekvencia 87,5 és 108 közé essen": "{n}: frequency must be between 87.5 and 108",
   "{n}. adó": "Station {n}",
   "{n}: a stream-cím http:// vagy https:// kezdetű legyen": "{n}: the stream URL must start with http:// or https://",
   "{n}. hangszóró: név és lejátszó kell": "Speaker {n}: name and player are required",
@@ -255,7 +258,7 @@ const EN = {
   "DEEZER fül": "DEEZER tab",
   "Látszik (a Sonos appban bekötött Deezer-fiókkal szól)": "Shown (plays with the Deezer account linked in the Sonos app)",
   "Rejtve (nincs Deezer)": "Hidden (no Deezer)",
-  "{n}: a frekvencia 87,5 és 108 közé essen (vagy hagyd üresen)": "{n}: the frequency must be between 87.5 and 108 (or leave it empty)",
+  "{n}: a frekvencia {a} és {b} közé essen (vagy hagyd üresen)": "{n}: the frequency must be between {a} and {b} (or leave it empty)",
   "A gombok frekvencia szerint rendeződnek, 12 hely van. A frekvencia elhagyható (csak internetes adó: a skálán egyenletesen elosztva, a gombon WEB). Sonosnál a furcsa portos https-cím helyett próbáld http-vel.": "Buttons are sorted by frequency; there are 12 slots. The frequency is optional (internet-only station: spread evenly on the dial, WEB on the button). On Sonos, try http instead of an https address with an odd port.",
   "Zenemappa": "Music folder",
   "A Deezer nem indult el ({h}). A Sonos appban kösd be a Deezer-fiókot (Beállítások → Szolgáltatások), vagy a ⚙ beállításokban rejtsd el a DEEZER fület.": "Deezer did not start ({h}). Link your Deezer account in the Sonos app (Settings → Services), or hide the DEEZER tab in ⚙ settings.",
@@ -278,8 +281,9 @@ const NYELV = () => (MAGYAR() ? "hu-HU" : document.documentElement.lang || undef
 const NEV_MAX = 8;
 const KN = (h) => (!h ? "" : h.kulcs === "multiroom" ? h.rovid : String(h.rovid || h.nev || "").slice(0, NEV_MAX));
 const ESC = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const MIN_F = 87.5, MAX_F = 108;
-const POZ = (f) => ((Math.min(MAX_F, Math.max(MIN_F, f)) - MIN_F) / (MAX_F - MIN_F)) * 100;
+// FM-sávok: a szokásos 87,5–108 MHz, és a japán 76–95 MHz (`fm_band: jp`, vagy magától, ha a HA-ban Japán az ország)
+const SAVOK = { std: [87.5, 108], jp: [76, 95] };
+const SAV_RE = /(?:^|\D)(\d{2,3})[.,](\d)(?!\d)/;     // „Petőfi 94,8” → 94.8 (a sávba esőt fogadja el)
 const MHZ = (f) => f.toLocaleString(NYELV(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const CIM = (u) => String(u || "").replace(/^([a-z0-9+.-]+:\/\/)+/i, "").replace(/;$/, "");   // sémák és záró ; nélkül (a Sonos x-rincon-mp3radio://http://… alakban adja vissza)
 const SZOL = (s) => ["playing", "buffering"].includes(s?.state);
@@ -457,8 +461,10 @@ class CantabileCard extends HTMLElement {
     if (!Array.isArray(config.hangszorok) || !config.hangszorok.length) throw new Error(T("Adj meg legalább egy hangszórót (speakers)."));
     // frekvencia nélküli (csak internetes) adók: a skálán egyenletesen elosztva, a gombon WEB felirattal
     const adok = [...(config.adok || [])].filter((a) => a && a.url).map((a) => ({ ...a }));
+    const savK = config.fm_band === "jp" || config.fm_band === "japan" || (!config.fm_band && this._hass?.config?.country === "JP") ? "jp" : "std";
+    const [MIN_F, MAX_F] = this._sav = SAVOK[savK];
     const nincsF = adok.filter((a) => !(Number(a.frekvencia) >= MIN_F && Number(a.frekvencia) <= MAX_F));
-    nincsF.forEach((a, k) => { a.frekvencia = Math.round((88.5 + ((k + 1) * 19) / (nincsF.length + 1)) * 10) / 10; a.virt = true; });
+    nincsF.forEach((a, k) => { a.frekvencia = Math.round((MIN_F + 1 + ((k + 1) * (MAX_F - MIN_F - 1.5)) / (nincsF.length + 1)) * 10) / 10; a.virt = true; });
     adok.forEach((a) => { a.frekvencia = Number(a.frekvencia); });
     this._config = { magno: {}, ...config, adok: adok.sort((a, b) => a.frekvencia - b.frekvencia) };
     // multiroom: ha legalább két Sonos van, a SPEAKERS kapcsoló kap egy közös állást is (mint a receivereken az A+B) –
@@ -483,6 +489,8 @@ class CantabileCard extends HTMLElement {
     this._hass = hass;
     // a típus nélküli hangszórók a platformból kapják meg (ehhez a hass kell): újraépítés egyszer
     if (elso && this._autoMod) { this._autoMod = false; this.setConfig(this._eredetiCfg); }
+    // Japánban (ha a kártyán nincs megadva fm_band) a japán FM-sáv: ehhez is a hass kell, újraépítés egyszer
+    else if (elso && !this._config?.fm_band && hass.config?.country === "JP" && this._sav !== SAVOK.jp) this.setConfig(this._eredetiCfg);
     if (elso) this._infoKer();
     if (this._hsz == null) this._hsz = this._kezdoHangszoro();
     if (this._mod == null) this._mod = this._kezdoMod();
@@ -508,6 +516,8 @@ class CantabileCard extends HTMLElement {
     catch (e) { this._ent = {}; this._nincsIntegracio = true; }
     this._frissit();
   }
+
+  static getConfigElement() { return document.createElement("cantabile-card-editor"); }
 
   static getStubConfig(hass) {
     const lejatszok = Object.keys(hass?.states || {}).filter((e) => e.startsWith("media_player."));
@@ -616,16 +626,21 @@ class CantabileCard extends HTMLElement {
     return t || h;
   }
 
+  // a skálán elfoglalt hely (%) és a sáv közepe – a kártya FM-sávja szerint
+  _poz(f) { const [a, b] = this._sav || SAVOK.std; return ((Math.min(b, Math.max(a, f)) - a) / (b - a)) * 100; }
+  _savKozep() { const [a, b] = this._sav || SAVOK.std; return Math.round((a + b) * 5) / 10; }
+  _savFrek(nev) { const m = SAV_RE.exec(nev || ""), f = m ? Number(`${m[1]}.${m[2]}`) : NaN, [a, b] = this._sav || SAVOK.std; return f >= a && f <= b ? `${m[1]}.${m[2]}` : ""; }
+
   _epit() {
     const c = this._config;
     this._kcimHtml = this._ksorHtml = null;
     let jelek = "";
-    for (let f = 88; f <= 108; f += 0.5) {
+    for (let f = Math.ceil(this._sav[0]); f <= this._sav[1]; f += 0.5) {
       const egesz = Number.isInteger(f);
-      jelek += `<i class="j ${egesz ? "n" : ""}" style="left:${POZ(f)}%"></i>`;
-      if (egesz && f % 2 === 0) jelek += `<b class="sz${f % 4 === 2 ? " ptl" : ""}" style="left:${POZ(f)}%">${f}</b>`;
+      jelek += `<i class="j ${egesz ? "n" : ""}" style="left:${this._poz(f)}%"></i>`;
+      if (egesz && f % 2 === 0) jelek += `<b class="sz${f % 4 === 2 ? " ptl" : ""}" style="left:${this._poz(f)}%">${f}</b>`;
     }
-    const adojel = c.adok.map((a, i) => `<i class="aj" data-i="${i}" style="left:${POZ(a.frekvencia)}%"></i>`).join("");
+    const adojel = c.adok.map((a, i) => `<i class="aj" data-i="${i}" style="left:${this._poz(a.frekvencia)}%"></i>`).join("");
     const ADOHELY = 12;
     const gombok = c.adok.map((a, i) => `
       <button class="bill ado" data-i="${i}"><span class="led"></span><b>${ESC(a.rovid || a.nev)}</b><small>${a.virt ? "WEB" : MHZ(a.frekvencia)}</small></button>`).join("")
@@ -1539,7 +1554,7 @@ class CantabileCard extends HTMLElement {
               <div class="jelm">${jelmero}<span class="jfel" id="jfel"></span><span class="stereo"><i></i>STEREO</span></div>
               <div class="skkoz">
                 <span class="mertek">FM</span><span class="mertek j2">MHz</span>
-                <div class="sav"><div class="vonal"></div>${jelek}${adojel}<div class="mutato" id="mutato" style="left:${POZ(c.adok[0]?.frekvencia ?? 98)}%"></div></div>
+                <div class="sav"><div class="vonal"></div>${jelek}${adojel}<div class="mutato" id="mutato" style="left:${this._poz(c.adok[0]?.frekvencia ?? this._savKozep())}%"></div></div>
                 <div class="kiir"><span id="ado"></span><span id="cim"></span></div>
               </div>
               <div class="giro" id="giro" title="${T("Hangolás: húzd oldalra vagy görgess")}"><div class="kerek" id="kerek"></div><small>TUNING</small></div>
@@ -2214,7 +2229,7 @@ class CantabileCard extends HTMLElement {
       this.shadowRoot.getElementById("elo").classList.add("kezi");
     };
     const lep = (df) => {
-      this._hangolo.f = Math.min(MAX_F, Math.max(MIN_F, this._hangolo.f + df));
+      this._hangolo.f = Math.min(this._sav[1], Math.max(this._sav[0], this._hangolo.f + df));
       poz += df * 60; kerek.style.backgroundPositionX = `${poz.toFixed(1)}px`;
       this._hangoloRajz(); this._jelRajz();
     };
@@ -2243,7 +2258,7 @@ class CantabileCard extends HTMLElement {
 
   _hangoloRajz() {
     const sr = this.shadowRoot, f = this._hangolo.f, { i, d } = this._legkozelebbi(f), c = this._config;
-    sr.getElementById("mutato").style.left = `${POZ(f)}%`;
+    sr.getElementById("mutato").style.left = `${this._poz(f)}%`;
     sr.getElementById("ado").innerHTML = d <= 0.25 ? `<b>${ESC(c.adok[i].nev)}</b> · ${MHZ(c.adok[i].frekvencia)} MHz` : `${MHZ(Math.round(f * 10) / 10)} MHz · NO STATION`;
     sr.getElementById("cim").textContent = "";
   }
@@ -2321,7 +2336,7 @@ class CantabileCard extends HTMLElement {
         </section>
         <section class="bresz"><h3>${T("Rádióadók")} <button class="bgomb" data-a="ujado">${T("+ Új adó")}</button></h3>
           <div class="bfejlec ado"><span>${T("NÉV")}</span><span>${T("GOMBON")}</span><span>MHZ</span><span>${T("STREAM-CÍM")}</span><span></span><span></span></div>
-          ${sz.adok.map((a, i) => `<div class="bsor ado">${be("adok", i, "nev", a.nev, `placeholder="${T("Név")}"`)}${be("adok", i, "rovid", a.rovid, `placeholder="${T("(a név)")}"`)}${be("adok", i, "frekvencia", a.frekvencia, 'inputmode="decimal" placeholder="87,5–108"')}${be("adok", i, "url", a.url, 'placeholder="https://…"')}<button class="bproba" data-a="proba" data-i="${i}" title="${T("Lejátszás a választott hangszórón")}">${T("▶ Próba")}</button><button class="bx" data-a="torol" data-l="adok" data-i="${i}" title="${T("Törlés")}">×</button></div>`).join("")}
+          ${sz.adok.map((a, i) => `<div class="bsor ado">${be("adok", i, "nev", a.nev, `placeholder="${T("Név")}"`)}${be("adok", i, "rovid", a.rovid, `placeholder="${T("(a név)")}"`)}${be("adok", i, "frekvencia", a.frekvencia, 'inputmode="decimal" placeholder="${MHZ(this._sav[0])}–${MHZ(this._sav[1])}"')}${be("adok", i, "url", a.url, 'placeholder="https://…"')}<button class="bproba" data-a="proba" data-i="${i}" title="${T("Lejátszás a választott hangszórón")}">${T("▶ Próba")}</button><button class="bx" data-a="torol" data-l="adok" data-i="${i}" title="${T("Törlés")}">×</button></div>`).join("")}
           <p class="bmeg">${T("A gombok frekvencia szerint rendeződnek, 12 hely van. A frekvencia elhagyható (csak internetes adó: a skálán egyenletesen elosztva, a gombon WEB). Sonosnál a furcsa portos https-cím helyett próbáld http-vel.")}</p>
           <div class="bker"><input id="bkeres" placeholder="${T("Adó keresése név szerint (Radio Browser), pl. Kossuth, Jazzy, Rock FM")}" value="${ESC(this._keresett || "")}"><button class="bgomb" data-a="keres">${T("Keresés")}</button></div>
           <div class="btalalat">${(this._talalatok || []).map((t, i) => `<div><em>${ESC(t.name)}</em><small>${ESC([t.codec, t.bitrate ? t.bitrate + " kbps" : "", t.countrycode].filter(Boolean).join(" · "))}</small><button class="bgomb" data-a="felvesz" data-i="${i}">${T("+ Felvesz")}</button></div>`).join("")}</div>
@@ -2372,8 +2387,8 @@ class CantabileCard extends HTMLElement {
     if (a === "keres") return this._keres();
     if (a === "felvesz") {
       const t = this._talalatok[i];
-      const f = /(?:^|\D)(8[7-9]|9\d|10[0-8])[.,](\d)(?!\d)/.exec(t.name);
-      sz.adok.push({ nev: t.name.trim(), frekvencia: f ? `${f[1]}.${f[2]}` : "", url: t.url_resolved || t.url });
+      const f = this._savFrek(t.name);
+      sz.adok.push({ nev: t.name.trim(), frekvencia: f, url: t.url_resolved || t.url });
       return this._beallRajz(f ? "" : T("„{n}” felvéve – add meg a frekvenciáját (MHz).", { n: t.name.trim() }));
     }
     if (a === "proba") {
@@ -2403,7 +2418,7 @@ class CantabileCard extends HTMLElement {
     const adok = sz.adok.map((a) => ({ ...a, nev: String(a.nev || "").trim(), rovid: String(a.rovid || "").trim(), url: String(a.url || "").trim(), frekvencia: String(a.frekvencia ?? "").trim() === "" ? NaN : Number(String(a.frekvencia).replace(",", ".")) }));
     adok.forEach((a, i) => {
       if (!a.nev) hibak.push(T("{n}. adó: hiányzik a név", { n: i + 1 }));
-      if (Number.isFinite(a.frekvencia) && !(a.frekvencia >= 87.5 && a.frekvencia <= 108)) hibak.push(T("{n}: a frekvencia 87,5 és 108 közé essen (vagy hagyd üresen)", { n: a.nev || T("{n}. adó", { n: i + 1 }) }));
+      if (Number.isFinite(a.frekvencia) && !(a.frekvencia >= this._sav[0] && a.frekvencia <= this._sav[1])) hibak.push(T("{n}: a frekvencia {a} és {b} közé essen (vagy hagyd üresen)", { n: a.nev || T("{n}. adó", { n: i + 1 }), a: MHZ(this._sav[0]), b: MHZ(this._sav[1]) }));
       if (!/^https?:\/\//.test(a.url)) hibak.push(T("{n}: a stream-cím http:// vagy https:// kezdetű legyen", { n: a.nev || T("{n}. adó", { n: i + 1 }) }));
     });
     const hsz = sz.hangszorok.map((h) => { const o = { nev: String(h.nev || "").trim(), entity: h.entity, mod: h.mod === "sonos" ? "sonos" : "url" }; if (String(h.rovid || "").trim()) o.rovid = String(h.rovid).trim(); return o; });
@@ -3003,8 +3018,8 @@ class CantabileCard extends HTMLElement {
 
   _netGombra(t) {
     this._netZar(); this._beallNyit();
-    const f = /(?:^|\D)(8[7-9]|9\d|10[0-8])[.,](\d)(?!\d)/.exec(t.name || "");
-    this._szerk.adok.push({ nev: (t.name || "").trim(), frekvencia: f ? `${f[1]}.${f[2]}` : "", url: t.url_resolved || t.url });
+    const f = this._savFrek(t.name);
+    this._szerk.adok.push({ nev: (t.name || "").trim(), frekvencia: f, url: t.url_resolved || t.url });
     this._beallRajz(f ? T("„{n}” felvéve – a Mentéssel gombként is megmarad.", { n: (t.name || "").trim() }) : T("„{n}” felvéve – add meg a frekvenciáját (MHz), majd Mentés.", { n: (t.name || "").trim() }));
   }
 
@@ -3777,7 +3792,7 @@ class CantabileCard extends HTMLElement {
     sr.querySelectorAll('.ogomb[data-f="net"]').forEach((b) => b.classList.toggle("be", !!this._net || (radioSzol && !!kulso)));
     elo.classList.toggle("tilt", !elerheto);
     magno.classList.toggle("tilt", !elerheto);
-    sr.getElementById("mutato").style.left = `${POZ(c.adok[mutat]?.frekvencia ?? 98)}%`;
+    sr.getElementById("mutato").style.left = `${this._poz(c.adok[mutat]?.frekvencia ?? this._savKozep())}%`;
     sr.querySelectorAll(".ado").forEach((b) => b.classList.toggle("akt", radioSzol && Number(b.dataset.i) === i));
     sr.querySelectorAll(".hsz").forEach((b) => b.classList.toggle("akt", Number(b.dataset.i) === this._hsz));
     const hu = this._hangUtolso(), L = this._hszIdx, bton = this._hsz === this._btIdx;
@@ -4128,6 +4143,55 @@ class CantabileCard extends HTMLElement {
 // a BT kimenet (ezen a készüléken szóló <audio>) az oldalhoz tartozik, nem a kártyapéldányhoz: ha a HA a vezérlőpultot
 // újraépíti (pl. mobilnet → Wi-Fi váltás utáni újrakapcsolódáskor), az új kártya átveszi a szóló lejátszót, és le is tudja állítani
 const HELYI_KOZOS = {};
+// vizuális kártyaszerkesztő (a HA kártyaválasztójában): hangszórók, márkanév, előlap, kijelző, zenemappa, FM-sáv – a
+// beállítás nyelvét (angol / magyar kulcsok) megtartja; az adók és a nevek a kártya ⚙ gombjával szerkeszthetők
+class CantabileCardEditor extends HTMLElement {
+  setConfig(c) { this._c = c; this._rajz(); }
+  set hass(h) { this._h = h; this._rajz(); }
+
+  _rajz() {
+    if (!this._h || !this._c) return;
+    if (!this._f) {
+      const p = document.createElement("p");
+      p.style.cssText = "margin:0 0 12px;color:var(--secondary-text-color)";
+      p.textContent = T("A rádióadókat, a hangszórók nevét és a kártyán megjelenő rövid nevet a kártya ⚙ gombjával állíthatod be.");
+      this._f = document.createElement("ha-form");
+      const cimke = { speakers: T("Hangszórók"), brand: T("Márkanév"), finish: T("Előlap"), display: T("Kijelző"), media_folder: T("Zenemappa"), fm_band: T("FM-sáv") };
+      this._f.computeLabel = (sema) => cimke[sema.name] || sema.name;
+      this._f.addEventListener("value-changed", (e) => this._valt(e.detail.value));
+      this.append(p, this._f);
+    }
+    const b = ATKULCS(this._c, KULCS), kij = b.magno?.vu_kijelzo;
+    this._f.hass = this._h;
+    this._f.schema = [
+      { name: "speakers", selector: { entity: { multiple: true, filter: { domain: "media_player" } } } },
+      { name: "brand", selector: { text: {} } },
+      { name: "finish", selector: { select: { mode: "dropdown", options: [{ value: "silver", label: T("Ezüst (húzott alumínium)") }, { value: "black", label: T("Fekete (90-es évek)") }] } } },
+      { name: "display", selector: { select: { mode: "dropdown", options: [{ value: "vu", label: T("Deprez-műszer (mutatós VU)") }, { value: "vfd", label: T("Fluoreszcens kijelző (VFD)") }] } } },
+      { name: "media_folder", selector: { text: {} } },
+      { name: "fm_band", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: T("Az ország szerint") }, { value: "std", label: "87,5–108 MHz" }, { value: "jp", label: T("Japán (76–95 MHz)") }] } } },
+    ];
+    this._f.data = { speakers: (b.hangszorok || []).map((h) => h?.entity).filter(Boolean), brand: b.marka || "", finish: b.felulet === "black" ? "black" : "silver",
+      display: KIJELZO_KI[kij] || kij || "vu", media_folder: b.magno?.nas || "", fm_band: b.fm_band || "auto" };
+  }
+
+  _valt(v) {
+    const b = ATKULCS(this._c, KULCS), regi = new Map((b.hangszorok || []).map((h) => [h?.entity, h]));
+    // a meglévő hangszóró beállítása (név, rövid név, mód) marad; az újak a lejátszó nevét kapják
+    b.hangszorok = (v.speakers || []).map((e) => regi.get(e) || { nev: this._h.states[e]?.attributes?.friendly_name || e.split(".")[1], entity: e });
+    if (v.brand) b.marka = v.brand; else delete b.marka;
+    if (v.finish === "black") b.felulet = "black"; else delete b.felulet;
+    b.magno = { ...(b.magno || {}), vu_kijelzo: KIJELZO_BE[v.display] || "deprez" };
+    if (v.media_folder) b.magno.nas = v.media_folder; else delete b.magno.nas;
+    if (v.fm_band && v.fm_band !== "auto") b.fm_band = v.fm_band; else delete b.fm_band;
+    const angol = !!(this._c.speakers || this._c.stations || this._c.tape || this._c.brand);
+    const uj = angol ? ATKULCS({ ...b, magno: { ...b.magno, vu_kijelzo: KIJELZO_KI[b.magno.vu_kijelzo] } }, VISSZA) : b;
+    this._c = uj;
+    this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: uj }, bubbles: true, composed: true }));
+  }
+}
+if (!customElements.get("cantabile-card-editor")) customElements.define("cantabile-card-editor", CantabileCardEditor);
+
 ["_audio", "_audioE", "_aktAudio", "_elemzo", "_helyiId", "_helyiLista", "_helyiMeret", "_helyiNevek", "_telKaz", "_helyiAlvas", "_helyiAlvasIdo"].forEach((k) =>
   Object.defineProperty(CantabileCard.prototype, k, { get() { return HELYI_KOZOS[k]; }, set(v) { HELYI_KOZOS[k] = v; }, configurable: true }));
 

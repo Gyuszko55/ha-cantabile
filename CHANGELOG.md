@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.5 – unreleased
+
+- Visual card editor: in the dashboard's card editor the speakers (picked from the media players), brand, front panel, display, music folder and FM band can be set without YAML; it keeps the card's key language (English or Hungarian) and the existing speakers' names. Stations and names stay on the card's ⚙.
+- Japanese FM band (76–95 MHz): `fm_band: jp`, or automatically when Home Assistant's country is Japan – dial, tuning, station positions, ⚙ check and the frequency read from station names follow it.
+
 ## 1.12.4 – 2026-10-28
 
 - The card uses its own fonts everywhere: a bundled Arial-compatible sans (Arimo, OFL) for all labels next to Michroma, Exo 2 and Great Vibes, so a phone with a replaced system font no longer changes the look; the phone's enlarged text size no longer pushes the layout apart (`text-size-adjust: none`).

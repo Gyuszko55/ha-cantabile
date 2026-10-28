@@ -264,10 +264,13 @@ Az integráció beállítása után nyisd meg a beszélgetőügynök beállítá
 
 ## A kártya beállításai (YAML)
 
+A kártyaszerkesztő (✎ a vezérlőpulton) YAML nélkül beállítja a hangszórókat, a márkanevet, az előlapot, a kijelzőt, a zenemappát és az FM-sávot; az adókat, a hangszórók nevét és a kártyán megjelenő rövid nevet a kártya saját ⚙ gombjával lehet megadni. A teljes YAML:
+
 ```yaml
 type: custom:cantabile-card
 brand: Cantabile                 # elhagyható
 finish: silver                   # silver (ezüst húzott alumínium) | black (90-es évek fekete húzott előlap)
+fm_band: jp                      # elhagyható: jp = japán FM-sáv, 76–95 MHz (magától, ha a HA-ban Japán az ország)
 bt: true                         # BT-kimenet ezen a készüléken; false = nincs
 speakers:
   - name: Nappali                      # teljes név – a hangvezérlés ezt használja
@@ -280,7 +283,7 @@ speakers:
 stations:                        # elhagyható – a NET-tel többet is találsz
   - name: Petőfi Rádió
     short: Petőfi                # a gomb felirata
-    frequency: 94.8              # helye a skálán (87,5–108)
+    frequency: 94.8              # helye a skálán (87,5–108; Japánban 76–95)
     url: https://icast.connectmedia.hu/4738/mr2.mp3
 tape:
   media_folder: media-source://media_source/local/Zene   # előadó/album/szám
