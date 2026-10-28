@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.2 – 2026-10-28
+
+- Black front: horizontal brushing, much finer and denser (1–2 px hairlines) and much fainter, on a deeper black.
+
 ## 1.10.1 – 2026-10-28
 
 - Black front: a clearly brushed surface (three layers of hairlines of different spacing instead of one faint one); the cassette door's side strips and the edge of the cassette window and the VFD are black instead of chrome and white.

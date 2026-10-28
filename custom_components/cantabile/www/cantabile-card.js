@@ -1362,12 +1362,12 @@ class CantabileCard extends HTMLElement {
         /* fekete előlap (finish: black): a 90-es évek fekete, finoman húzott alumínium előlapja – világos feliratok, sötét gombok és tárcsák;
            a kijelzők, a kazetta és a lámpák színe nem változik */
         :host([fekete]) .elo {
-          /* húzott fekete: három, eltérő periódusú hajszálcsík-réteg (szabálytalan húzásnyom) + enyhe függőleges fényátmenet */
+          /* húzott fekete: vízszintes, nagyon sűrű és halvány hajszálvonalak (1–2 px-es periódus, egy szabálytalanabb réteggel), mélyfekete alap */
           background:
-            repeating-linear-gradient(90deg, rgba(255,255,255,.075) 0 1px, transparent 1px 3px, rgba(0,0,0,.35) 3px 4px, transparent 4px 5px),
-            repeating-linear-gradient(90deg, transparent 0 7px, rgba(255,255,255,.04) 7px 8px, transparent 8px 13px, rgba(0,0,0,.22) 13px 14px, transparent 14px 23px),
-            repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.025) 31px 33px, transparent 33px 57px, rgba(0,0,0,.15) 57px 59px, transparent 59px 89px),
-            linear-gradient(180deg, #34363b, #1d1e21 50%, #141517);
+            repeating-linear-gradient(180deg, rgba(255,255,255,.022) 0 1px, transparent 1px 2px),
+            repeating-linear-gradient(180deg, transparent 0 2px, rgba(0,0,0,.28) 2px 3px, transparent 3px 5px, rgba(255,255,255,.012) 5px 6px, transparent 6px 7px),
+            linear-gradient(90deg, rgba(255,255,255,.015), transparent 30%, rgba(255,255,255,.025) 60%, transparent),
+            linear-gradient(180deg, #161719, #0d0e0f 55%, #09090a);
           box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -2px 0 rgba(0,0,0,.6), 0 0 0 1px #050506; }
         :host([fekete]) .fej, :host([fekete]) .fej .tipus { color: #c9ccd1; text-shadow: none; }
         :host([fekete]) .fej .marka { color: #eceef1; text-shadow: 0 1px 0 rgba(0,0,0,.8); }
