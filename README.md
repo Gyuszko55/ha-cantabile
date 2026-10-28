@@ -54,6 +54,11 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
 - **BT**: play on the device the card is open on (headphones, Bluetooth speaker).
 - Switching speakers carries the music over, like a real speaker selector.
 
+**TV (Cantabile TV)**
+- TVs become speakers, with the track on the screen: on **Cast** devices (TV sticks, Android TV boxes, Nest Hub) a
+  full-screen TV page – artist image, cover, title, artist, album, format, an equalizer that follows the music and a
+  progress bar; on **DLNA** TVs a full-screen still track card. See *TV players* below.
+
 **Voice**
 - An Assist tool for any LLM conversation agent (Google Gemini, OpenAI, Anthropic, Ollama…):
   *“Play Queen in the living room”*, *“Put on the Kind of Magic album”*, *“Turn on Jazz FM in the bedroom”*,
@@ -105,6 +110,7 @@ Front-panel labels are always English, like on a real old hi-fi; settings, messa
 | Your speakers' integration | playback | **Settings → Devices & services → Add integration**: *Sonos*, *WiiM*, *LinkPlay*, *DLNA Digital Media Renderer*, *Google Cast*, *Music Assistant*, *Squeezebox*… (Home Assistant's own integrations, not part of Cantabile). |
 | `ffmpeg` on the host | the real VU signal (optional) | Included in Home Assistant OS and the container image. On a Python-venv (Core) install, install it with the system package manager. Without it the meters simulate. |
 | A music folder | NAS / PHONE tabs (optional) | See *Connecting a music library (NAS)* below. |
+| Home Assistant reachable over https from the TV | the Cast TV page (optional) | Home Assistant Cloud, or your own external URL with a certificate. |
 | A conversation agent | voice control (optional) | E.g. *Google Gemini*, *OpenAI*, *Anthropic*, *Ollama*; then turn on **Cantabile** in its options (see *Voice control*). |
 | Streaming accounts / keys | DEEZER, SPOTIFY, TIDAL (optional) | See the next section. |
 
@@ -161,6 +167,31 @@ Copy `custom_components/cantabile` into your `config/custom_components` folder a
 After setting up the integration, open your conversation agent's options (e.g. **Google Gemini → Configure**) and turn on
 **Cantabile** next to *Assist* under *Control Home Assistant*.
 
+### TV players (Cantabile TV)
+1. **Settings → Devices & services → Cantabile → Configure → TV players**: pick the TVs. A Cast device (integration
+   *Google Cast*) gets the live TV page, a DLNA TV (integration *DLNA Digital Media Renderer*) the still track card.
+   Each becomes a `media_player` called “Cantabile TV · …”.
+2. **For Cast TVs only**, create the TV page once: **Settings → Dashboards → Add dashboard → New dashboard from
+   scratch**, title *Cantabile TV*, URL **`cantabile-tv`** (no need to show it in the sidebar); open it → ✎ → ⋮ →
+   *Raw configuration editor* and paste:
+   ```yaml
+   views:
+     - title: TV
+       path: tv
+       panel: true
+       cards:
+         - type: custom:cantabile-tv
+   ```
+   The TV loads this page through Home Assistant's Cast receiver, so Home Assistant must be reachable from the TV over
+   https (Home Assistant Cloud or your own external URL).
+3. On the card: **⚙ → Speakers → + New speaker** → choose the **“Cantabile TV · …”** player (not the TV's own Cast /
+   DLNA player – that would only get the sound; the card warns about it).
+
+- The TV plays the music folder, radio, NET stations and PHONE music; Deezer, Tidal and the Sonos favourites stay on Sonos.
+- DLNA: about 7 s preparation per track (on albums the next one is prepared in the background), sound as AAC 256 kbps,
+  no seeking; radio runs as a live video. Cast: the sound is the original file / stream.
+- Next / previous track work from the card, Home Assistant's controls and by voice.
+
 ## Adding your own speakers and sources
 
 - **Speakers**: card ⚙ → *Speakers* → **+ New speaker** → pick the player. Only players that can play media are listed;
@@ -198,6 +229,8 @@ After setting up the integration, open your conversation agent's options (e.g. *
 | A station plays on Sonos but not on BT | Try the http variant of the stream URL; BT radio goes through the integration (`/api/cantabile/stream`). |
 | VU meters only “simulate” | No `ffmpeg` on the host, or an encrypted stream (Deezer). |
 | Voice: the agent says it can't play music, or “Tool … not found” in the Assist debug | Turn on *Cantabile* in the agent's options. If your own agent prompt names the tool, use its exact name – with Assist also on it is `cantabile__cantabile_play`. |
+| A TV only plays the sound (e.g. “Default Media Receiver” on screen) | The card uses the TV's own Cast / DLNA player: switch the speaker to its “Cantabile TV · …” player (⚙ shows a *Switch* button). |
+| The Cast TV shows nothing / “dashboard not found” | Create the `cantabile-tv` dashboard with the `tv` view (see *TV players*), and check that Home Assistant is reachable from the TV over https. |
 | Music folder is empty | Check the media-source path in ⚙ and that the folder is visible under **Media**. |
 
 ## Card configuration (YAML)
@@ -263,4 +296,4 @@ The earlier Hungarian keys (`hangszorok`, `adok`, `magno`, `nas` …) are accept
 
 ## Licence
 
-MIT – see [LICENSE](LICENSE). The bundled *Great Vibes*, *Michroma* and *Exo 2* fonts are under the SIL Open Font License 1.1 (see the OFL-*.txt files next to the card).
+MIT – see [LICENSE](LICENSE). The bundled *Great Vibes*, *Michroma* and *Exo 2* fonts are under the SIL Open Font License 1.1 (see the OFL-*.txt files in `www` and `fonts`).

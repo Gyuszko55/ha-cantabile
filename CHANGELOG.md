@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.12.0 – 2026-10-28
+
+- **Cantabile TV**: TVs as speakers, with the track on the screen. Add them in the integration options (*TV players*); each becomes a `media_player` (“Cantabile TV · …”) that the card, the track player and voice control use like any other speaker.
+  - **Cast devices** (TV sticks, Android TV boxes, Nest Hub…): a full-screen TV page – the artist image (Deezer) slowly moving in the background, the cover, title, artist, album · year, format chips, an amber equalizer with peak caps and a waveform line, a progress bar and a clock; for radio ON AIR and LIVE. The page plays the sound itself (Web Audio analysis, so the equalizer follows the music) and is cast automatically (`cast.show_lovelace_view`, dashboard `cantabile-tv`, view `tv`, card `custom:cantabile-tv`).
+  - **DLNA TVs** (DLNA Digital Media Renderer integration): a full-screen still track card (cover, artist image, details) – sent as a video (the card + the music, AAC 256 kbps), because TVs' own music players don't show the cover. About 7 s preparation per track; on albums the next track is prepared in the background. Radio plays as a live video. Seeking is not available on these videos.
+  - Track details from the file tags (ffprobe), the cover from the album folder or the file, the artist image from Deezer; untagged files get a tidy name from the file name (capitalised, copy suffix removed).
+  - Next / previous track on the TV players (card FF/REW, Home Assistant controls, voice).
+- **Speaker selector redrawn** (hi-fi style): the names are listed beside the knob – on the left right-aligned, on the right left-aligned – each joined to the knob with a straight and then slanted line; the pointer turns along the line of the chosen speaker, its lamp sits on the line next to the knob. Up to 4 positions all on the right; up to 8 positions (4 per side).
+- Settings: a TV's own Cast / DLNA player is hidden from the speaker list when it has a Cantabile TV player; if one is still chosen, a warning with a *Switch* button appears (and a message when switching to it), plus a tip for Cast / DLNA devices that could become TV players.
+
 ## 1.11.1 – 2026-10-28
 
 - Wording: "old hi-fi" instead of "1970s" (card picker description, README); the card description now also mentions the black front, Spotify and Tidal.

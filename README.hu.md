@@ -54,6 +54,11 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
 - **BT**: azon a készüléken szól, amelyiken a kártya nyitva van (fülhallgató, Bluetooth hangszóró).
 - Hangszóróváltáskor a zene átkerül, mint egy igazi hangszóró-választón.
 
+**TV (Cantabile TV)**
+- A TV-k is hangszórók lesznek, a képernyőn a számmal: **Cast**-eszközön (TV-stick, Android TV-doboz, Nest Hub) teljes
+  képernyős TV-oldal – előadókép, borító, cím, előadó, album, formátum, a zenével együtt mozgó equalizer és
+  haladásjelző; **DLNA**-s TV-n teljes képernyős, álló adatlap. Lásd lent: *TV-lejátszók*.
+
 **Hangvezérlés**
 - Assist-eszköz bármelyik LLM-es beszélgetőügynökhöz (Google Gemini, OpenAI, Anthropic, Ollama…):
   *„Játssz Queent a nappaliban”*, *„Tedd be a Kind of Magic albumot”*, *„Kapcsold be a Jazz FM-et a hálóban”*,
@@ -105,6 +110,7 @@ Az előlapok feliratai mindig angolok, mint egy igazi régi hi-fin; a beállít�
 | A hangszóróid integrációja | lejátszás | **Beállítások → Eszközök és szolgáltatások → Integráció hozzáadása**: *Sonos*, *WiiM*, *LinkPlay*, *DLNA Digital Media Renderer*, *Google Cast*, *Music Assistant*, *Squeezebox*… (a Home Assistant saját integrációi, nem a Cantabile részei). |
 | `ffmpeg` a gazdagépen | valódi VU-jel (elhagyható) | A Home Assistant OS-ben és a konténer-képben benne van. Python-venv-es (Core) telepítésnél a rendszer csomagkezelőjével tedd fel. Nélküle a mérők utánoznak. |
 | Zenemappa | NAS / PHONE fül (elhagyható) | Lásd lent: *Zenetár (NAS) csatolása*. |
+| https-en a TV felől elérhető Home Assistant | a Cast-os TV-oldal (elhagyható) | Home Assistant Cloud, vagy saját külső cím tanúsítvánnyal. |
 | Beszélgetőügynök | hangvezérlés (elhagyható) | Pl. *Google Gemini*, *OpenAI*, *Anthropic*, *Ollama*; utána a beállításaiban kapcsold be a **Cantabile**-t (lásd *Hangvezérlés*). |
 | Streaming-fiókok / kulcsok | DEEZER, SPOTIFY, TIDAL (elhagyható) | Lásd a következő részt. |
 
@@ -162,6 +168,31 @@ Másold a `custom_components/cantabile` mappát a `config/custom_components` map
 Az integráció beállítása után nyisd meg a beszélgetőügynök beállításait (pl. **Google Gemini → Beállítás**), és a
 *Home Assistant vezérlése* résznél az *Assist* mellett kapcsold be a **Cantabile**-t is.
 
+### TV-lejátszók (Cantabile TV)
+1. **Beállítások → Eszközök és szolgáltatások → Cantabile → Beállítás → TV-lejátszók**: válaszd ki a TV-ket. A
+   Cast-eszköz (*Google Cast* integráció) élő TV-oldalt kap, a DLNA-s TV (*DLNA Digital Media Renderer* integráció)
+   álló adatlapot. Mindegyikből egy „Cantabile TV · …” nevű `media_player` lesz.
+2. **Csak Cast-os TV-hez**, egyszer: hozd létre a TV-oldalt: **Beállítások → Irányítópultok → Irányítópult hozzáadása →
+   Új, üres irányítópult**, cím *Cantabile TV*, cím (URL) **`cantabile-tv`** (az oldalsávban nem kell mutatni); nyisd meg
+   → ✎ → ⋮ → *Nyers konfigurációszerkesztő*, és illeszd be:
+   ```yaml
+   views:
+     - title: TV
+       path: tv
+       panel: true
+       cards:
+         - type: custom:cantabile-tv
+   ```
+   A TV ezt az oldalt a Home Assistant Cast-vevőjén át tölti be, ezért a Home Assistantnak a TV felől https-en
+   elérhetőnek kell lennie (Home Assistant Cloud vagy saját külső cím).
+3. A kártyán: **⚙ → Hangszórók → + Új hangszóró** → a **„Cantabile TV · …”** lejátszót válaszd (ne a TV saját Cast- /
+   DLNA-lejátszóját – az csak a hangot kapná; a kártya figyelmeztet is rá).
+
+- A TV a zenemappát, a rádiót, a NET-adókat és a PHONE zenéit játssza; a Deezer, a Tidal és a Sonos-kedvencek Sonoson maradnak.
+- DLNA: számonként kb. 7 mp előkészítés (albumnál a következőt a háttérben készíti), a hang AAC 256 kbps, tekerni nem
+  lehet; a rádió élő videóként megy. Cast: a hang az eredeti fájl / adás.
+- Következő / előző szám a kártyáról, a Home Assistant vezérlőiből és hanggal is.
+
 ## Saját hangszórók és források hozzáadása
 
 - **Hangszórók**: a kártya ⚙ → *Hangszórók* → **+ Új hangszóró** → a lejátszó kiválasztása. Csak lejátszani tudó
@@ -199,6 +230,8 @@ Az integráció beállítása után nyisd meg a beszélgetőügynök beállítá
 | Egy adó Sonoson szól, BT-n nem | Próbáld a stream-cím http-s változatát; a BT-rádió az integráción át megy (`/api/cantabile/stream`). |
 | A VU-mérő csak „utánoz” | Nincs `ffmpeg` a gazdagépen, vagy titkosított a stream (Deezer). |
 | Hangvezérlés: az ügynök azt mondja, nem tud zenét indítani, vagy az Assist-hibakeresőben „Tool … not found” | Kapcsold be a *Cantabile*-t az ügynök beállításaiban. Ha a saját utasításod megnevezi az eszközt, a pontos nevét írd – bekapcsolt Assist mellett `cantabile__cantabile_play`. |
+| A TV csak a hangot kapja (pl. „Default Media Receiver” a képernyőn) | A kártya a TV saját Cast- / DLNA-lejátszóját használja: állítsd át a hangszórót a „Cantabile TV · …” lejátszóra (a ⚙-ben *Átállítás* gomb). |
+| A Cast-os TV-n nem jelenik meg semmi / „dashboard not found” | Hozd létre a `cantabile-tv` irányítópultot a `tv` nézettel (lásd *TV-lejátszók*), és ellenőrizd, hogy a Home Assistant a TV felől https-en elérhető. |
 | Üres a zenemappa | Ellenőrizd a ⚙-ben a médiaforrás-útvonalat, és hogy a mappa látszik-e a **Média** menüben. |
 
 ## A kártya beállításai (YAML)
@@ -264,4 +297,4 @@ A korábbi magyar kulcsok (`hangszorok`, `adok`, `magno`, `nas` …) is működn
 
 ## Licenc
 
-MIT – lásd [LICENSE](LICENSE). A mellékelt *Great Vibes*, *Michroma* és *Exo 2* betűkészlet SIL Open Font License 1.1 alatt áll (lásd a kártya melletti OFL-*.txt fájlokat).
+MIT – lásd [LICENSE](LICENSE). A mellékelt *Great Vibes*, *Michroma* és *Exo 2* betűkészlet SIL Open Font License 1.1 alatt áll (lásd az OFL-*.txt fájlokat a `www` és a `fonts` mappában).
