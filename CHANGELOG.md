@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.12.7 – unreleased
+## 1.12.7 – 2026-10-28
 
 Fixes from a full review of the integration:
 
