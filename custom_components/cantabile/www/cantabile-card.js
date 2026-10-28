@@ -319,7 +319,9 @@ const FAJLNEV = (u) => {
   return n.replace(/\.[a-z0-9]+$/i, "").replace(/^\d+[-_. ]*/, "").replace(/_/g, " ").replace(/\s+-\s+/, " – ").trim();
 };
 const ORA = (mp) => { mp = Math.max(0, Math.floor(mp || 0)); return `${Math.floor(mp / 3600)}:${String(Math.floor(mp / 60) % 60).padStart(2, "0")}:${String(mp % 60).padStart(2, "0")}`; };
-const SZOLGALTATO = { 2: "Deezer", 12: "Spotify", 174: "TIDAL", 204: "Apple Music", 284: "YouTube Music", 160: "SoundCloud" };
+const SZOLGALTATO = { 2: "Deezer", 9: "Spotify", 12: "Spotify", 174: "TIDAL", 204: "Apple Music", 284: "YouTube Music", 160: "SoundCloud" };
+// a betöltött stream-kazetta szolgáltatója a forrás-dobozba (Spotify Connecten nincs Sonos-sid)
+const SZOLG_NEV = { spotify: "SPOTIFY", tidal: "TIDAL", deezer: "DEEZER" };
 // kis ikonok a kijelző-kazettához
 const KI = {
   hang: '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z"/></svg>',
@@ -3609,7 +3611,7 @@ class CantabileCard extends HTMLElement {
     const nas = kaz?.forras === "nas" || /\/media\/local\//.test(id) || /\/media\/local\//.test(a.media_title || "");
     const atm = kaz?.atmeneti || /\.cantabile_atmeneti\//.test(`${id} ${a.media_title || ""}`);
     const am = this._atmenetiAll;
-    const forras = atm && (megy || kaz) ? (am && am.kesz < am.db ? `TEMP ↑${am.kesz}/${am.db}` : "TEMP") : megy ? (nas ? "NAS" : SZOLGALTATO[sid] ? "STREAM" : kaz?.forras === "stream" ? "STREAM" : kaz?.forras === "tel" ? "PHONE" : "") : (kaz ? (kaz.forras === "nas" ? "NAS" : kaz.forras === "tel" ? "PHONE" : "STREAM") : "");
+    const forras = atm && (megy || kaz) ? (am && am.kesz < am.db ? `TEMP ↑${am.kesz}/${am.db}` : "TEMP") : megy ? (nas ? "NAS" : SZOLGALTATO[sid] ? SZOLGALTATO[sid].split(" ")[0].toUpperCase() : kaz?.forras === "stream" ? (SZOLG_NEV[kaz.tipus] || "STREAM") : kaz?.forras === "tel" ? "PHONE" : "") : (kaz ? (kaz.forras === "nas" ? "NAS" : kaz.forras === "tel" ? "PHONE" : "STREAM") : "");
     // állapotsor: hangerő · hangszóró · sorszám · lista · keverés · ismétlés · forrás
     let sorsz = "–/–";
     if (megy && a.queue_size) sorsz = `${String(a.queue_position || 1).padStart(3, "0")}/${String(a.queue_size).padStart(3, "0")}`;

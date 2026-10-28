@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.9.6 – 2026-10-28
+
+- Spotify on Sonos is recognised on the tape display: Sonos marks Spotify with service id 9 (only 12 was known), so the quality field and the format line now read "Spotify" / "Spotify | stream".
+- The source box names the streaming service (SPOTIFY, DEEZER, TIDAL, APPLE, YOUTUBE…) instead of a plain STREAM – also for a Spotify cassette on a Spotify Connect speaker. Bitrate and codec stay hidden for these: Sonos plays the service directly and reports neither.
+
 ## 1.9.5 – 2026-10-28
 
 - Spotify Connect: the device Spotify is currently playing on also counts when the card looks for the speaker (Spotify may leave a WiiM out of its device list while it plays, listing only an anonymous id); when playback is already on that device, the card starts the cassette there without switching devices first.
