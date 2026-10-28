@@ -598,32 +598,39 @@ class CantabileCard extends HTMLElement {
       <div class="toloo">${tolo(hszIdx.map((i) => `<button class="hszv" data-i="${i}" title="${ESC(kim[i].nev)}">${ESC(KN(kim[i]))}</button>`).join(""), "thsz", T("Hangszóró váltása"))}<small>SPEAKERS</small></div>
       ${btIdx >= 0 ? `<div class="toloo">${tolo(`<button class="btv" data-b="1">ON</button><button class="btv" data-b="0">OFF</button>`, "tbt", T("BT be / ki"))}<small>BT</small></div>` : ""}
     </div></div>`;
-    // forgó hangszóró-választó (hi-fi SELECTOR mintára): a gomb két oldalán egymás alatt a nevek (bal oldalt jobbra, jobb
-    // oldalt balra zárva), mindegyiktől vízszintes, majd ferde vonal fut a gombhoz – a mutató abba az irányba fordul; a
-    // lámpa a vonalon, a gomb mellett. Legfeljebb 4 állásnál minden név jobbra kerül; legfeljebb 10 állás (oldalanként 5).
+    // forgó hangszóró-választó (hi-fi SELECTOR mintára): a mutató állásai egyenletesen egy ~270°-os íven (bal alsótól az
+    // óramutató irányában a jobb alsóig); minden álláshoz sugárirányú vonal indul a gombból, és a név magasságában vízszintesbe
+    // fordul. Oldalanként legfeljebb 4 név (bal oldalt jobbra, jobb oldalt balra zárva); a 9. név középen a gomb fölé, a 10.-kel
+    // ketten a gomb fölé, egymás mellé kerülnek. Legfeljebb 4 állásnál minden név jobbra (a gomb jobb felén, 0–150°).
     const L0 = kim.map((h, i) => i).filter((i) => kim[i].entity !== HELYI).slice(0, 10), nL = L0.length;
-    const ketOldal = nL > 4, nBal = ketOldal ? Math.floor(nL / 2) : 0, sorMax = ketOldal ? nL - nBal : nL;
-    const R = 26, SOR = sorMax > 4 ? 16 : 18, VH = Math.max(90, sorMax * SOR + 24), CY = Math.round(VH / 2) - 3, KAR = 16, VIZ = 9;
-    const CX = ketOldal ? 108 : R + 8, VW = ketOldal ? 216 : CX + R + KAR + VIZ + 74;
-    // a mutató állásai (és a vonalak csatlakozása a gombon) egyenletesen egy kb. 270°-os íven, a bal alsótól az óramutató
-    // irányában a jobb alsóig – mint egy valódi kapcsolón; csak jobb oldali neveknél a gomb jobb felén (0–150°)
+    const ketOldal = nL > 4, R = 26, SUG = R + 14, VIZ = 10, LBL = 66;
     const IV = ketOldal ? [-135, 135] : [0, 150];
+    const fokok = L0.map((i, n) => (nL > 1 ? IV[0] + ((IV[1] - IV[0]) * n) / (nL - 1) : 0));
+    // a felső (gomb fölötti) nevek: 9-nél a középső, 10-nél a két középső
+    const felso = new Set(nL === 9 ? [4] : nL === 10 ? [4, 5] : []);
+    const CX = ketOldal ? SUG + VIZ + LBL : R + 8, CY = SUG + 14, VH = CY + Math.round(SUG * 0.71) + 20;
+    const VW = ketOldal ? 2 * CX : CX + SUG + VIZ + LBL + 8;
     const allas = {};
     L0.forEach((i, n) => {
-      const bal = n < nBal, k = bal ? nBal : nL - nBal, j = bal ? nBal - 1 - n : n - nBal;     // bal oldalt alulról felfelé, jobb oldalt fentről lefelé
-      const y = CY + (j - (k - 1) / 2) * SOR, kx = CX + (bal ? -1 : 1) * (R + KAR);
-      const fok = nL > 1 ? IV[0] + ((IV[1] - IV[0]) * n) / (nL - 1) : 0, szog = (fok * Math.PI) / 180;
-      const p = [CX + (R + 2) * Math.sin(szog), CY - (R + 2) * Math.cos(szog)];
-      const dx = kx - p[0], dy = y - p[1], d = Math.hypot(dx, dy) || 1;                       // a lámpa a ferde szakaszon, a gomb mellett
-      allas[i] = { bal, y, kx, lx: kx + (bal ? -VIZ : VIZ), fok, p, l: [p[0] + (dx / d) * 5, p[1] + (dy / d) * 5] };
+      const fok = fokok[n], szog = (fok * Math.PI) / 180, irany = [Math.sin(szog), -Math.cos(szog)];
+      const pont = (r) => [CX + r * irany[0], CY + r * irany[1]];
+      const p = pont(R + 2), k = pont(SUG), lamp = pont(R + 6);
+      let oldal = felso.has(n) ? (nL === 9 ? "fent" : n === 4 ? "fbal" : "fjobb") : fok <= 0 && ketOldal ? "bal" : "jobb";
+      // vízszintes szakasz: oldalt az oszlop széléig, fölül csak egy rövid kitérő a két név között
+      const vegX = oldal === "bal" ? CX - SUG - VIZ : oldal === "jobb" ? CX + SUG + VIZ : oldal === "fbal" ? k[0] - 6 : oldal === "fjobb" ? k[0] + 6 : k[0];
+      allas[i] = { oldal, fok, p, k, v: [vegX, k[1]], l: lamp };
     });
     this._forgoSzog = (i) => (allas[i] ? allas[i].fok : 0);
     const f1 = (x) => x.toFixed(1);
+    const cimke = (i) => {
+      const a = allas[i], hely = a.oldal === "bal" || a.oldal === "fbal" ? `right:${f1(VW - a.v[0] + 2)}px;top:${f1(a.v[1])}px`
+        : a.oldal === "fent" ? `left:${f1(a.v[0])}px;top:${f1(a.v[1] - 7)}px` : `left:${f1(a.v[0] + 2)}px;top:${f1(a.v[1])}px`;
+      return `<button class="fhsz${a.oldal === "fent" ? " ftop" : ""}" data-i="${i}" style="${hely}"><span class="fn">${ESC(KN(kim[i]))}</span></button>`;
+    };
     const forgo = `<div class="kimenet forgo${ketOldal ? " ket" : ""}"><div class="valaszto" style="width:${VW}px;height:${VH}px">
       <svg class="vvonal" width="${VW}" height="${VH}" viewBox="0 0 ${VW} ${VH}">${L0.map((i) => { const a = allas[i];
-        return `<polyline points="${f1(a.p[0])},${f1(a.p[1])} ${f1(a.kx)},${f1(a.y)} ${f1(a.lx)},${f1(a.y)}"/>`; }).join("")}</svg>
-      ${L0.map((i) => { const a = allas[i];
-        return `<span class="flamp" data-i="${i}" style="left:${f1(a.l[0])}px;top:${f1(a.l[1])}px"></span><button class="fhsz${a.bal ? " fbal" : ""}" data-i="${i}" style="${a.bal ? `right:${f1(VW - a.lx + 2)}px` : `left:${f1(a.lx + 2)}px`};top:${f1(a.y)}px"><span class="fn">${ESC(KN(kim[i]))}</span></button>`; }).join("")}
+        return `<polyline points="${f1(a.p[0])},${f1(a.p[1])} ${f1(a.k[0])},${f1(a.k[1])} ${f1(a.v[0])},${f1(a.v[1])}"/>`; }).join("")}</svg>
+      ${L0.map((i) => `<span class="flamp" data-i="${i}" style="left:${f1(allas[i].l[0])}px;top:${f1(allas[i].l[1])}px"></span>${cimke(i)}`).join("")}
       <div class="vgomb" style="left:${CX}px;top:${CY}px" title="${T("Hangszóró váltása")}"><div class="vsapka"></div></div><small style="left:${CX - 40}px;width:80px">SPEAKERS</small></div></div>`;
     const valto = `<button class="valto" title="${T("Rádió / tape")}"><span class="vr">RADIO</span><span class="kapcs"></span><span class="vm">TAPE</span></button>`;
     let beosztas = "";
@@ -1061,6 +1068,7 @@ class CantabileCard extends HTMLElement {
         .mjobb > .otg { display: none; }
         /* forgó hangszóró-választó (magnó) */
         .valaszto { position: relative; }
+        .valaszto .fhsz.ftop { transform: translate(-50%, -50%); }
         .valaszto .vvonal { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
         .valaszto .vvonal polyline { fill: none; stroke: #7d828a; stroke-width: 1; stroke-linejoin: round; }
         .vgomb { position: absolute; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; cursor: pointer;

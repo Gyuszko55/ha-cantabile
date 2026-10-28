@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.12.3 – unreleased
+
+- Speaker selector: at most 4 names per side; a 9th name sits centred above the knob, with a 10th the two top names sit side by side above it. Each line now leaves the knob radially (from its evenly spaced position on the ~270° arc) and turns horizontal at the height of its name.
+
 ## 1.12.2 – 2026-10-28
 
 - Cantabile TV: when the integration reloads (e.g. after adding a TV), a running TV page and its track details – CUE sheet included – carry over to the re-created player, so the card no longer falls back to the whole file's title and length. If a player still doesn't know what plays, the TV page sends the details again and signs in anew.
