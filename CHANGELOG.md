@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.12.6 – unreleased
+## 1.12.6 – 2026-10-28
 
 - Phone radio laid out like the phone tape deck: NET · SLEEP · BT right under the station buttons, then the volume knob with the SPEAKERS selector beside it, and at the bottom POWER in the left corner with the horizontal RADIO / TAPE switch in the middle.
 - Very narrow phones (card under 390 px): the two-sided speaker selector is drawn a little smaller on the radio and the tape deck, so the names don't touch the volume knob.
