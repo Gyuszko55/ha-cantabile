@@ -581,7 +581,7 @@ class CantabileCard extends HTMLElement {
     this._forgoSzog = (i) => (nL > 1 ? -82 + (164 * L0.indexOf(i)) / (nL - 1) : 0);
     const fPont = (i, r) => { const a = (this._forgoSzog(i) * Math.PI) / 180; return [100 + r * Math.sin(a), 64 - r * Math.cos(a)]; };
     const forgo = `<div class="kimenet forgo"><div class="valaszto">
-      ${L0.map((i) => { const [x, y] = fPont(i, 56); const szg = this._forgoSzog(i), old = szg < -60 ? " bal" : szg > 60 ? " jobb" : ""; return `<i class="vt" style="transform:rotate(${this._forgoSzog(i)}deg)"></i><button class="fhsz${old}" data-i="${i}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><span class="lamp"></span><span class="fn">${ESC(kim[i].rovid || kim[i].nev)}</span></button>`; }).join("")}
+      ${L0.map((i) => { const [x, y] = fPont(i, 56); const szg = this._forgoSzog(i), old = szg < -60 ? " fbal" : szg > 60 ? " fjobb" : ""; return `<i class="vt" style="transform:rotate(${this._forgoSzog(i)}deg)"></i><button class="fhsz${old}" data-i="${i}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><span class="lamp"></span><span class="fn">${ESC(kim[i].rovid || kim[i].nev)}</span></button>`; }).join("")}
       <div class="vgomb" title="${T("Hangszóró váltása")}"><div class="vsapka"></div></div><small>SPEAKERS</small></div></div>`;
     const valto = `<button class="valto" title="${T("Rádió / tape")}"><span class="vr">RADIO</span><span class="kapcs"></span><span class="vm">TAPE</span></button>`;
     let beosztas = "";
@@ -1032,11 +1032,11 @@ class CantabileCard extends HTMLElement {
         .valaszto .fhsz.akt { color: #23262b; }
         .valaszto .fhsz .fn { max-width: 78px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
         /* oldalsó állások: a név kifelé nyúlik, a lámpa a gomb felőli oldalon – hosszú név sem csúszik a gomb alá */
-        .valaszto .fhsz.bal { transform: translate(calc(-100% + 6px), -50%); flex-direction: row-reverse; }
-        .valaszto .fhsz.jobb { transform: translate(-6px, -50%); }
+        .valaszto .fhsz.fbal { transform: translate(calc(-100% + 6px), -50%); flex-direction: row-reverse; }
+        .valaszto .fhsz.fjobb { transform: translate(-6px, -50%); }
         .valaszto .fhsz.akt .lamp { background: #ffb020; box-shadow: 0 0 5px #ffb020; }
         .magno .mjobb > .forgo .valaszto { zoom: .92; }
-        :host([keskeny]) .magno .mjobb > .forgo .valaszto { zoom: 1.1; }
+        :host([keskeny]) .magno .mjobb > .forgo .valaszto { zoom: .9; }
         .magno .mjobb .mfelirat { max-width: 66px; font-size: 7.5px; letter-spacing: .04em; }
         :host([keskeny]) .magno .mjobb .mfelirat { font-size: 8px; letter-spacing: .08em; }
         .forgo.bton .fhsz.akt { color: #8a8e94; } .forgo.bton .fhsz.akt .lamp { background: #c9a14a; box-shadow: none; }
@@ -1045,11 +1045,12 @@ class CantabileCard extends HTMLElement {
         .fgomb.tiltva { opacity: .4; pointer-events: none; }
         .magno .kap .fgomb { display: none; }
         :host([keskeny]) .mkij .mfunk { display: none; }
-        /* mobil: felül az öt gomb teljes szélességben, alattuk a hangerőgomb és a RÁDIÓ / TAPE kapcsoló, legalul a forgó választó – így a szélső hangszórónevek sem lógnak le */
-        :host([keskeny]) .magno .mjobb { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "otg otg" "hang kap" "kim kim"; justify-content: stretch; align-items: center; gap: 4px 8px; row-gap: 6px; }
+        /* mobil: felül az öt gomb teljes szélességben, alattuk a hangerőgomb és mellette a forgó választó, legalul a RÁDIÓ / TAPE kapcsoló */
+        :host([keskeny]) .magno .mjobb { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "otg otg" "hang kim" "kap kap"; justify-content: stretch; align-items: center; gap: 4px 8px; row-gap: 6px; }
         :host([keskeny]) .magno .mjobb > .kap { margin-top: 0; }
+        :host([keskeny]) .magno .mjobb > .hangero { transform: translateY(var(--hgy, 0px)) scale(.72); margin: -25px -25px -25px -22px; }
         :host([keskeny]) .magno .mjobb > .otg { display: grid; grid-area: otg; align-self: end; margin-top: 4px; }
-        :host([keskeny]) .magno .mjobb > .forgo { justify-self: center; align-self: start; }
+        :host([keskeny]) .magno .mjobb > .forgo { justify-self: center; align-self: center; }
         :host([keskeny]) .magno .kap .fgomb { display: flex; min-width: 0; letter-spacing: .1em; }
         .magno .kap .sleep { display: none; }
         :host([keskeny]) .mkij { display: contents; }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.9.8 – 2026-10-28
+
+- Phone layout of the tape deck: the SPEAKERS selector is back beside the volume knob (under the five function buttons), the RADIO / TAPE switch moves below them; the selector and the knob are a little smaller so the outermost names fit on a 360 px wide phone.
+- Fixed: on phones the selected speaker in the leftmost dial position lost its place and lamp (its side class collided with the layout's own `.bal` class), so the first speaker looked missing from the dial.
+
 ## 1.9.7 – 2026-10-28
 
 - Voice: the Cantabile instructions given to the assistant no longer name the tool by its short name. With more than one LLM API enabled, Home Assistant lists it as `cantabile__cantabile_play`; a model told to use "cantabile_play" sometimes invented its own prefix (`cantabile:cantabile_play`), which Home Assistant rejects as an unknown tool, and the request fell back to the built-in media search.
