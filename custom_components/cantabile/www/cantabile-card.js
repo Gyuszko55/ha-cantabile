@@ -910,7 +910,7 @@ class CantabileCard extends HTMLElement {
         .jobb > .hangero, .mjobb > .hangero { grid-area: hang; justify-self: center; transform: scale(.84); margin: -14px; }
         .magno .mjobb > .hangero { transform: translateY(var(--hgy, 0px)) scale(.78); }
         :host(:not([keskeny])) .elo.magno { grid-template-columns: minmax(0, 1fr) 260px; }
-        :host(:not([keskeny])) .magno .mjobb > .forgo, :host(:not([keskeny])) .magno .mjobb > .kap { transform: translateY(var(--fgy, 0px)); }
+        :host(:not([keskeny])) .magno .mjobb > .forgo { transform: translateY(var(--fgy, 0px)); }
         .kimenet { grid-area: kim; }
         .kap { grid-area: kap; display: flex; flex-direction: column; align-items: center; gap: 7px; }
         .kap .valto, .rbal .valto { flex-direction: column; gap: 4px; }
@@ -1132,6 +1132,8 @@ class CantabileCard extends HTMLElement {
         .magno .kap .fgomb { display: none; }
         :host([keskeny]) .mkij .mfunk { display: none; }
         /* mobil: felül az öt gomb teljes szélességben, alattuk a hangerőgomb és mellette a forgó választó, legalul a RÁDIÓ / TAPE kapcsoló */
+        /* széles magnó: a (nagyobb feliratú) választó a hangerőgomb alatt teljes szélességben, a RADIO/TAPE kapcsoló a gomb mellett */
+        :host(:not([keskeny])) .magno .mjobb { grid-template-areas: "kap hang" "kim kim"; }
         :host([keskeny]) .magno .mjobb { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "otg otg" "hang kim" "kap kap"; justify-content: stretch; align-items: center; gap: 4px 8px; row-gap: 6px; }
         :host([keskeny]) .magno .mjobb > .kap { margin-top: 0; }
         :host([keskeny]) .magno .mjobb > .hangero { transform: translateY(var(--hgy, 0px)) scale(.72); margin: -25px -25px -25px -22px; }
@@ -3830,6 +3832,12 @@ class CantabileCard extends HTMLElement {
         uj = Math.max(0, Math.min(uj, regi + (jr.bottom - a.bottom)));
       }
       if (Math.abs(uj - regi) > 0.5) j.style.setProperty(v, `${uj.toFixed(1)}px`);
+    }
+    // keskenyebb széles kártyán a választó felső neve ne csússzon a VOLUME feliratra: akkor a hangerőgomb megy feljebb
+    const hc = m.querySelector(".mjobb > .hangero")?.getBoundingClientRect(), fo = m.querySelector(".mjobb > .forgo")?.getBoundingClientRect();
+    if (hc?.height && fo?.height && hc.bottom > fo.top - 6) {
+      const regi = parseFloat(j.style.getPropertyValue("--hgy")) || 0;
+      j.style.setProperty("--hgy", `${Math.max(-60, regi - (hc.bottom - fo.top + 6)).toFixed(1)}px`);
     }
   }
   _igazitKesobb() { cancelAnimationFrame(this._igazitIdo); this._igazitIdo = requestAnimationFrame(() => this._igazit()); }

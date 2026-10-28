@@ -4,6 +4,7 @@
 
 - The card uses its own fonts everywhere: a bundled Arial-compatible sans (Arimo, OFL) for all labels next to Michroma, Exo 2 and Great Vibes, so a phone with a replaced system font no longer changes the look; the phone's enlarged text size no longer pushes the layout apart (`text-size-adjust: none`).
 - Speaker selector: names 30 % larger (with room for them, and accents no longer clipped); the SPEAKERS label is the same size and colour as VOLUME.
+- Wide tape deck: the RADIO / TAPE switch moved next to the volume knob and the selector runs full width below it, so the larger selector no longer pushes the switch off the card's right edge; on narrower wide cards the volume knob moves up so the top speaker name can't touch the VOLUME label.
 
 ## 1.12.3 – 2026-10-28
 
