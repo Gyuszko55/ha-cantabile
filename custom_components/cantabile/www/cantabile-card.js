@@ -403,7 +403,13 @@ const BETU = () => {
   if (document.getElementById("tablet-radio-betu")) return;
   const st = document.createElement("style");
   st.id = "tablet-radio-betu";
-  st.textContent = "@font-face{font-family:'Great Vibes';src:url('/cantabile_static/GreatVibes-latin.woff2') format('woff2');font-display:swap}";
+  // az üzenetablak betűi (Michroma: fejléc, Exo 2: szöveg; OFL, helyben, magyar ékezetekkel)
+  const ff = (n, f, r, w = "400") => `@font-face{font-family:'${n}';src:url('/cantabile_static/${f}') format('woff2');font-weight:${w};font-display:swap;unicode-range:${r}}`;
+  const LAT = "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD";
+  const EXT = "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF";
+  st.textContent = "@font-face{font-family:'Great Vibes';src:url('/cantabile_static/GreatVibes-latin.woff2') format('woff2');font-display:swap}"
+    + ff("Michroma", "Michroma-latin.woff2", LAT) + ff("Michroma", "Michroma-latin-ext.woff2", EXT)
+    + ff("Exo 2", "Exo2-latin.woff2", LAT, "100 900") + ff("Exo 2", "Exo2-latin-ext.woff2", EXT, "100 900");
   document.head.appendChild(st);
 };
 const TAR = {
@@ -1359,6 +1365,24 @@ class CantabileCard extends HTMLElement {
         :host([keskeny]) .rotg .og-net { order: 1; } :host([keskeny]) .rotg .og-sleep { order: 2; } :host([keskeny]) .rotg .og-bt { order: 3; }
         :host([magas]) ha-card { grid-template-rows: auto; align-content: center; }
         :host([magas]) .elo { height: auto; aspect-ratio: 2.3; max-height: 100%; }
+        /* üzenetablak: külön réteg a kártya fölött – füstüveg, borostyán szegély, Michroma fejléc, Exo 2 szöveg, fogyó időcsík */
+        .uzreteg { position: absolute; left: 0; right: 0; z-index: 60; display: flex; justify-content: center; pointer-events: none; transform: translateY(-50%); }
+        .uzablak { pointer-events: none; opacity: 0; transform: translateY(-12px) scale(.97); transition: opacity .35s ease, transform .45s cubic-bezier(.2,1.2,.4,1);
+          position: relative; overflow: hidden; box-sizing: border-box; width: min(86%, 440px); padding: 11px 16px 13px; border-radius: 7px; cursor: pointer;
+          background: linear-gradient(180deg, rgba(30,32,36,.94), rgba(10,11,13,.96)); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+          border: 1px solid rgba(255,176,32,.38);
+          box-shadow: 0 14px 34px rgba(0,0,0,.55), 0 0 22px rgba(255,160,40,.14), inset 0 1px 0 rgba(255,255,255,.09); -webkit-tap-highlight-color: transparent; }
+        .uzablak.lat { opacity: 1; transform: none; pointer-events: auto; }
+        .uzablak.zar { opacity: 0; transform: translateY(6px) scale(.98); transition: opacity .6s ease, transform .6s ease; }
+        .uzfej { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font: 400 8.5px/1 Michroma, "Helvetica Neue", Arial, sans-serif;
+          letter-spacing: .32em; color: rgba(255,190,90,.78); }
+        .uzfej i { width: 6px; height: 6px; border-radius: 50%; background: #ffb020; box-shadow: 0 0 6px #ffb020; animation: uzpislog 1.6s ease-in-out infinite; }
+        .uzszoveg { font: 500 14.5px/1.4 "Exo 2", "Helvetica Neue", Arial, sans-serif; letter-spacing: .015em; color: #f3ead8; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+        .uzido { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; transform-origin: left center;
+          background: linear-gradient(90deg, rgba(255,176,32,.25), #ffb020); box-shadow: 0 0 6px rgba(255,176,32,.7); }
+        @keyframes uzfogy { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+        @keyframes uzpislog { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+        :host([keskeny]) .uzszoveg { font-size: 13.5px; }
         /* fekete előlap (finish: black): a 90-es évek fekete, finoman húzott alumínium előlapja – világos feliratok, sötét gombok és tárcsák;
            a kijelzők, a kazetta és a lámpák színe nem változik */
         :host([fekete]) .elo {
@@ -2581,8 +2605,37 @@ class CantabileCard extends HTMLElement {
 
   _telMappa() { return this._config.magno?.feltoltes || TEL_ALAP; }
 
+  // üzenet a lejátszón: külön réteg a kártya fölött (az elrendezést nem érinti), a kártya látható részén; becsúszik, majd elhalványul.
+  // Ha a kártya épp nem látszik (pl. a lapozó másik lapján), a HA saját értesítője jön.
   _uzen(szoveg) {
-    this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: szoveg }, bubbles: true, composed: true }));
+    const kartya = this.shadowRoot?.querySelector("ha-card"), r = kartya?.getBoundingClientRect();
+    const fent = r ? Math.max(0, -r.top) : 0, lent = r ? Math.min(r.height, innerHeight - r.top) : 0;
+    if (!kartya || !r.width || lent - fent < 80) {
+      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: szoveg }, bubbles: true, composed: true }));
+      return;
+    }
+    let reteg = kartya.querySelector(".uzreteg");
+    if (!reteg) {
+      reteg = document.createElement("div");
+      reteg.className = "uzreteg";
+      reteg.innerHTML = `<div class="uzablak" role="status" aria-live="polite"><div class="uzfej"><i></i>CANTABILE</div><div class="uzszoveg"></div><div class="uzido"></div></div>`;
+      reteg.querySelector(".uzablak").addEventListener("click", () => this._uzenZar());
+      kartya.appendChild(reteg);
+    }
+    const ablak = reteg.querySelector(".uzablak"), ido = Math.min(10000, 4000 + String(szoveg).length * 55);
+    reteg.querySelector(".uzszoveg").textContent = szoveg;
+    reteg.style.top = `${Math.round(fent + (lent - fent) * 0.3)}px`;
+    const csik = reteg.querySelector(".uzido");
+    csik.style.animation = "none"; void csik.offsetWidth; csik.style.animation = `uzfogy ${ido}ms linear forwards`;
+    ablak.classList.remove("zar"); void ablak.offsetWidth; ablak.classList.add("lat");
+    clearTimeout(this._uzenIdo);
+    this._uzenIdo = setTimeout(() => this._uzenZar(), ido);
+  }
+
+  _uzenZar() {
+    clearTimeout(this._uzenIdo);
+    const ablak = this.shadowRoot?.querySelector(".uzreteg .uzablak");
+    if (ablak?.classList.contains("lat")) { ablak.classList.add("zar"); ablak.classList.remove("lat"); }
   }
 
   async _bongesz(id) {

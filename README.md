@@ -195,4 +195,4 @@ The earlier Hungarian keys (`hangszorok`, `adok`, `magno`, `nas` …) are accept
 
 ## Licence
 
-MIT – see [LICENSE](LICENSE). The bundled *Great Vibes* font is under the SIL Open Font License 1.1.
+MIT – see [LICENSE](LICENSE). The bundled *Great Vibes*, *Michroma* and *Exo 2* fonts are under the SIL Open Font License 1.1 (see the OFL-*.txt files next to the card).

@@ -196,4 +196,4 @@ A korábbi magyar kulcsok (`hangszorok`, `adok`, `magno`, `nas` …) is működn
 
 ## Licenc
 
-MIT – lásd [LICENSE](LICENSE). A mellékelt *Great Vibes* betűkészlet SIL Open Font License 1.1 alatt áll.
+MIT – lásd [LICENSE](LICENSE). A mellékelt *Great Vibes*, *Michroma* és *Exo 2* betűkészlet SIL Open Font License 1.1 alatt áll (lásd a kártya melletti OFL-*.txt fájlokat).

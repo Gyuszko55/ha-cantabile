@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.11.0 – 2026-10-28
+
+- Messages appear on the player itself instead of Home Assistant's toast: a smoked-glass window with an amber edge, a blinking lamp and a CANTABILE header (Michroma), the text in Exo 2; it slides in over the visible part of the card, an amber line runs down while it stays (4–10 s depending on length), then it fades out – a tap closes it at once. It is a separate layer above the card, so the layout is untouched. When the card is not visible (e.g. another page of a pager), the Home Assistant toast is used as before.
+- Bundled fonts: Michroma and Exo 2 (SIL OFL 1.1, Latin + Latin Extended, served locally).
+
 ## 1.10.2 – 2026-10-28
 
 - Black front: horizontal brushing, much finer and denser (1–2 px hairlines) and much fainter, on a deeper black.
