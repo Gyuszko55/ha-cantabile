@@ -59,6 +59,8 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
   full-screen TV page – artist image, cover, title, artist, album, format, an equalizer that follows the music and a
   progress bar; on **DLNA** TVs a full-screen still track card. See *TV players* below.
 
+![Cantabile TV on a Cast TV: artist image, cover, track details, equalizer and progress bar](docs/images/tv-cast.png)
+
 **Voice**
 - An Assist tool for any LLM conversation agent (Google Gemini, OpenAI, Anthropic, Ollama…):
   *“Play Queen in the living room”*, *“Put on the Kind of Magic album”*, *“Turn on Jazz FM in the bedroom”*,
@@ -110,7 +112,8 @@ Front-panel labels are always English, like on a real old hi-fi; settings, messa
 | Your speakers' integration | playback | **Settings → Devices & services → Add integration**: *Sonos*, *WiiM*, *LinkPlay*, *DLNA Digital Media Renderer*, *Google Cast*, *Music Assistant*, *Squeezebox*… (Home Assistant's own integrations, not part of Cantabile). |
 | `ffmpeg` on the host | the real VU signal (optional) | Included in Home Assistant OS and the container image. On a Python-venv (Core) install, install it with the system package manager. Without it the meters simulate. |
 | A music folder | NAS / PHONE tabs (optional) | See *Connecting a music library (NAS)* below. |
-| Home Assistant reachable over https from the TV | the Cast TV page (optional) | Home Assistant Cloud, or your own external URL with a certificate. |
+| **Cast TV** (Cantabile TV, optional) | the live TV page | A Cast device with a screen (Chromecast / Google TV, Android TV box or stick, Nest Hub) set up with the **Google Cast** integration; Home Assistant reachable from the TV over **https** (Home Assistant Cloud, or your own external URL with a certificate); the `cantabile-tv` dashboard (see *TV players*). |
+| **DLNA TV** (Cantabile TV, optional) | the still track card | A TV with a DLNA renderer, set up with the **DLNA Digital Media Renderer** integration; Home Assistant's **internal URL** reachable from the TV over the LAN; `ffmpeg` on the host (it makes the track-card videos); about 1.5 GB of disk for the video cache. |
 | A conversation agent | voice control (optional) | E.g. *Google Gemini*, *OpenAI*, *Anthropic*, *Ollama*; then turn on **Cantabile** in its options (see *Voice control*). |
 | Streaming accounts / keys | DEEZER, SPOTIFY, TIDAL (optional) | See the next section. |
 
@@ -186,6 +189,26 @@ After setting up the integration, open your conversation agent's options (e.g. *
    https (Home Assistant Cloud or your own external URL).
 3. On the card: **⚙ → Speakers → + New speaker** → choose the **“Cantabile TV · …”** player (not the TV's own Cast /
    DLNA player – that would only get the sound; the card warns about it).
+
+![Cantabile TV on a DLNA TV: a full-screen still track card](docs/images/tv-dlna.jpg)
+
+**Cast settings and requirements**
+- The TV loads the page through Home Assistant's Cast receiver (`cast.home-assistant.io`), which connects to Home Assistant
+  over **https** – Home Assistant Cloud (remote UI) or your own external URL with a valid certificate. A plain `http://`
+  LAN address is not enough.
+- If you set `http: cors_allowed_origins:` yourself, keep `https://cast.home-assistant.io` in the list (it is there by default).
+- Android TV / Google TV: set the screensaver (and sleep) to *Never*, otherwise the TV leaves the page after ~15 minutes.
+- Don't let other automations cast to the same TV while it plays (they would replace the page).
+- If the Home Assistant app still runs on the TV but lost its connection (e.g. after a restart), Cantabile closes it and casts again.
+
+**DLNA settings and requirements**
+- The TV must be **on** (most TVs drop off DLNA in standby) – turn it on first, e.g. with a script or Wake-on-LAN.
+- Home Assistant's **internal URL** (Settings → System → Network) must be reachable from the TV; the TV fetches the video
+  from there without logging in (signed, time-limited links).
+- Each track is turned into a short-lived MP4 (the track card as a still picture + the music as AAC 256 kbps) under
+  `config/.cache/cantabile_tv` – about 7 s per track, the next album track is prepared in the background, the cache is
+  kept under ~1.5 GB. Radio runs as a live MPEG-TS video.
+- Seeking is not available on these videos; next / previous track work.
 
 - The TV plays the music folder, radio, NET stations and PHONE music; Deezer, Tidal and the Sonos favourites stay on Sonos.
 - DLNA: about 7 s preparation per track (on albums the next one is prepared in the background), sound as AAC 256 kbps,

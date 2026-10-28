@@ -59,6 +59,8 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
   képernyős TV-oldal – előadókép, borító, cím, előadó, album, formátum, a zenével együtt mozgó equalizer és
   haladásjelző; **DLNA**-s TV-n teljes képernyős, álló adatlap. Lásd lent: *TV-lejátszók*.
 
+![Cantabile TV Cast-os TV-n: előadókép, borító, a szám adatai, equalizer és haladásjelző](docs/images/tv-cast.png)
+
 **Hangvezérlés**
 - Assist-eszköz bármelyik LLM-es beszélgetőügynökhöz (Google Gemini, OpenAI, Anthropic, Ollama…):
   *„Játssz Queent a nappaliban”*, *„Tedd be a Kind of Magic albumot”*, *„Kapcsold be a Jazz FM-et a hálóban”*,
@@ -110,7 +112,8 @@ Az előlapok feliratai mindig angolok, mint egy igazi régi hi-fin; a beállít�
 | A hangszóróid integrációja | lejátszás | **Beállítások → Eszközök és szolgáltatások → Integráció hozzáadása**: *Sonos*, *WiiM*, *LinkPlay*, *DLNA Digital Media Renderer*, *Google Cast*, *Music Assistant*, *Squeezebox*… (a Home Assistant saját integrációi, nem a Cantabile részei). |
 | `ffmpeg` a gazdagépen | valódi VU-jel (elhagyható) | A Home Assistant OS-ben és a konténer-képben benne van. Python-venv-es (Core) telepítésnél a rendszer csomagkezelőjével tedd fel. Nélküle a mérők utánoznak. |
 | Zenemappa | NAS / PHONE fül (elhagyható) | Lásd lent: *Zenetár (NAS) csatolása*. |
-| https-en a TV felől elérhető Home Assistant | a Cast-os TV-oldal (elhagyható) | Home Assistant Cloud, vagy saját külső cím tanúsítvánnyal. |
+| **Cast-os TV** (Cantabile TV, elhagyható) | az élő TV-oldal | Képernyős Cast-eszköz (Chromecast / Google TV, Android TV-doboz vagy -stick, Nest Hub) a **Google Cast** integrációval; a Home Assistant a TV felől **https**-en elérhető (Home Assistant Cloud, vagy saját külső cím tanúsítvánnyal); a `cantabile-tv` irányítópult (lásd *TV-lejátszók*). |
+| **DLNA-s TV** (Cantabile TV, elhagyható) | az álló adatlap | DLNA-lejátszós TV a **DLNA Digital Media Renderer** integrációval; a Home Assistant **belső címe** a TV felől elérhető a helyi hálózaton; `ffmpeg` a gazdagépen (ez készíti az adatlap-videókat); kb. 1,5 GB lemezhely a videótárnak. |
 | Beszélgetőügynök | hangvezérlés (elhagyható) | Pl. *Google Gemini*, *OpenAI*, *Anthropic*, *Ollama*; utána a beállításaiban kapcsold be a **Cantabile**-t (lásd *Hangvezérlés*). |
 | Streaming-fiókok / kulcsok | DEEZER, SPOTIFY, TIDAL (elhagyható) | Lásd a következő részt. |
 
@@ -187,6 +190,26 @@ Az integráció beállítása után nyisd meg a beszélgetőügynök beállítá
    elérhetőnek kell lennie (Home Assistant Cloud vagy saját külső cím).
 3. A kártyán: **⚙ → Hangszórók → + Új hangszóró** → a **„Cantabile TV · …”** lejátszót válaszd (ne a TV saját Cast- /
    DLNA-lejátszóját – az csak a hangot kapná; a kártya figyelmeztet is rá).
+
+![Cantabile TV DLNA-s TV-n: teljes képernyős, álló adatlap](docs/images/tv-dlna.jpg)
+
+**Cast-beállítások és követelmények**
+- A TV az oldalt a Home Assistant Cast-vevőjén (`cast.home-assistant.io`) át tölti be, ami **https**-en kapcsolódik a Home
+  Assistanthoz – Home Assistant Cloud (távoli elérés) vagy saját külső cím érvényes tanúsítvánnyal. Sima `http://` helyi cím
+  nem elég.
+- Ha magad állítottad be a `http: cors_allowed_origins:` listát, maradjon benne a `https://cast.home-assistant.io` (alapból benne van).
+- Android TV / Google TV: a képernyővédőt (és az alvást) állítsd *Soha* értékre, különben a TV kb. 15 perc után elhagyja az oldalt.
+- Lejátszás közben más automatizálás ne castoljon ugyanarra a TV-re (az lecserélné az oldalt).
+- Ha a TV-n még a Home Assistant fut, de elvesztette a kapcsolatot (pl. újraindítás után), a Cantabile bezárja és újra kiküldi.
+
+**DLNA-beállítások és követelmények**
+- A TV legyen **bekapcsolva** (a legtöbb TV készenlétben eltűnik a DLNA-ról) – előbb kapcsold be, pl. szkripttel vagy Wake-on-LAN-nal.
+- A Home Assistant **belső címe** (Beállítások → Rendszer → Hálózat) legyen elérhető a TV felől; a TV onnan, bejelentkezés
+  nélkül tölti le a videót (aláírt, időkorlátos címmel).
+- Minden számból rövid életű MP4 készül (álló kép az adatlappal + a zene AAC 256 kbps-ben) a `config/.cache/cantabile_tv`
+  mappába – számonként kb. 7 mp, az album következő száma a háttérben készül, a tár ~1,5 GB alatt marad. A rádió élő
+  MPEG-TS videóként megy.
+- Ezekben a videókban nem lehet tekerni; a következő / előző szám működik.
 
 - A TV a zenemappát, a rádiót, a NET-adókat és a PHONE zenéit játssza; a Deezer, a Tidal és a Sonos-kedvencek Sonoson maradnak.
 - DLNA: számonként kb. 7 mp előkészítés (albumnál a következőt a háttérben készíti), a hang AAC 256 kbps, tekerni nem
