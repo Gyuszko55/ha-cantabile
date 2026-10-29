@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.12.13 – 2026-10-29
 
 - Speaker lock between users: a speaker belongs to the user who started music on it from a Cantabile card (or by voice as a logged-in user). Other users' cards show it dimmed with a slowly blinking lamp, can't select it or send it commands, and say who is using it ("… is in use: Kata · phone is using it."). The same user can continue from another device. Released on STOP / POWER / switching speaker, or after 5 minutes of silence; an administrator can take it over from the message (the previous user is told). Voice requests don't take a speaker someone else is using. New websocket commands `cantabile/lock/subscribe`, `cantabile/lock/claim`, `cantabile/lock/release`.
 
