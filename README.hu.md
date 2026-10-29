@@ -167,8 +167,12 @@ Másold a `custom_components/cantabile` mappát a `config/custom_components` map
 
 1. **Beállítások → Eszközök és szolgáltatások → Integráció hozzáadása → Cantabile.** Ha hangvezérlést is szeretnél,
    hagyd bekapcsolva az „Assist-eszközt”.
-2. Kártya a vezérlőpultra: **Vezérlőpult szerkesztése → Kártya hozzáadása → Cantabile.** A kártyát az integráció
-   maga szolgálja ki és regisztrálja, külön erőforrás nem kell.
+2. Kártya a vezérlőpultra: **Vezérlőpult szerkesztése → Kártya hozzáadása → Cantabile** (vagy *Kézi* kártya
+   `type: custom:cantabile-card` sorral). A kártyát az integráció maga szolgálja ki és regisztrálja, külön erőforrás nem kell.
+   > **A kártya magától nem jelenik meg.** Az integráció létrehozza az entitásokat és elérhetővé teszi a kártyát, de a
+   > vezérlőpultra neked kell feltenned. Ha a kártyaválasztóban nincs „Cantabile”, az újraindítás után frissítsd a
+   > böngészőt (Ctrl+F5, vagy újratöltés a mobilappban). YAML-módú erőforrásoknál vedd fel a
+   > `/cantabile_static/cantabile-card.js` fájlt *module* típusú erőforrásként.
 3. A kártya **⚙** gombjával állítsd be a hangszórókat, az adókat és a zenemappát. A *Mentés* minden vezérlőpult minden
    Cantabile kártyájába beírja, így a tablet és a telefon egyforma marad.
 

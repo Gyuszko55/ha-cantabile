@@ -166,8 +166,12 @@ Copy `custom_components/cantabile` into your `config/custom_components` folder a
 ## Setup
 
 1. **Settings → Devices & services → Add integration → Cantabile.** Leave “Assist tool” on if you want voice control.
-2. Add the card to a dashboard: **Edit dashboard → Add card → Cantabile.** The integration serves and registers the card
-   itself – no separate resource is needed.
+2. Add the card to a dashboard: **Edit dashboard → Add card → Cantabile** (or a *Manual* card with
+   `type: custom:cantabile-card`). The integration serves and registers the card itself – no separate resource is needed.
+   > **The card does not appear on its own.** The integration creates the entities and makes the card available, but you
+   > have to add it to a dashboard yourself. If “Cantabile” is missing from the card picker, hard-refresh the browser
+   > (Ctrl+F5, or reload in the companion app) after the restart. With YAML-mode resources, add
+   > `/cantabile_static/cantabile-card.js` as a *module* resource.
 3. Open **⚙** on the card to set the speakers, stations and the music folder. *Save* writes the settings into every
    Cantabile card on all your dashboards, so the tablet and the phone stay identical.
 
