@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.12.11 – unreleased
+## 1.12.11 – 2026-10-29
 
 - WIIM tab on the tape shelf (when a WiiM is among the speakers): the WiiM's presets as tapes – anything saved as a preset in the WiiM Home app, from any of its music services (Tidal, Qobuz, Amazon Music, Deezer, radio…), plays from Cantabile on the WiiM. On another speaker the card says where they play.
 - QUEUE tab on a WiiM: when the WiiM plays its own queue (a preset or an album started in the WiiM app), the queue is listed and a tap jumps to a track.
