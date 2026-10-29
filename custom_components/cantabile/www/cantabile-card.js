@@ -299,6 +299,14 @@ const EN = {
   "telefon": "phone",
   "számítógép": "computer",
   "hangvezérlés": "voice control",
+  "Hangos keresés": "Voice search",
+  "Nem értettem – próbáld újra.": "I didn't catch that – try again.",
+  "Nem hallottam semmit – próbáld újra.": "I didn't hear anything – try again.",
+  "A hangos kereséshez mikrofon kell, amit a böngésző csak https-kapcsolaton enged.": "Voice search needs the microphone, which the browser only allows over https.",
+  "A mikrofon nincs engedélyezve – engedd meg a böngészőben vagy a HA app beállításaiban.": "The microphone isn't allowed – allow it in the browser or in the HA app settings.",
+  "Nem érhető el mikrofon: {e}": "No microphone available: {e}",
+  "Nincs beszédfelismerő: állíts be egy hangsegédet beszédfelismeréssel (Beállítások → Hangsegédek).": "No speech recognition: set up an assistant with speech-to-text (Settings → Voice assistants).",
+  "A beszédfelismerés nem sikerült: {e}": "Speech recognition failed: {e}",
   "A Cantabile integráció nincs telepítve.": "The Cantabile integration is not installed.",
   "Rádióadásnál a pontos hely nem ismert, a szöveg kiemelés nélkül látszik.": "On radio the exact position is unknown, so no line is highlighted."
 };
@@ -633,6 +641,7 @@ class CantabileCard extends HTMLElement {
     cancelAnimationFrame(this._anim); this._anim = null;
     this._jelFeliratkozas();
     this._foglSub?.then((u) => u?.(), () => {}); this._foglSub = null; this._foglKesz = false;
+    this._mik?.megszakit?.();
   }
 
   _kezdoHangszoro() {
@@ -1380,6 +1389,18 @@ class CantabileCard extends HTMLElement {
         .pkeres { width: 100%; box-sizing: border-box; border: 1px solid rgba(233,220,196,.35); border-radius: 15px; padding: 6px 12px; background: rgba(0,0,0,.25);
           color: #f3e8d4; font: 500 calc(13px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; outline: none; }
         .pkeres::placeholder { color: #a88f6b; }
+        .mikdoboz { position: relative; display: block; flex: 1; min-width: 0; }
+        .mikdoboz > input { width: 100%; box-sizing: border-box; padding-right: 34px !important; }
+        .pmik { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%;
+          display: grid; place-items: center; background: transparent; color: #cdb995; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .bker .pmik { color: inherit; opacity: .75; }
+        .pmik svg { width: 16px; height: 16px; fill: currentColor; }
+        .pmik:hover { color: #ffd892; }
+        .pmik:focus-visible { outline: 2px solid #ffd892; outline-offset: 1px; }
+        .pmik.rogzit { background: #c8321f; color: #fff; opacity: 1; animation: mikpulz 1.1s ease-in-out infinite; }
+        .pmik.dolgozik { background: rgba(255,216,146,.2); color: #ffd892; opacity: 1; animation: mikpulz 1.1s ease-in-out infinite; }
+        @keyframes mikpulz { 50% { box-shadow: 0 0 0 5px rgba(200,50,31,.28); } }
+        @media (prefers-reduced-motion: reduce) { .pmik.rogzit, .pmik.dolgozik { animation: none; } }
         .pkeres:focus { border-color: #ffd892; }
         .kcsop { margin: 10px 0 6px; color: #cdb995; font: 700 calc(10px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; display: flex; gap: 8px; }
         .kcsop:first-child { margin-top: 2px; }
@@ -2586,6 +2607,7 @@ class CantabileCard extends HTMLElement {
     b.querySelectorAll("select[data-l]").forEach((el) => el.addEventListener("change", () => this._beallIr(el)));
     b.querySelectorAll("[data-a]").forEach((el) => el.addEventListener("click", () => this._beallMuvelet(el)));
     b.querySelector("#bkeres").addEventListener("keydown", (e) => { if (e.key === "Enter") this._keres(); });
+    this._mikHozza(b.querySelector("#bkeres"), () => this._keres());
   }
 
   _beallIr(el) {
@@ -3157,6 +3179,145 @@ class CantabileCard extends HTMLElement {
     this._frissit();
   }
 
+  // ---- hangos keresés: mikrofon gomb a keresőmezőkben. A HA Assist beszédfelismerője (az alapértelmezett hangsegéd
+  // folyamatának STT-része, assist_pipeline/run), ha nincs ilyen, a böngészőé (Web Speech). A felismert szöveg a mezőbe
+  // kerül, és a keresés elindul; a mező a szokott módon javítható.
+  _mikHozza(inp, utana = null) {
+    if (!inp || inp.parentElement?.classList.contains("mikdoboz")) return;
+    const w = document.createElement("span"), b = document.createElement("button");
+    w.className = "mikdoboz";
+    b.type = "button"; b.className = "pmik"; b.title = T("Hangos keresés"); b.setAttribute("aria-label", T("Hangos keresés"));
+    b.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>';
+    inp.replaceWith(w); w.append(inp, b);
+    if (this._mik?.id === inp.id) { this._mik.b = b; b.classList.add(this._mik.fazis); }   // újrarajzolás felvétel közben
+    b.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (this._mik) return this._mik.allj?.();
+      this._mikIndit(inp.id, b, utana);
+    });
+  }
+
+  _mikFazis(f) {
+    const m = this._mik; if (!m) return;
+    m.b?.classList.remove(m.fazis); m.fazis = f; m.b?.classList.add(f);
+  }
+
+  async _mikIndit(id, b, utana) {
+    const m = this._mik = { id, b, fazis: "rogzit", allj: null, megszakit: null };
+    b.classList.add("rogzit");
+    let szoveg = null;
+    try {
+      szoveg = await this._mikAssist(m);
+    } catch (e) {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (e?.tartalek && SR && this._mik === m) {
+        try { szoveg = await this._mikBongeszo(m, SR); } catch (e2) { this._mikHiba(e2); }
+      } else this._mikHiba(e?.tartalek ? { kod: "nincs" } : e);
+    } finally {
+      m.b?.classList.remove("rogzit", "dolgozik");
+      if (this._mik === m) this._mik = null;
+    }
+    if (szoveg == null || m.megszakitva) return;
+    const t = String(szoveg).trim().replace(/[.!?]+$/, "");
+    if (!t) return this._uzen(T("Nem értettem – próbáld újra."));
+    const inp = this.shadowRoot?.getElementById(id);
+    if (!inp) return;
+    inp.value = t;
+    inp.dispatchEvent(new Event("input", { bubbles: true }));
+    utana?.();
+  }
+
+  _mikHiba(e) {
+    const uz = {
+      https: T("A hangos kereséshez mikrofon kell, amit a böngésző csak https-kapcsolaton enged."),
+      engedely: T("A mikrofon nincs engedélyezve – engedd meg a böngészőben vagy a HA app beállításaiban."),
+      mik: T("Nem érhető el mikrofon: {e}", { e: e?.e?.message || e?.e || "" }),
+      nincs: T("Nincs beszédfelismerő: állíts be egy hangsegédet beszédfelismeréssel (Beállítások → Hangsegédek)."),
+      csend: T("Nem hallottam semmit – próbáld újra."),
+    }[e?.kod] || T("A beszédfelismerés nem sikerült: {e}", { e: e?.e?.message || e?.e?.code || e?.e || e?.message || e || "" });
+    this._uzen(uz);
+  }
+
+  // a HA Assist STT-je: 16 kHz-es, 16 bites mono PCM a websocketen (bináris keretek: az első bájt a kezelő azonosítója);
+  // a HA hangfelismerése (VAD) jelzi, ha elhallgattunk – vagy a gomb újbóli megnyomása, legkésőbb 10 mp
+  _mikAssist(m) {
+    return new Promise((ok, hiba) => {
+      const conn = this._hass?.connection;
+      if (!conn?.socket) return hiba({ tartalek: true });
+      if (!navigator.mediaDevices?.getUserMedia) return hiba({ kod: "https" });
+      let folyam = null, ctx = null, unsub = null, kezelo = null, vege = false, kesz = false, szoveg = null, hibaJott = null;
+      const sor = [], idok = [];
+      const takarit = () => {
+        idok.forEach(clearTimeout);
+        try { folyam?.getTracks().forEach((t) => t.stop()); } catch (e) { /* már leállt */ }
+        try { ctx?.close(); } catch (e) { /* már zárva */ }
+        unsub?.then((u) => u?.(), () => {});
+      };
+      const befejez = (fn, v) => { if (kesz) return; kesz = true; takarit(); fn(v); };
+      const kuld = (d) => { try { conn.socket.send(d); } catch (e) { /* bontott kapcsolat: a run-end / az időkorlát zár */ } };
+      const keret = (i16) => { const d = new Uint8Array(1 + i16.byteLength); d[0] = kezelo; d.set(new Uint8Array(i16.buffer), 1); kuld(d); };
+      const allj = () => {
+        if (vege) return;
+        vege = true; this._mikFazis("dolgozik");
+        try { folyam?.getTracks().forEach((t) => t.stop()); } catch (e) { /* már leállt */ }
+        if (kezelo != null) kuld(new Uint8Array([kezelo]));
+      };
+      m.allj = allj;
+      m.megszakit = () => { m.megszakitva = true; allj(); befejez(ok, null); };
+      navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }).then((f) => {
+        folyam = f;
+        if (kesz) return takarit();
+        const AC = window.AudioContext || window.webkitAudioContext;
+        try { ctx = new AC({ sampleRate: 16000 }); } catch (e) { ctx = new AC(); }
+        const arany = ctx.sampleRate / 16000, forras = ctx.createMediaStreamSource(f), proc = ctx.createScriptProcessor(4096, 1, 1);
+        proc.onaudioprocess = (ev) => {
+          if (vege) return;
+          const be = ev.inputBuffer.getChannelData(0), n = Math.floor(be.length / arany), i16 = new Int16Array(n);
+          for (let i = 0; i < n; i++) i16[i] = Math.max(-1, Math.min(1, be[Math.floor(i * arany)])) * 0x7fff;
+          if (kezelo == null) sor.push(i16); else keret(i16);
+        };
+        forras.connect(proc); proc.connect(ctx.destination);
+        unsub = conn.subscribeMessage((ev) => {
+          if (ev.type === "run-start") {
+            kezelo = ev.data?.runner_data?.stt_binary_handler_id;
+            if (kezelo == null) { hibaJott = { code: "nincs-stt" }; return; }
+            sor.splice(0).forEach(keret);
+            if (vege) kuld(new Uint8Array([kezelo]));
+          } else if (ev.type === "stt-vad-end") allj();
+          else if (ev.type === "stt-end") szoveg = ev.data?.stt_output?.text || "";
+          else if (ev.type === "error") hibaJott = ev.data || {};
+          else if (ev.type === "run-end") {
+            if (szoveg != null) return befejez(ok, szoveg);
+            if (hibaJott?.code === "stt-no-text-recognized") return befejez(ok, "");
+            // nem jutott el a hangig (nincs hangsegéd / beszédfelismerő): a böngésző felismerője jöhet
+            befejez(hiba, kezelo == null || hibaJott?.code === "nincs-stt" ? { tartalek: true } : { kod: "stt", e: hibaJott });
+          }
+        }, { type: "assist_pipeline/run", start_stage: "stt", end_stage: "stt", input: { sample_rate: 16000 } });
+        unsub.catch(() => befejez(hiba, { tartalek: true }));
+        idok.push(setTimeout(allj, 10000), setTimeout(() => befejez(hiba, { kod: "stt", e: "időtúllépés" }), 30000));
+      }, (e) => befejez(hiba, { kod: e?.name === "NotAllowedError" || e?.name === "SecurityError" ? "engedely" : "mik", e }));
+    });
+  }
+
+  // tartalék: a böngésző beszédfelismerője (Chrome: a Google-é); a félkész szöveg már gépelés közben a mezőben látszik
+  _mikBongeszo(m, SR) {
+    return new Promise((ok, hiba) => {
+      const r = new SR(), ny = String(this._hass?.locale?.language || this._hass?.language || "en");
+      r.lang = ny === "hu" ? "hu-HU" : ny; r.interimResults = true; r.maxAlternatives = 1;
+      let vegso = "", rossz = null;
+      r.onresult = (e) => {
+        vegso = [...e.results].map((x) => x[0].transcript).join("");
+        const inp = this.shadowRoot?.getElementById(m.id); if (inp) inp.value = vegso;
+      };
+      r.onerror = (e) => { rossz = e.error === "not-allowed" || e.error === "service-not-allowed" ? { kod: "engedely" } : e.error === "no-speech" ? { kod: "csend" } : e.error === "aborted" ? null : { kod: "stt", e: e.error }; };
+      r.onend = () => (rossz ? hiba(rossz) : ok(m.megszakitva ? null : vegso));
+      r.onspeechend = () => this._mikFazis("dolgozik");
+      m.allj = () => { this._mikFazis("dolgozik"); r.stop(); };
+      m.megszakit = () => { m.megszakitva = true; r.abort(); };
+      try { r.start(); } catch (e) { hiba({ kod: "stt", e }); }
+    });
+  }
+
   _netZar() {
     this._net = null;
     const p = this.shadowRoot?.getElementById("netpolc");
@@ -3189,6 +3350,7 @@ class CantabileCard extends HTMLElement {
       this._netIdo = setTimeout(() => this._netLista(lista), 450);
     });
     inp?.addEventListener("keydown", (e) => { if (e.key === "Enter") inp.blur(); });
+    this._mikHozza(inp);
     this._netLista(lista);
   }
 
@@ -3966,6 +4128,7 @@ class CantabileCard extends HTMLElement {
         this._keresIdo = setTimeout(() => (pl.ful === "mind" ? this._mindRajz(lista) : KERES_NORM(pl.keres).length >= 2 ? (pl.ful === "deezer" ? this._deezerRajz(lista) : szolg ? this._szolgRajz(lista, pl.ful) : this._keresRajz(lista)) : this._polcRajz()), pl.ful === "deezer" || szolg || pl.ful === "mind" ? 450 : 180);
       });
       kereso.addEventListener("keydown", (e) => { if (e.key === "Enter") kereso.blur(); });
+      this._mikHozza(kereso);
     }
     if (pl.ful === "mind") return this._mindRajz(lista);
     if (pl.ful === "deezer") return this._deezerRajz(lista);

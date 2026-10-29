@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Voice search: every search box on the tape shelf (SEARCH, NAS, Deezer, Spotify, Tidal), in NET and in the ⚙ station search has a microphone button. Speak, and the recognised text goes into the box and is searched straight away. Recognition uses the speech-to-text of the default Assist voice assistant (streamed over the websocket, `assist_pipeline/run`, STT stage only); if there is none, the browser's own recogniser (Web Speech). Recording stops when you stop talking, on a second tap or after 10 s; missing https, a denied microphone or no recogniser give a clear message.
+
 ## 1.12.13 – 2026-10-29
 
 - Speaker lock between users: a speaker belongs to the user who started music on it from a Cantabile card (or by voice as a logged-in user). Other users' cards show it dimmed with a slowly blinking lamp, can't select it or send it commands, and say who is using it ("… is in use: Kata · phone is using it."). The same user can continue from another device. Released on STOP / POWER / switching speaker, or after 5 minutes of silence; an administrator can take it over from the message (the previous user is told). Voice requests don't take a speaker someone else is using. New websocket commands `cantabile/lock/subscribe`, `cantabile/lock/claim`, `cantabile/lock/release`.
