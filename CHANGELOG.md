@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.12.12 – unreleased
+## 1.12.12 – 2026-10-29
 
 Fixes from a full review:
 
