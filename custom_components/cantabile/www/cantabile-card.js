@@ -300,6 +300,12 @@ const EN = {
   "számítógép": "computer",
   "hangvezérlés": "voice control",
   "Hangos keresés": "Voice search",
+  "Műfajok (a zenefájlok címkéiből)": "Genres (from the music files' tags)",
+  "Nincs műfaj": "No genre",
+  "Műfajok gyűjtése a zenefájlok címkéiből… {k} / {n} album": "Collecting genres from the music files' tags… {k} / {n} albums",
+  "A zenefájlokban nincs műfaj-címke.": "The music files have no genre tags.",
+  "↻ Újraolvasás": "↻ Read again",
+  "A műfajok nem olvashatók: {h}": "Genres can't be read: {h}",
   "Nem értettem – próbáld újra.": "I didn't catch that – try again.",
   "Nem hallottam semmit – próbáld újra.": "I didn't hear anything – try again.",
   "A hangos kereséshez mikrofon kell, amit a böngésző csak https-kapcsolaton enged.": "Voice search needs the microphone, which the browser only allows over https.",
@@ -4121,6 +4127,7 @@ class CantabileCard extends HTMLElement {
     const ut = (pl.ful === "nas" || pl.ful === "deezer" || szolg) && pl.ut.length
       ? `<button data-vissza>${T("‹ Vissza")}</button>${ESC(pl.ut.map((x) => x.cim).join(" › "))}`
       : pl.ful === "sor" ? ""
+      : pl.ful === "mufaj" ? (pl.ut.length ? `<button data-vissza>${T("‹ Vissza")}</button>${ESC(pl.ut[0].cim)}` : T("Műfajok (a zenefájlok címkéiből)"))
       : pl.ful === "mind" ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés mindenhol…")}" value="${ESC(pl.keres || "")}">`
       : pl.ful === "wiim" ? T("WiiM-presetek")
       : pl.ful === "deezer" ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés a Deezeren…")}" value="${ESC(pl.keres || "")}">`
@@ -4136,6 +4143,7 @@ class CantabileCard extends HTMLElement {
         ${this._szolgLatszik("tidal") ? `<button class="pful ${pl.ful === "tidal" ? "akt" : ""}" data-ful="tidal" title="${T("kísérleti")}">TIDAL<sup>β</sup></button>` : ""}
         ${this._kimenetek.some((h) => this._wiim(h)) ? `<button class="pful ${pl.ful === "wiim" ? "akt" : ""}" data-ful="wiim">WIIM</button>` : ""}
         <button class="pful ${pl.ful === "nas" ? "akt" : ""}" data-ful="nas">NAS</button>
+        ${nasGyoker ? `<button class="pful ${pl.ful === "mufaj" ? "akt" : ""}" data-ful="mufaj">GENRE</button>` : ""}
         <button class="pful ${pl.ful === "tel" ? "akt" : ""}" data-ful="tel">PHONE</button>
         <button class="pful ${pl.ful === "sor" ? "akt" : ""}" data-ful="sor">QUEUE</button>
         <div class="put">${ut}</div>
@@ -4173,6 +4181,7 @@ class CantabileCard extends HTMLElement {
       if (pl.ful === "tel") return this._telRajz(lista);
       if (pl.ful === "sor") return this._sorRajz(lista);
       if (pl.ful === "wiim") return this._wiimRajz(lista);
+      if (pl.ful === "mufaj") return this._mufajRajz(lista);
       if (pl.ful === "stream") {
         const kaz = await this._streamKazettak();
         if (allapot !== kulcs(this._polc)) return;
@@ -4222,6 +4231,43 @@ class CantabileCard extends HTMLElement {
     } catch (err) {
       lista.innerHTML = `<div class="puzenet">${T("Hiba: {h}", { h: ESC(err?.message || err) })}</div>`;
     }
+  }
+
+  // GENRE fül: a zenemappa albumai műfajonként, a zenefájlok címkéiből (a szerver gyűjti albumonként, a háttérben – mufaj.py);
+  // gyűjtés közben a haladás látszik, és a lista magától frissül
+  async _mufajRajz(lista) {
+    const pl = this._polc, nas = String(this._config.magno?.nas || "").replace(/\/$/, "");
+    clearTimeout(this._mufajIdo);
+    let r;
+    try { r = await this._hass.callWS({ type: "cantabile/genres", mappa: nas, kihagy: [this._telMappa(), this._config.magno?.hires].filter(Boolean), frissit: !!pl.mufajFrissit }); }
+    catch (e) { if (this._polc === pl && pl.ful === "mufaj") lista.innerHTML = `<div class="puzenet">${T("A műfajok nem olvashatók: {h}", { h: ESC(e?.message || e) })}</div>`; return; }
+    pl.mufajFrissit = false;
+    if (this._polc !== pl || pl.ful !== "mufaj") return;
+    const fut = r.running ? `<div class="puzenet">${T("Műfajok gyűjtése a zenefájlok címkéiből… {k} / {n} album", { k: r.done, n: r.total || "…" })}</div>` : "";
+    if (r.running) this._mufajIdo = setTimeout(() => { if (this._polc === pl && pl.ful === "mufaj" && lista.isConnected) this._mufajRajz(lista); }, 2500);
+    if (!pl.ut.length) {
+      const g = r.genres;
+      lista.innerHTML = fut + (g.length ? `<div class="eloadok">${g.map((x, i) => `<button data-g="${i}">${ESC(x.name || T("Nincs műfaj"))} <small>${x.albums.length}</small></button>`).join("")}</div>`
+        : r.running ? "" : `<div class="puzenet">${T("A zenefájlokban nincs műfaj-címke.")}</div>`)
+        + (r.running ? "" : `<div class="tsor"><button class="tgomb halk" data-frissit>${T("↻ Újraolvasás")}</button></div>`);
+      lista.querySelectorAll("[data-g]").forEach((b) => b.addEventListener("click", () => {
+        const x = g[Number(b.dataset.g)]; pl.ut = [{ id: x.name, cim: x.name || T("Nincs műfaj") }]; this._polcRajz();
+      }));
+      lista.querySelector("[data-frissit]")?.addEventListener("click", () => { pl.mufajFrissit = true; this._mufajRajz(lista); });
+      return;
+    }
+    const albumok = r.genres.find((x) => x.name === pl.ut[0].id)?.albums || [];
+    const kaz = albumok.map((rel) => { const t = rel.split("/"); return { cim: t[t.length - 1], alcim: t.length > 1 ? t[t.length - 2] : "", forras: "nas", id: `${nas}/${rel}` }; })
+      .sort((a, b) => a.alcim.localeCompare(b.alcim, NYELV(), { numeric: true }) || a.cim.localeCompare(b.cim, NYELV(), { numeric: true }));
+    lista.innerHTML = fut + (kaz.length ? `<div class="kazettak">${kaz.map((k, i) => this._kazettaCsempe(k, i)).join("")}</div>` : `<div class="puzenet">${T("Üres mappa.")}</div>`);
+    lista.querySelectorAll(".kt").forEach((b) => b.addEventListener("click", async () => {
+      const k = kaz[Number(b.dataset.i)];
+      let sz;
+      try { sz = await this._albumSzamok(k.id); } catch (e) { return this._uzen(T("A zenemappa nem olvasható: {h}", { h: e?.message || e })); }
+      if (!sz.length) return this._uzen(T("Ebben a mappában nincs lejátszható szám."));
+      this._polcZar();
+      this._betolt({ ...k, szamok: sz });
+    }));
   }
 
   // TELEFON fül: (1) zene választása erről a készülékről → azonnal szól a BT kimeneten, feltöltés nélkül;

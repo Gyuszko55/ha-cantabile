@@ -28,6 +28,7 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
 - A VU-mérő a **valódi hangszintet** mutatja: az integráció a szerveren ugyanazt a streamet vagy fájlt elemzi.
 - REW / PLAY / FF / STOP / PAUSE / EJECT, SHUFFLE, REPEAT (1–5 kör vagy végtelen), FADE (Sonos-áttűnés), SLEEP.
 - Kazetta-polc (EJECT):
+  - **GENRE** – a zenemappa albumai műfajonként, a zenefájlok saját műfaj-címkéiből (albumonként egyszer olvassa ki a háttérben, utána megjegyzi; először a haladást mutatja); koppints egy műfajra, majd egy albumra;
   - **KERESÉS** – egy kereső minden forrásra: zenemappa, Deezer, Spotify, WiiM-presetek, Sonos-kedvencek és rádióadók; ugyanaz az album több forrásból egy sorba kerül forráscímkékkel, koppintásra a választott hangszórón szóló legjobb forrásból indul (vagy megmondja, melyik hangszórón szól). Minden keresőmezőben (a NET-ben és a ⚙ adókeresőjében is) 🎤 gomb van a **hangos kereséshez**: mondd, és a felismert szövegre azonnal keres. Az alapértelmezett Assist-hangsegéd beszédfelismerőjét használja, ha nincs ilyen, a böngészőét; a mikrofonhoz https kell. A magyarra állított felismerő az idegen előadóneveket néha fonetikusan írja le – ilyenkor javítsd a mezőben;
   - **STREAMING** – a Sonos-kedvencek (listák, albumok);
   - **DEEZER** – a teljes Deezer-kínálat: toplista, keresés, előadó-oldalak (csak Sonoson);

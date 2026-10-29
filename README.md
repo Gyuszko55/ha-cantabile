@@ -28,6 +28,7 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
 - The VU meters show the **real audio level**: the integration analyses the same stream or file on the server.
 - REW / PLAY / FF / STOP / PAUSE / EJECT, SHUFFLE, REPEAT (1–5 rounds or endless), FADE (Sonos crossfade), SLEEP.
 - The tape shelf (EJECT):
+  - **GENRE** – the music folder's albums by genre, from the music files' own genre tags (read once per album in the background, then kept; the tab shows the progress the first time); tap a genre, then an album;
   - **SEARCH** – one search over every source: music folder, Deezer, Spotify, WiiM presets, Sonos favourites and radio stations; the same album from several sources is one row with source tags, and a tap plays it from the best source for the chosen speaker (or says which speakers can play it). Every search box (also NET and ⚙ stations) has a 🎤 button for **voice search**: speak, and the recognised text is searched straight away. It uses the speech-to-text of your default Assist voice assistant, or the browser's own recogniser if there is none; the microphone needs https. A recogniser set to your language may spell foreign artist names phonetically – correct the text in the box;
   - **STREAMING** – your Sonos favourites (playlists and albums);
   - **DEEZER** – the whole Deezer catalogue: charts, search, artist pages (Sonos only);

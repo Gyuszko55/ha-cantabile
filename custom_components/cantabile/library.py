@@ -1,4 +1,4 @@
-"""Zenemappa-lista a magnó keresőjéhez: `cantabile/nas_list` websocket-parancs.
+"""Zenemappa-lista a magnó keresőjéhez: `cantabile/nas_list` websocket-parancs (és a GENRE fül műfajai: `cantabile/genres`, mufaj.py).
 
 A kártya egy média-forrás mappát ad meg (pl. media-source://media_source/local/Zene); a szerver bejárja a hozzá
 tartozó helyi mappát, és visszaadja az almappák és a zenefájlok relatív útvonalát. A keresést a kártya végzi (ékezet-
@@ -93,3 +93,27 @@ def regisztral(hass: HomeAssistant) -> None:
         connection.send_result(msg["id"], eredmeny)
 
     websocket_api.async_register_command(hass, ws_nas_lista)
+
+    from .mufaj import Gyujto
+    gyujto = Gyujto(hass)
+
+    @websocket_api.websocket_command({
+        vol.Required("type"): "cantabile/genres", vol.Required("mappa"): str,
+        vol.Optional("kihagy", default=[]): [str], vol.Optional("frissit", default=False): bool,
+    })
+    @websocket_api.async_response
+    async def ws_mufajok(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        """A zenemappa albumai műfajonként (a fájlok címkéiből; mufaj.py) – a GENRE fülhöz."""
+        mappa: str = msg["mappa"].rstrip("/")
+        forras, _, rel = mappa[len(ELOTAG):].partition("/") if mappa.startswith(ELOTAG) else ("", "", "")
+        alap = hass.config.media_dirs.get(forras) if forras else None
+        gyoker = media_ut(alap, rel) if alap else None
+        if gyoker is None:
+            connection.send_error(msg["id"], "rossz_mappa", szoveg(hass, "folder_not_source"))
+            return
+        if not await hass.async_add_executor_job(os.path.isdir, gyoker):
+            connection.send_error(msg["id"], "nincs_mappa", szoveg(hass, "folder_unavailable"))
+            return
+        connection.send_result(msg["id"], await gyujto.lekerdez(gyoker, msg["kihagy"], msg["frissit"]))
+
+    websocket_api.async_register_command(hass, ws_mufajok)
