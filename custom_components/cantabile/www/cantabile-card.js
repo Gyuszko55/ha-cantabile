@@ -130,6 +130,13 @@ const EN = {
   "Legalább egy hangszóró kell.": "At least one speaker is required.",
   "nem találom a kártyát ezen a vezérlőpulton": "the card was not found on this dashboard",
   "Áttekintés": "Overview",
+  "WiiM-presetek": "WiiM presets",
+  "WiiM-preset {n}": "WiiM preset {n}",
+  "Nincs WiiM a hangszórók között.": "There is no WiiM among the speakers.",
+  "A WiiM-presetek nem olvashatók: {h}": "The WiiM presets can't be read: {h}",
+  "A WiiM-presetek a(z) {h} hangszórón szólnak – válts rá.": "WiiM presets play on {h} – switch to it.",
+  "Még nincs WiiM-preset.": "There are no WiiM presets yet.",
+  "Presetet a WiiM Home appban menthetsz – bármelyik zenei szolgáltatásból (Tidal, Qobuz, Amazon, Deezer, rádió…).": "Save presets in the WiiM Home app – from any music service (Tidal, Qobuz, Amazon, Deezer, radio…).",
   "A(z) {h}: a parancs nem sikerült – {e}": "{h}: the command failed – {e}",
   "A parancs nem sikerült: {e}": "The command failed: {e}",
   "egyik sem": "none",
@@ -1726,6 +1733,7 @@ class CantabileCard extends HTMLElement {
       if (h.entity !== HELYI && this._hass?.states[h.entity]?.state === "unavailable") return false;
       if (kaz?.forras !== "stream") return true;
       if (h.entity === HELYI) return false;
+      if (kaz.tipus === "wiim_preset") return this._wiim(h);
       return h.mod === "sonos" || (kaz.tipus === "spotify" && !!this._spotifyEszkoz(h));
     };
     return (this._kimenetek || []).filter(ok).map((h) => KN(h)).join(", ") || T("egyik sem");
@@ -2777,7 +2785,10 @@ class CantabileCard extends HTMLElement {
         TAR.ir("tablet-magno-kazetta", JSON.stringify({ cim: kaz.cim, alcim: kaz.alcim, forras: "tel", id: kaz.id, entity: HELYI }));
         return this._frissit();
       }
-      if (kaz.forras === "stream") {
+      if (kaz.forras === "stream" && kaz.tipus === "wiim_preset") {
+        if (!this._wiim(hsz)) throw Object.assign(new Error(T("A(z) {h} hangszórón ez nem játszható le – lejátszható: {l}.", { h: KN(hsz), l: this._kepesek(kaz, hsz) })), { hely: true });
+        await this._hiv("media_player", "play_media", { ...e, media_content_id: kaz.id, media_content_type: "music" });
+      } else if (kaz.forras === "stream") {
         if (hsz.mod !== "sonos" && kaz.tipus === "spotify" && this._stream?.spotify_entity && hsz.entity !== HELYI) return this._spotifyConnect(kaz, hsz);
         if (hsz.mod !== "sonos") throw Object.assign(new Error(T("A(z) {h} hangszórón ez nem játszható le – lejátszható: {l}.", { h: KN(hsz), l: this._kepesek(kaz, hsz) })), { hely: true });
         if (kaz.tipus === "spotify" && /^spotify:\/\//.test(kaz.id)) {
@@ -3412,6 +3423,27 @@ class CantabileCard extends HTMLElement {
   }
 
   // ---- lejátszási sor (SOR fül): Sonoson a hangszóró saját sora, WiiM-en a kazetta számai, BT-n a kártya listája ----
+  // WiiM (a HA wiim-integrációja): a WiiM Home appban bármelyik zenei szolgáltatásból mentett presetek kazettaként
+  _wiim(h) { return !!h && h.entity !== HELYI && this._hass?.entities?.[h.entity]?.platform === "wiim"; }
+
+  async _wiimRajz(lista) {
+    const pl = this._polc, hsz = this._hangszoro();
+    const cel = this._wiim(hsz) ? hsz : this._kimenetek.find((h) => this._wiim(h));
+    if (!cel) { lista.innerHTML = `<div class="puzenet">${T("Nincs WiiM a hangszórók között.")}</div>`; return; }
+    lista.innerHTML = `<div class="puzenet">${T("Betöltés…")}</div>`;
+    let elemek;
+    try {
+      const r = await this._hass.callWS({ type: "media_player/browse_media", entity_id: cel.entity, media_content_id: "wiim_library/library_root/favorites", media_content_type: "playlist" });
+      elemek = (r.children || []).filter((x) => x.can_play);
+    } catch (err) { lista.innerHTML = `<div class="puzenet">${T("A WiiM-presetek nem olvashatók: {h}", { h: ESC(err?.message || err) })}</div>`; return; }
+    if (this._polc !== pl || pl.ful !== "wiim") return;
+    const kaz = elemek.map((x) => ({ cim: x.title, alcim: T("WiiM-preset {n}", { n: x.media_content_id }), forras: "stream", tipus: "wiim_preset", id: String(x.media_content_id), kep: x.thumbnail || null }));
+    lista.innerHTML = (this._wiim(hsz) ? "" : `<div class="puzenet">${T("A WiiM-presetek a(z) {h} hangszórón szólnak – válts rá.", { h: ESC(KN(cel)) })}</div>`)
+      + (kaz.length ? `<div class="kazettak">${kaz.map((k, i) => this._kazettaCsempe(k, i)).join("")}</div>` : "")
+      + `<div class="puzenet">${kaz.length ? "" : T("Még nincs WiiM-preset.") + " "}${T("Presetet a WiiM Home appban menthetsz – bármelyik zenei szolgáltatásból (Tidal, Qobuz, Amazon, Deezer, rádió…).")}</div>`;
+    lista.querySelectorAll(".kt").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._betolt(kaz[Number(b.dataset.i)]); }));
+  }
+
   _sorForras() {
     const hsz = this._hangszoro();
     if (hsz.entity === HELYI) {
@@ -3425,6 +3457,8 @@ class CantabileCard extends HTMLElement {
     if (hsz.mod === "sonos") return { mod: "sonos", hsz, vez, kulcs: `sonos|${vez}|${a.queue_size}`, akt: a.queue_size ? (Number(a.queue_position) || 1) - 1 : -1 };
     const kaz = this._kazetta();
     if (kaz?.szamok?.length) return { mod: "wiim", hsz, kaz, kulcs: `wiim|${kaz.id}`, akt: this._szamIndex(kaz, a) };
+    // WiiM saját sora (pl. presetből vagy a WiiM appból indított album): a HA wiim-integrációjának böngészőjéből
+    if (this._wiim(hsz)) return { mod: "wiimsor", hsz, kulcs: `wiimsor|${hsz.entity}|${a.media_album_name || ""}`, akt: (this._wiimSorCimek || []).indexOf(a.media_title || "") };
     return { mod: "nincs", hsz };
   }
 
@@ -3443,6 +3477,11 @@ class CantabileCard extends HTMLElement {
             : /^https?:/i.test(x.media_content_id || "") ? FAJLNEV(x.media_content_id) || T("(cím nélkül)") : /^x-sonos-http:/i.test(x.media_content_id || "") ? T("(cím nélkül – Deezer)") : T("(cím nélkül)"),
           al: [x.media_artist, x.media_album_name].filter(Boolean).join(" · "),
           id: x.media_content_id, nas: /^https?:\/\/[^/]+\/media\/local\//i.test(x.media_content_id || "") }));
+      } else if (f.mod === "wiimsor") {
+        const v = await this._hass.callWS({ type: "media_player/browse_media", entity_id: f.hsz.entity, media_content_id: "wiim_library/library_root/playlists", media_content_type: "playlist" });
+        elemek = (v.children || []).map((x) => ({ cim: x.title || T("(cím nélkül)"), al: "", idx: x.media_content_id }));
+        this._wiimSorCimek = elemek.map((e) => e.cim);
+        if (!elemek.length) { lista.innerHTML = `<div class="puzenet">${T("A(z) {h} hangszórón most nincs lejátszási sor. Tegyél be egy kazettát.", { h: ESC(KN(f.hsz)) })}</div>`; return; }
       } else {
         const szamok = f.mod === "helyi" ? this._helyiLista.szamok : f.kaz.szamok;
         const kiir = (id) => this._helyiNevek?.get(id) || FAJLNEV(id);
@@ -3455,7 +3494,7 @@ class CantabileCard extends HTMLElement {
     pl.sor = { kulcs: f.kulcs, db: elemek.length, elemek };
     const kevert = !!this._hass?.states[f.vez || ""]?.attributes?.shuffle, szerk = f.mod === "sonos";
     // húzással átrendezhető: Sonoson (keverés nélkül – ott a sor sorrendje nem a lejátszásé), WiiM-en és BT-n
-    const huz = elemek.length > 1 && !(szerk && kevert);
+    const huz = elemek.length > 1 && !(szerk && kevert) && f.mod !== "wiimsor";
     lista.innerHTML = `<div class="sorfej">${ESC(KN(f.hsz))} · ${T("{n} szám", { n: elemek.length })}${kevert ? ` · ${T("keverve")}` : ""}${szerk && kevert ? `<span> – ${T("keverés közben a „következőnek” nem érhető el")}</span>` : ""}</div>
       <div class="sorlista${huz ? " huzhato" : ""}">${elemek.map((e, i) => `<div class="sorsor">${huz ? `<span class="foga" title="${T("Húzd az átrendezéshez")}"><i></i><i></i><i></i></span>` : ""}<button data-q="${i}"><span class="sn">${i + 1}</span><span class="st"><b>${ESC(e.cim)}</b>${e.al ? `<small>${ESC(e.al)}</small>` : ""}</span></button>${szerk
         ? `<span class="sorm">${e.nas && !kevert ? `<button class="sm" data-kov="${i}" title="${T("Következőnek")}">${SI.kov}</button>` : ""}<button class="sm" data-tor="${i}" title="${T("Törlés a sorból")}">${SI.torol}</button></span>` : ""}</div>`).join("")}</div>`;
@@ -3595,6 +3634,7 @@ class CantabileCard extends HTMLElement {
       if (f.mod === "sonos") await this._hiv("sonos", "play_queue", { entity_id: f.vez, queue_position: i });
       else if (f.mod === "helyi") await this._helyiSzam(i);
       else if (f.mod === "wiim") await this._sorozat(f.hsz, f.kaz.szamok, i);
+      else if (f.mod === "wiimsor") await this._hiv("media_player", "play_media", { entity_id: f.hsz.entity, media_content_id: String(this._polc?.sor?.elemek?.[i]?.idx ?? i), media_content_type: "track" });
     } catch (err) { this._uzen(T("Nem sikerült a számra ugrani: {h}", { h: err?.message || err })); }
   }
 
@@ -3607,6 +3647,7 @@ class CantabileCard extends HTMLElement {
     const ut = (pl.ful === "nas" || pl.ful === "deezer" || szolg) && pl.ut.length
       ? `<button data-vissza>${T("‹ Vissza")}</button>${ESC(pl.ut.map((x) => x.cim).join(" › "))}`
       : pl.ful === "sor" ? ""
+      : pl.ful === "wiim" ? T("WiiM-presetek")
       : pl.ful === "deezer" ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés a Deezeren…")}" value="${ESC(pl.keres || "")}">`
       : szolg ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés: {s}…", { s: szolgNev })}" value="${ESC(pl.keres || "")}">`
       : nasGyoker ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés a zenemappában…")}" value="${ESC(pl.keres || "")}">`
@@ -3617,6 +3658,7 @@ class CantabileCard extends HTMLElement {
         ${this._config.deezer !== false && this._vanSonos() ? `<button class="pful ${pl.ful === "deezer" ? "akt" : ""}" data-ful="deezer">DEEZER</button>` : ""}
         ${this._szolgLatszik("spotify") ? `<button class="pful ${pl.ful === "spotify" ? "akt" : ""}" data-ful="spotify" title="${T("kísérleti")}">SPOTIFY<sup>β</sup></button>` : ""}
         ${this._szolgLatszik("tidal") ? `<button class="pful ${pl.ful === "tidal" ? "akt" : ""}" data-ful="tidal" title="${T("kísérleti")}">TIDAL<sup>β</sup></button>` : ""}
+        ${this._kimenetek.some((h) => this._wiim(h)) ? `<button class="pful ${pl.ful === "wiim" ? "akt" : ""}" data-ful="wiim">WIIM</button>` : ""}
         <button class="pful ${pl.ful === "nas" ? "akt" : ""}" data-ful="nas">NAS</button>
         <button class="pful ${pl.ful === "tel" ? "akt" : ""}" data-ful="tel">PHONE</button>
         <button class="pful ${pl.ful === "sor" ? "akt" : ""}" data-ful="sor">QUEUE</button>
@@ -3647,6 +3689,7 @@ class CantabileCard extends HTMLElement {
     try {
       if (pl.ful === "tel") return this._telRajz(lista);
       if (pl.ful === "sor") return this._sorRajz(lista);
+      if (pl.ful === "wiim") return this._wiimRajz(lista);
       if (pl.ful === "stream") {
         const kaz = await this._streamKazettak();
         if (allapot !== kulcs(this._polc)) return;
