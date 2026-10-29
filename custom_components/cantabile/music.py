@@ -34,6 +34,7 @@ from homeassistant.core import Event, HomeAssistant, ServiceCall, SupportsRespon
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 
+from . import foglalas
 from .const import szoveg
 from .library import ELOTAG, _bejar, media_ut
 from .runtime import Cantabile
@@ -765,10 +766,19 @@ class Zene:
 
     # ---- a szolgáltatás ----
     async def kezel(self, call: ServiceCall) -> dict[str, Any]:
-        return await self.play(call.data)
+        return await self.play(call.data, call.context.user_id)
 
-    async def play(self, d: dict[str, Any]) -> dict[str, Any]:
-        """A közös motor (szolgáltatás és LLM-eszköz): angol mezőnevek, angol kulcsú válasz."""
+    async def play(self, d: dict[str, Any], user_id: str | None = None) -> dict[str, Any]:
+        """A közös motor (szolgáltatás és LLM-eszköz): angol mezőnevek, angol kulcsú válasz. A foglalt hangszórót
+        (amelyet más felhasználó használ) nem veszi el; sikeres indításkor a hangszóró a kérő felhasználóé lesz."""
+        hova: list[str] = []
+        v = await self._play(d, user_id, hova)
+        if v.get("success") and user_id and hova:
+            u = await self.hass.auth.async_get_user(user_id)
+            foglalas.kozpont(self.hass).foglal(hova, user_id, (u.name if u else None) or "?", "hang")
+        return v
+
+    async def _play(self, d: dict[str, Any], user_id: str | None, hova: list[str]) -> dict[str, Any]:
         mit, fajta, eloado = str(d.get("query") or "").strip(), KIND[d.get("kind") or "auto"], str(d.get("artist") or "").strip()
         forras = SOURCE[d.get("source") or "auto"]
         beall: dict[str, Any] = {"hol": str(d.get("speaker") or "")}
@@ -782,6 +792,10 @@ class Zene:
             deezer_be = c.get("deezer") is not False
             hsz = self.hangszorok(c, d["hol"])
             hol_szoveg, tagok, mod = hsz
+            if m := foglalas.kozpont(self.hass).masik(tagok, user_id):
+                nev = next((h.get("nev") for h in c.get("hangszorok", []) if h.get("entity") == m[0]), None) or hol_szoveg
+                raise HibaUzenet("busy", hol=nev, ki=m[1]["nev"])
+            hova.extend(tagok)
             sonos = next((h["entity"] for h in c.get("hangszorok", []) if h.get("mod") == "sonos"), None)
 
             if fajta == "radio":

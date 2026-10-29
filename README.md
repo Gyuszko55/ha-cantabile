@@ -330,6 +330,14 @@ The earlier Hungarian keys (`hangszorok`, `adok`, `magno`, `nas` …) are accept
 - **Stations**: `frequency` is optional; internet-only stations are spread on the dial and show WEB.
 - **Deezer** needs the Deezer account linked in the Sonos app; without it, hide the tab (`deezer: false` or ⚙).
 - **Saving in ⚙** needs an administrator and a UI-managed dashboard; with YAML dashboards edit the YAML (and add `/cantabile_static/cantabile-card.js` as a module resource if your resources are in YAML mode). Uploading to / clearing the music folder also needs an administrator; the temporary upload works for every user.
+- **Speaker lock (several users)**: a speaker belongs to the user who started music on it from a Cantabile card
+  (or by voice, when the voice request comes from a logged-in user). On the other users' cards it is dimmed in the selector
+  with a slowly blinking lamp and can't be selected; commands to it are refused, and the card says who is using it
+  (“Living room is in use: Kata · phone is using it.”). The same user can carry on from another device. The speaker is
+  released on STOP, POWER or switching to another speaker, or when it has been silent (paused, stopped, off) for
+  5 minutes. An administrator can take it over with **Take over** in the message; the previous user's card is told.
+  Voice requests (`cantabile.play`, the Assist tool) don't take a speaker someone else is using. The BT output is never
+  locked. Locks live in memory: after a Home Assistant restart every speaker is free.
 - **Security**: the BT radio proxy (`/api/cantabile/stream`) and the temporary upload (`/api/cantabile/upload`) need a logged-in user; the proxy only passes audio, the upload folder is capped at 2 GB and cleared after 24 hours.
 - Radio Browser, Deezer and LRCLIB are public directories; Cantabile sends them only your search terms (for lyrics:
   artist, title, album and length of the song). Lyrics are cached in memory only.

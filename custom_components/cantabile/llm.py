@@ -45,7 +45,8 @@ class Lejatszas(llm.Tool):
         self._zene = zene
 
     async def async_call(self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext) -> llm.ToolResult:
-        valasz = await self._zene.play(dict(tool_input.tool_args))
+        ctx = getattr(llm_context, "context", None)
+        valasz = await self._zene.play(dict(tool_input.tool_args), ctx.user_id if ctx else None)
         # a ToolResult a HA 2025 végén jelent meg; régebbi HA-n az eszköz egyszerű választ ad vissza
         if hasattr(llm, "ToolResult"):
             return llm.ToolResult(data=valasz, error=not valasz.get("success"))

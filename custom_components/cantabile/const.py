@@ -47,6 +47,7 @@ _TEXT: dict[str, dict[str, str]] = {
     "nas_unavailable": {"hu": "A zenemappa most nem érhető el.", "en": "The music folder is not available right now."},
     "what": {"hu": "Nem értettem, mit játsszak.", "en": "I didn't catch what to play."},
     "no_station": {"hu": "Nem találok „{mit}” nevű rádióadót.", "en": "I can't find a radio station called “{mit}”."},
+    "busy": {"hu": "A(z) {hol} hangszórót most {ki} használja – válassz másikat.", "en": "{hol} is in use by {ki} right now – pick another speaker."},
     "lists_sonos": {"hu": "A listák csak Sonos hangszórón szólnak.", "en": "Playlists only play on Sonos speakers."},
     "deezer_sonos": {
         "hu": "A Deezer csak Sonos hangszórón szól.",

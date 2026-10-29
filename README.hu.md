@@ -331,6 +331,14 @@ A korábbi magyar kulcsok (`hangszorok`, `adok`, `magno`, `nas` …) is működn
 - **Adók**: a `frequency` elhagyható; a csak internetes adók a skálán elosztva, WEB felirattal.
 - **Deezer**: a Sonos appban bekötött Deezer-fiók kell; ha nincs, rejtsd el a fület (`deezer: false` vagy ⚙).
 - **Mentés a ⚙-ben**: rendszergazda és felületen szerkesztett vezérlőpult kell; YAML-vezérlőpultnál a YAML-t szerkeszd (YAML-módú erőforrásoknál a `/cantabile_static/cantabile-card.js` modult is vedd fel). A zenemappába töltés / ürítés is rendszergazdai; az átmeneti feltöltés mindenkinek megy.
+- **Hangszóró-foglalás (több felhasználó)**: a hangszóró azé a felhasználóé, aki egy Cantabile kártyáról (vagy
+  bejelentkezett felhasználóként hanggal) zenét indított rajta. A többi felhasználó kártyáján a választóban halvány,
+  a lámpája lassan villog, és nem választható ki; a parancsok sem mennek rá, a kártya megmondja, ki használja
+  („A(z) Nappali foglalt: Kata · telefon használja.”). Ugyanaz a felhasználó a másik készülékéről folytathatja.
+  A foglalás STOP-ra, POWER-re vagy másik hangszóróra váltáskor szűnik meg, vagy ha a hangszóró 5 perce nem szól
+  (szünet, áll, ki van kapcsolva). Rendszergazda az üzenet **Átveszem** gombjával átveheti; az előző felhasználó
+  kártyája erről üzenetet kap. A hangparancs (`cantabile.play`, az Assist-eszköz) nem veszi el a más által használt
+  hangszórót. A BT kimenet soha nem foglalt. A foglalás a memóriában van: HA-újraindítás után minden hangszóró szabad.
 - **Biztonság**: a BT-továbbító (`/api/cantabile/stream`) és az átmeneti feltöltés (`/api/cantabile/upload`) bejelentkezett felhasználót kér; a továbbító csak hangot ad tovább, a feltöltési mappa legfeljebb 2 GB, 24 óra után ürül.
 - A Radio Browser, a Deezer és az LRCLIB nyilvános adatbázis; a Cantabile csak a keresett szöveget küldi nekik
   (dalszövegnél: előadó, cím, album, hossz). A dalszövegeket csak a memóriában tárolja.
