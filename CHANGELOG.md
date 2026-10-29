@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Cantabile TV mirror: when you switch the card from a playing Cast TV to another speaker (selector, moving the music, or the new ▶ buttons), the TV page stays on without sound and shows what plays there – title, artist, album, cover, rotating artist pictures and progress – and follows every new track, wherever it comes from. The equaliser follows the real signal level where it can be analysed, otherwise it is simulated. It follows further speaker changes and ends when the TV plays again, is turned off, or after 10 minutes of silence. New websocket command `cantabile/tv/follow`; the TV player shows `mirror_of` while mirroring.
 - "Doesn't play here" messages offer the way out: when a search result or a tape plays only on other speakers (e.g. a Deezer album while a TV is selected), the message has a ▶ button for each speaker it plays on. A tap switches to that speaker – what was playing on the old one stops – and starts it straight away, so there is no need to leave the shelf and search again.
 
 ## 1.12.14 – 2026-10-29

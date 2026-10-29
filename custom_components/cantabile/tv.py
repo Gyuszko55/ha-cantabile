@@ -788,6 +788,20 @@ def ws_report(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: di
     conn.send_result(msg["id"], {"resend": bool(lj is not None and (not lj.meta_ismert() or lj.oldal is None))})
 
 
+@websocket_api.websocket_command({vol.Required("type"): "cantabile/tv/follow", vol.Required("source"): str, vol.Required("target"): str})
+@callback
+def ws_follow(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """A kártyán hangszórót váltottak (`source` → `target`): a TV, amelyről elváltottak – vagy amelyik az előzőt
+    tükrözte –, ezentúl hang nélkül az újat mutatja; ha épp erre a TV-re váltottak, a tükre véget ér."""
+    for lj in list(kozpont(hass).lejatszok.values()):
+        if lj.entity_id == msg["target"]:
+            lj.tukor_vege()
+        elif (lj.entity_id == msg["source"] and lj.friss_szolt()) or lj._tukor == msg["source"]:  # noqa: SLF001
+            if msg["target"].startswith("media_player."):
+                lj.tukroz(msg["target"])
+    conn.send_result(msg["id"])
+
+
 def regisztral(hass: HomeAssistant) -> None:
     hass.data[DOMAIN]["tv"] = TvKozpont(hass)
     hass.http.register_view(TvKep(hass))
@@ -796,3 +810,4 @@ def regisztral(hass: HomeAssistant) -> None:
     hass.http.register_view(TvElo(hass))
     websocket_api.async_register_command(hass, ws_subscribe)
     websocket_api.async_register_command(hass, ws_report)
+    websocket_api.async_register_command(hass, ws_follow)

@@ -3,14 +3,20 @@
 Cast-eszköznél (cast integráció) a TV-oldal szól és rajzol; DLNA-s TV-nél (dlna_dmr) a TV maga játssza a zenét, a
 képernyőre pedig a szám adatlapja kerül borítóként (tv_kep.py) – ilyenkor ez a lejátszó a DLNA-lejátszót vezérli, és
 annak állapotát mutatja.
+
+Tükör: ha a kártyán a TV-ről másik hangszóróra váltanak, a (Cast-os) TV-oldal hang nélkül tovább mutatja, ami ott szól –
+a szám adatait, a borítót, a váltakozó előadóképeket és a haladást –, számváltáskor frissül. Véget ér, ha a TV-n újra
+lejátszás indul, a TV-t kikapcsolják, vagy ha a követett hangszóró 10 perce nem szól.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 import time
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components import websocket_api
@@ -21,7 +27,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_TV_PLAYERS
@@ -29,6 +35,10 @@ from .entity import CantabileEntity
 from .tv import TV_DASHBOARD, TV_VIEW, kozpont
 
 _LOGGER = logging.getLogger(__name__)
+
+TUKOR_CSEND = 600          # mp: ennyi csend után a tükör véget ér (a TV elengedi a képernyőt)
+# Sonos-rádió és más élő adások azonosítói (a tükörben „ON AIR” jelenik meg)
+RADIO_ID = re.compile(r"^(x-rincon-mp3radio|x-sonosapi-stream|x-sonosapi-radio|x-sonosapi-hls|aac|hls-radio):", re.I)
 
 TAMOGATOTT = (
     MediaPlayerEntityFeature.PLAY_MEDIA | MediaPlayerEntityFeature.PLAY | MediaPlayerEntityFeature.PAUSE
@@ -67,6 +77,11 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self._poz_ido = None
         self._cue_i: int | None = None          # CUE-s albumnál a szóló szám sorszáma (a TV-oldal jelenti)
         self._cim_tar: tuple[str | None, str | None] = (None, None)
+        self._tukor: str | None = None          # a hangszóró, amelyet a TV-oldal hang nélkül mutat
+        self._tukor_le: list[Any] = []
+        self._tukor_kulcs: tuple[Any, ...] | None = None
+        self._tukor_csend: float | None = None
+        self._szolt = 0.0                       # mikor szólt utoljára (a váltáskor a tükör csak a szóló TV-ről indul)
 
     async def async_added_to_hass(self) -> None:
         kp = kozpont(self.hass)
@@ -80,6 +95,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self.async_on_remove(async_track_state_change_event(self.hass, [self.cast], self._cast_valtozott))
 
     async def async_will_remove_from_hass(self) -> None:
+        self.tukor_vege(kuld=False)
         kp = kozpont(self.hass)
         kp.lejatszok.pop(self.entity_id, None)
         kp.atadas[self.entity_id] = {"oldal": self.oldal, "meta": self._meta, "src": self._src, "mcid": self._mcid, "cue_i": self._cue_i,
@@ -108,6 +124,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
     @callback
     def oldal_ki(self, conn: websocket_api.ActiveConnection, msg_id: int) -> None:
         if self.oldal == (conn, msg_id):
+            self.tukor_vege(kuld=False)
             self.oldal = None
             self.oldal_jott.clear()
             self._allapot = MediaPlayerState.OFF
@@ -132,6 +149,8 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         if "track" in msg:
             self._cue_i = msg["track"]
         self._allapot = {"playing": MediaPlayerState.PLAYING, "paused": MediaPlayerState.PAUSED}.get(msg["state"], MediaPlayerState.IDLE)
+        if self._allapot == MediaPlayerState.PLAYING:
+            self._szolt = time.monotonic()
         if msg.get("position") is not None:
             self._poz, self._poz_ido = msg["position"], dt_util.utcnow()
         if msg.get("duration"):
@@ -252,12 +271,103 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         a = {"cast_entity": self.cast, "tv_mode": "dlna" if self.dlna else "cast", "tv_page": self.oldal is not None}
+        if self._tukor:
+            a["mirror_of"] = self._tukor
         if self._meta.get("cue"):
             a["cue_tracks"] = len(self._meta["cue"])       # a kártya ilyenkor a lejátszóval léptet (fájlon belül)
         return a
 
+    # ---- tükör ----
+    def friss_szolt(self) -> bool:
+        """Szól, szünetel, vagy az elmúlt percben szólt (a kártya váltáskor előbb leállítja, csak utána vált)."""
+        return self._tukor is not None or self._allapot in (MediaPlayerState.PLAYING, MediaPlayerState.PAUSED) or time.monotonic() - self._szolt < 60
+
+    @callback
+    def tukroz(self, cel: str) -> None:
+        """A TV-oldal hang nélkül a `cel` hangszórót mutatja (DLNA-s TV-n nincs ilyen: ott a TV maga játszik)."""
+        if self.dlna or self.oldal is None or cel == self.entity_id or cel == self._tukor:
+            return
+        self.tukor_vege(kuld=False)
+        self._tukor, self._tukor_kulcs, self._tukor_csend = cel, None, None
+        self._allapot, self._src, self._meta, self._mcid, self._poz, self._cue_i = MediaPlayerState.IDLE, None, {}, None, None, None
+        self._tukor_le = [
+            async_track_state_change_event(self.hass, [cel], self._tukor_valtozott),
+            async_track_time_interval(self.hass, self._tukor_ellenoriz, timedelta(seconds=60)),
+        ]
+        self._tukor_frissit(elso=True)
+        self.async_write_ha_state()
+
+    @callback
+    def tukor_vege(self, kuld: bool = True) -> None:
+        if self._tukor is None:
+            return
+        for le in self._tukor_le:
+            le()
+        self._tukor_le, self._tukor = [], None
+        if kuld:
+            self.uzen({"cmd": "stop"})
+        self.async_write_ha_state()
+
+    @callback
+    def _tukor_valtozott(self, _ev: Event) -> None:
+        self._tukor_frissit()
+
+    @callback
+    def _tukor_ellenoriz(self, _now: Any = None) -> None:
+        if self._tukor_csend is not None and time.monotonic() - self._tukor_csend >= TUKOR_CSEND:
+            self.tukor_vege()
+
+    @callback
+    def _tukor_frissit(self, elso: bool = False) -> None:
+        st = self.hass.states.get(self._tukor) if self._tukor else None
+        if st is None:
+            return
+        a = st.attributes
+        allapot = {"playing": "playing", "buffering": "playing", "paused": "paused"}.get(st.state, "idle")
+        if allapot == "playing":
+            self._tukor_csend = None
+        elif self._tukor_csend is None:
+            self._tukor_csend = time.monotonic()
+        ido = a.get("media_position_updated_at")
+        allas = {"target": self._tukor, "state": allapot, "position": a.get("media_position"), "duration": a.get("media_duration"),
+                 "at": ido.timestamp() if isinstance(ido, datetime) else time.time()}
+        if elso:
+            self.uzen({"cmd": "mirror", **allas})       # a TV-oldal azonnal elhallgat; az adatok utána jönnek
+        kulcs = (a.get("media_content_id"), a.get("media_title"), a.get("media_artist"), a.get("media_album_name"))
+        if kulcs != self._tukor_kulcs and any(kulcs[1:]):
+            self._tukor_kulcs = kulcs
+            self.hass.async_create_background_task(self._tukor_meta(st, allas, kulcs), f"cantabile_tv_tukor_{self.entity_id}")
+        elif not elso:
+            self.uzen({"cmd": "mirror_state", **allas})
+
+    async def _tukor_meta(self, st: Any, allas: dict[str, Any], kulcs: tuple[Any, ...]) -> None:
+        """A követett hangszóró szóló számának adatai: zenemappás fájlnál a címkék, a mappa képei és a borító (mint a TV
+        saját lejátszásánál), streamnél a hangszóró adatai és borítója; mindkettőnél az előadó képei (Deezer, TheAudioDB)."""
+        kp, a = kozpont(self.hass), st.attributes
+        mcid = str(a.get("media_content_id") or "")
+        fajl = None
+        if re.match(r"^(https?://|/media/)", mcid):
+            with contextlib.suppress(Exception):
+                _, fajl = kp.forras(mcid)
+        radio = not fajl and (bool(a.get("media_channel")) or bool(RADIO_ID.match(mcid)))
+        extra: dict[str, Any] = {"title": a.get("media_title"), "artist": a.get("media_artist"), "album": a.get("media_album_name"),
+                                 "kind": "stream" if radio else "track", "station": a.get("media_channel") if radio else None}
+        if not fajl and a.get("entity_picture"):
+            extra["cover"] = a["entity_picture"]
+        try:
+            meta = await kp.adatok(mcid, fajl, extra)
+        except Exception:  # noqa: BLE001 – a kép nélküli adatlap is jobb a semminél
+            _LOGGER.debug("Cantabile TV: a tükör adatai nem jöttek meg (%s)", self._tukor, exc_info=True)
+            meta = {k: v for k, v in extra.items() if v}
+        if not radio:
+            meta.pop("station", None)
+        if self._tukor is None or self._tukor_kulcs != kulcs:
+            return                                  # közben új szám jött, vagy véget ért a tükör
+        self.uzen({"cmd": "mirror", "meta": {k: v for k, v in meta.items() if not k.startswith("_")}, **allas})
+
     # ---- vezérlés ----
     async def async_play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
+        self.tukor_vege(kuld=False)
         kp = kozpont(self.hass)
         cim = await kp.feloldas(media_id, self.entity_id)
         src, fajl = kp.forras(cim)
@@ -320,24 +430,32 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         await self.hass.services.async_call("media_player", szolg, {"entity_id": self.cast, **adat}, blocking=True)
 
     async def async_media_pause(self) -> None:
+        if self._tukor:
+            return                                  # tükör: a TV nem szól, nincs mit szüneteltetni
         if self.dlna:
             await self._cel_hiv("media_pause")
             return
         self.uzen({"cmd": "pause"})
 
     async def async_media_play(self) -> None:
+        if self._tukor:
+            return
         if self.dlna:
             await self._cel_hiv("media_play")
             return
         self.uzen({"cmd": "resume"})
 
     async def async_media_stop(self) -> None:
+        if self._tukor:
+            return                                  # a kártya váltáskor leállítja a TV-t: a tükör marad
         if self.dlna:
             await self._cel_hiv("media_stop")
             return
         self.uzen({"cmd": "stop"})
 
     async def async_media_seek(self, position: float) -> None:
+        if self._tukor:
+            return
         if self.dlna:
             await self._cel_hiv("media_seek", seek_position=position)
             return
@@ -373,6 +491,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         await self.hass.services.async_call("media_player", "volume_mute", {"entity_id": self.cast, "is_volume_muted": mute}, blocking=True)
 
     async def async_turn_off(self) -> None:
+        self.tukor_vege()
         if self.dlna:
             await self._cel_hiv("media_stop")
             return

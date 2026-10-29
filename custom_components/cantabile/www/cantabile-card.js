@@ -2434,6 +2434,9 @@ class CantabileCard extends HTMLElement {
       this._valtSor = (this._valtSor || Promise.resolve()).then(() => this._atviszHaKell(regi, uj))
         .catch((e) => this._uzen(T("Az átváltás nem sikerült: {h}", { h: e?.message || e })));
     } else this._csoportAllit(uj);
+    // a TV, amelyről elváltottunk (vagy amelyik az előzőt tükrözte), hang nélkül tovább mutatja, ami most szól
+    if (regi && regi !== uj && regi.entity !== HELYI && uj.entity !== HELYI && this._ent && !this._nincsIntegracio)
+      this._hass.callWS({ type: "cantabile/tv/follow", source: regi.entity, target: uj.entity }).catch(() => {});
     // a régi hangszóró foglalása: ha átváltás után már nem szól, elengedjük (ami az új állásnak is tagja, az marad)
     if (regi && regi !== uj && regi.entity !== HELYI) {
       const marad = uj.tagok || [uj.entity], ids = (regi.tagok || [regi.entity]).filter((e) => !marad.includes(e));
@@ -5021,6 +5024,7 @@ class CantabileTv extends HTMLElement {
     // az események mindig az épp aktív (látható) példányhoz mennek – a Cast-vevő a kártyát le is cserélheti
     ["playing", "pause", "ended", "error", "loadedmetadata", "seeked"].forEach((e) => a.addEventListener(e, () => {
       const ez = window._cantabileTv || this;
+      if (ez._tukor) return;                         // tükör: a leállított hang eseményei ne engedjék el a képernyőt
       if (e === "playing") ez._ebren(true);
       else if (e === "pause" || e === "ended" || e === "error") ez._ebren(false);
       if (e === "ended") { ez._allapot = "idle"; ez._v.classList.add("ures2"); }
@@ -5071,6 +5075,23 @@ class CantabileTv extends HTMLElement {
       }
       return;
     }
+    // tükör: hang nélkül egy másik hangszórót mutat (a kártyán a TV-ről átváltottak) – adatok, képek, haladás, jelszint
+    if (m.cmd === "mirror" || m.cmd === "mirror_state") {
+      if (m.cmd === "mirror") {
+        if (a.getAttribute("src")) { a.pause(); a.removeAttribute("src"); a.load(); }
+        this._src = null; this._cueI = null;
+        if (!this._tukor || this._tukor.cel !== m.target) this._tukorJel(m.target);
+        this._tukor = { ...(this._tukor || {}), cel: m.target };
+        if (m.meta) { this._meta = m.meta; this._mutat(m.meta); }
+        this._ebren(true);                           // a tükör végéig (10 perc csend) ébren marad
+      }
+      if (!this._tukor) return;
+      Object.assign(this._tukor, { poz: Number(m.position) || 0, at: m.at ? m.at * 1000 : Date.now(), hossz: Number(m.duration) || 0 });
+      this._allapot = m.state === "playing" ? "playing" : m.state === "paused" ? "paused" : "idle";
+      this._v.classList.toggle("szun", this._allapot === "paused");
+      return;
+    }
+    if (m.cmd === "play" || m.cmd === "stop") this._tukorVege();
     if (m.cmd === "play") {
       this._src = m.src;
       this._meta = m.meta || {};
@@ -5088,8 +5109,29 @@ class CantabileTv extends HTMLElement {
     this._jelent();
   }
 
+  // a követett hangszóró jelszintje (cantabile/signal) az equalizerhez; ha nem elemezhető (pl. Deezer), utánzat
+  _tukorJel(cel) {
+    const u = this._tukorLeir; this._tukorLeir = null;
+    if (u) Promise.resolve(u).then((f) => f && f()).catch(() => {});
+    this._tukorSzint = 0; this._tukorNincs = false;
+    if (!cel || !this._h) return;
+    this._tukorLeir = this._h.connection.subscribeMessage((v) => {
+      if (v.allapot === "nincs") { this._tukorNincs = true; return; }
+      if (v.l == null) return;
+      this._tukorNincs = false;
+      this._tukorSzint = Math.max(0, Math.min(1, (Math.max(v.l, v.r) + 24) / 27));   // −24 … +3 VU → 0 … 1
+    }, { type: "cantabile/signal", entity_id: cel }).catch(() => { this._tukorNincs = true; return null; });
+  }
+
+  _tukorVege() {
+    if (!this._tukor) return;
+    this._tukor = null; this._tukorJel(null);
+    this._allapot = "idle"; this._v.classList.add("ures2");
+    this._ebren(false);
+  }
+
   _jelent(hiba, metaval) {
-    if (!this._tv) return;
+    if (!this._tv || this._tukor) return;           // tükörben a TV nem szól: a lejátszó állapota „idle” marad
     const a = this._a, hossz = a && isFinite(a.duration) ? a.duration : null;
     this._h.callWS({ type: "cantabile/tv/report", tv: this._tv, state: this._allapot || "idle", position: a ? a.currentTime : null,
       duration: hossz, src: this._src || null, ...(hiba ? { error: hiba } : {}), ...(this._cueI != null ? { track: this._cueI } : {}),
@@ -5177,11 +5219,13 @@ class CantabileTv extends HTMLElement {
   }
 
   _halad() {
-    const a = this._a, sr = this.shadowRoot;
-    if (!a || !sr) return;
+    const a = this._a, sr = this.shadowRoot, t = this._tukor;
+    if ((!a && !t) || !sr) return;
     const ido = (s) => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), p = Math.floor((s % 3600) / 60), mp = String(s % 60).padStart(2, "0"); return h ? `${h}:${String(p).padStart(2, "0")}:${mp}` : `${p}:${mp}`; };
-    const cue = this._cueKovet();                  // CUE-s albumnál a szám saját ideje
-    const hossz = cue ? cue.hossz : isFinite(a.duration) && a.duration > 0 ? a.duration : 0, most = a.currentTime - (cue ? cue.kezd : 0);
+    const cue = t ? null : this._cueKovet();       // CUE-s albumnál a szám saját ideje
+    let hossz, most;
+    if (t) { hossz = t.hossz; most = t.poz + (this._allapot === "playing" ? (Date.now() - t.at) / 1000 : 0); if (hossz) most = Math.min(most, hossz); }
+    else { hossz = cue ? cue.hossz : isFinite(a.duration) && a.duration > 0 ? a.duration : 0; most = a.currentTime - (cue ? cue.kezd : 0); }
     sr.querySelector(".most").textContent = ido(most);
     sr.querySelector(".vege").textContent = hossz ? ido(hossz) : "";
     const p = hossz ? Math.min(100, (most / hossz) * 100) : 0;
@@ -5197,7 +5241,18 @@ class CantabileTv extends HTMLElement {
       if (this._le || gen !== this._gen) return;    // a lekerült példány rajzolása leáll (az új példány rajzol)
       requestAnimationFrame(kor);
       const W = this._cv.width, H = this._cv.height, alap = H * 0.72;
-      if (!this._an || this._allapot !== "playing") {
+      if (this._tukor && this._allapot === "playing") {
+        // tükör: nincs hang az oldalon – a követett hangszóró jelszintjéből (vagy utánzatból) rajzolt sávok
+        nyugszik = "";
+        g.clearRect(0, 0, W, H);
+        const most = performance.now() / 1000, szint = this._tukorNincs || !this._tukorSzint ? 0.5 + 0.18 * Math.sin(most * 1.7) + 0.1 * Math.sin(most * 4.3) : this._tukorSzint;
+        for (let i = 0; i < N; i++) {
+          const alak = 1 - 0.5 * (i / N), mozg = 0.3 + 0.7 * Math.abs(Math.sin(most * (2.1 + (i % 7) * 0.53) + i * 1.37) * Math.sin(most * (0.9 + (i % 5) * 0.31) + i));
+          const v = Math.min(1, 1.7 * szint * alak * mozg);
+          simit[i] = v > simit[i] ? v : simit[i] * 0.86 + v * 0.14;
+          csucs[i] = Math.max(csucs[i] - 0.012, simit[i]);
+        }
+      } else if (!this._an || this._allapot !== "playing") {
         for (let i = 0; i < N; i++) { simit[i] *= 0.9; csucs[i] *= 0.95; }
         // csendben, a sávok lecsengése után a kép nem változik: nem rajzol újra (kíméli a TV-botot)
         // (a méret is a kulcsban: átméretezéskor a vászon kiürül, akkor újra kell rajzolni)
@@ -5231,7 +5286,7 @@ class CantabileTv extends HTMLElement {
           g.fillStyle = "#fff1cf"; g.fillRect(x, alap - csucs[i] * alap - 4, bw, 2.5 * (W / 1152));       // csúcsjelző
         }
       }
-      if (vis !== "bars" && this._an && this._allapot === "playing") {
+      if (vis !== "bars" && this._an && this._allapot === "playing" && !this._tukor) {
         this._an.getByteTimeDomainData(this._ido);
         g.beginPath();
         const lepes = Math.max(1, Math.floor(this._ido.length / 512));
@@ -5249,7 +5304,7 @@ class CantabileTv extends HTMLElement {
 
 // a hang, az elemző és a szóló szám az oldalhoz tartozik, nem a kártyapéldányhoz (lásd a BT kimenetnél is)
 const TV_KOZOS = {};
-["_a", "_ctx", "_an", "_frek", "_ido", "_src", "_meta", "_allapot", "_tv", "_cueI"].forEach((k) =>
+["_a", "_ctx", "_an", "_frek", "_ido", "_src", "_meta", "_allapot", "_tv", "_cueI", "_tukor", "_tukorLeir", "_tukorSzint", "_tukorNincs"].forEach((k) =>
   Object.defineProperty(CantabileTv.prototype, k, { get() { return TV_KOZOS[k]; }, set(v) { TV_KOZOS[k] = v; }, configurable: true }));
 
 if (!customElements.get("cantabile-tv")) {
