@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.12.19 – 2026-10-30
 
 - TV mirror started and stopped at once when the TV was playing a music-folder tape: the sequence player took the TV going quiet for the end of the track and sent the next one to the TV, which ended the mirror. The card now starts the mirror only after moving the music, and the sequence player stops when its TV switches to mirroring.
 - TV mirror of a Sonos playing from the music folder showed no details: Sonos reports no title / artist for these files, and the mirror waited for them. It now reads the file's own tags whenever the track changes.
