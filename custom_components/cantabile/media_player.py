@@ -82,6 +82,8 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self._tukor_kulcs: tuple[Any, ...] | None = None
         self._tukor_csend: float | None = None
         self._szolt = 0.0                       # mikor szólt utoljára (a váltáskor a tükör csak a szóló TV-ről indul)
+        self.oldal_kepes: set[str] = set()      # mit tud a TV-n futó oldal (a régebbi kártyakód nem ismeri a tükröt)
+        self._ujrakuldes: asyncio.Task | None = None
 
     async def async_added_to_hass(self) -> None:
         kp = kozpont(self.hass)
@@ -287,6 +289,11 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         """A TV-oldal hang nélkül a `cel` hangszórót mutatja (DLNA-s TV-n nincs ilyen: ott a TV maga játszik)."""
         if self.dlna or self.oldal is None or cel == self.entity_id or cel == self._tukor:
             return
+        if "mirror" not in self.oldal_kepes:
+            # régi oldal fut a TV-n: újraküldjük a friss kártyával, és utána indul a tükör
+            if self._ujrakuldes is None or self._ujrakuldes.done():
+                self._ujrakuldes = self.hass.async_create_background_task(self._friss_oldallal_tukroz(cel), f"cantabile_tv_ujrakuld_{self.entity_id}")
+            return
         self.tukor_vege(kuld=False)
         self._tukor, self._tukor_kulcs, self._tukor_csend = cel, None, None
         self._allapot, self._src, self._meta, self._mcid, self._poz, self._cue_i = MediaPlayerState.IDLE, None, {}, None, None, None
@@ -296,6 +303,15 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         ]
         self._tukor_frissit(elso=True)
         self.async_write_ha_state()
+
+    async def _friss_oldallal_tukroz(self, cel: str) -> None:
+        try:
+            await kozpont(self.hass).ujrakuld(self)
+        except Exception as err:  # noqa: BLE001 – a TV elérhetetlen lett: nincs tükör
+            _LOGGER.warning("Cantabile TV: a TV-oldal frissítése nem sikerült (%s): %s", self.cast, err)
+            return
+        if "mirror" in self.oldal_kepes:
+            self.tukroz(cel)
 
     @callback
     def tukor_vege(self, kuld: bool = True) -> None:

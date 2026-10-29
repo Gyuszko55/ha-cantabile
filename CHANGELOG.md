@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Cantabile TV mirror after an update: a Cast receiver only reconnects after a Home Assistant restart and keeps running the old card code, which doesn't know the mirror. The TV page now tells the server what it can do (`features` in `cantabile/tv/subscribe`); if an older page is running when a mirror should start, Cantabile casts the page again (with the fresh card) and then starts the mirror.
+
 ## 1.12.15 – 2026-10-29
 
 - Cantabile TV mirror: when you switch the card from a playing Cast TV to another speaker (selector, moving the music, or the new ▶ buttons), the TV page stays on without sound and shows what plays there – title, artist, album, cover, rotating artist pictures and progress – and follows every new track, wherever it comes from. The equaliser follows the real signal level where it can be analysed, otherwise it is simulated. It follows further speaker changes and ends when the TV plays again, is turned off, or after 10 minutes of silence. New websocket command `cantabile/tv/follow`; the TV player shows `mirror_of` while mirroring.

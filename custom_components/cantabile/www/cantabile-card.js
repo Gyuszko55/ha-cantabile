@@ -5045,7 +5045,7 @@ class CantabileTv extends HTMLElement {
   _feliratkozik() {
     clearTimeout(this._ujraIdo);
     if (this._leir) return;                          // már fel van iratkozva (ne legyen két előfizetés)
-    this._msg = { type: "cantabile/tv/subscribe" };
+    this._msg = { type: "cantabile/tv/subscribe", features: TV_KEPES };
     if (this._c.tv || this._tv) this._msg.tv = this._c.tv || this._tv;    // a lecserélt példány utódja azonnal átveszi a lejátszót
     this._h.connection.subscribeMessage((m) => this._parancs(m), this._msg)
       .then((u) => {
@@ -5301,6 +5301,9 @@ class CantabileTv extends HTMLElement {
     kor();
   }
 }
+
+// amit ez a TV-oldal tud (a szerver ebből látja, ha egy frissítés után még a régi kód fut a TV-n, és újraküldi)
+const TV_KEPES = ["mirror"];
 
 // a hang, az elemző és a szóló szám az oldalhoz tartozik, nem a kártyapéldányhoz (lásd a BT kimenetnél is)
 const TV_KOZOS = {};

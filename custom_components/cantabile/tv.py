@@ -122,7 +122,7 @@ class TvKozpont:
 
     # ---- oldal ↔ lejátszó ----
     @callback
-    def bejelentkezik(self, conn: websocket_api.ActiveConnection, msg_id: int, kert: str | None) -> CantabileTv | None:
+    def bejelentkezik(self, conn: websocket_api.ActiveConnection, msg_id: int, kert: str | None, kepes: list[str] | None = None) -> CantabileTv | None:
         jelolt = self.lejatszok.get(kert or "")
         if jelolt is None and self._var is not None:
             jelolt = self._var
@@ -133,8 +133,24 @@ class TvKozpont:
             return None
         if self._var is jelolt:
             self._var = None
+        jelolt.oldal_kepes = set(kepes or [])
         jelolt.oldal_be(conn, msg_id)
         return jelolt
+
+    async def ujrakuld(self, lj: CantabileTv) -> None:
+        """A TV-n futó oldal régebbi kártyakóddal fut (egy frissítés után a Cast-vevő csak újracsatlakozik, a kódot nem tölti
+        újra): bezárja és újra kiküldi, így a TV a friss kártyát tölti be."""
+        try:
+            await self.hass.services.async_call("media_player", "turn_off", {"entity_id": lj.cast}, blocking=True)
+        except HomeAssistantError as err:
+            _LOGGER.debug("Cantabile TV: a régi oldal bezárása nem sikerült (%s): %s", lj.cast, err)
+        for _ in range(20):                                # a régi oldal kapcsolata megszűnik
+            if lj.oldal is None:
+                break
+            await asyncio.sleep(0.5)
+        lj.oldal = None
+        await asyncio.sleep(2)
+        await self.oldalt_kuld(lj)
 
     async def oldalt_kuld(self, lj: CantabileTv) -> None:
         """Kiküldi a TV-oldalt a Cast-eszközre, és megvárja, amíg bejelentkezik."""
@@ -758,11 +774,11 @@ class TvElo(HomeAssistantView):
         return ki
 
 
-@websocket_api.websocket_command({vol.Required("type"): "cantabile/tv/subscribe", vol.Optional("tv"): str})
+@websocket_api.websocket_command({vol.Required("type"): "cantabile/tv/subscribe", vol.Optional("tv"): str, vol.Optional("features"): [str]})
 @callback
 def ws_subscribe(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
     """A TV-oldal bejelentkezése: innentől ezen az előfizetésen kapja a parancsokat."""
-    lj = kozpont(hass).bejelentkezik(conn, msg["id"], msg.get("tv"))
+    lj = kozpont(hass).bejelentkezik(conn, msg["id"], msg.get("tv"), msg.get("features"))
     if lj is None:
         conn.send_error(msg["id"], "no_tv", szoveg(hass, "no_tv"))
         return
