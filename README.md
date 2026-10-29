@@ -28,8 +28,10 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
 - The VU meters show the **real audio level**: the integration analyses the same stream or file on the server.
 - REW / PLAY / FF / STOP / PAUSE / EJECT, SHUFFLE, REPEAT (1–5 rounds or endless), FADE (Sonos crossfade), SLEEP.
 - The tape shelf (EJECT):
+  - **SEARCH** – one search over every source: music folder, Deezer, Spotify, WiiM presets, Sonos favourites and radio stations; the same album from several sources is one row with source tags, and a tap plays it from the best source for the chosen speaker (or says which speakers can play it);
   - **STREAMING** – your Sonos favourites (playlists and albums);
   - **DEEZER** – the whole Deezer catalogue: charts, search, artist pages (Sonos only);
+  - **WIIM** – the WiiM's presets: anything saved as a preset in the WiiM Home app (Tidal, Qobuz, Amazon Music, Deezer, radio…) plays from Cantabile on the WiiM;
   - **NAS** – your music folder (artist → album), with instant search;
   - **PHONE** – music from the phone / computer: on BT directly, on any other speaker via a temporary upload (TEMP on the tape, deleted after 24 h); or upload it to the music folder for good;
   - **QUEUE** – the current queue: jump, remove, play next, add to end (Sonos).

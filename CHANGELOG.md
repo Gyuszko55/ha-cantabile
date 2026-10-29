@@ -4,6 +4,7 @@
 
 - WIIM tab on the tape shelf (when a WiiM is among the speakers): the WiiM's presets as tapes – anything saved as a preset in the WiiM Home app, from any of its music services (Tidal, Qobuz, Amazon Music, Deezer, radio…), plays from Cantabile on the WiiM. On another speaker the card says where they play.
 - QUEUE tab on a WiiM: when the WiiM plays its own queue (a preset or an album started in the WiiM app), the queue is listed and a tap jumps to a track.
+- SEARCH tab (first on the shelf): one search box over every source at once – the music folder, Deezer, Spotify, the WiiM presets, the Sonos favourites, the card's stations and Radio Browser. The same album or track from several sources is one row (NAS folder names like “(1978) Dire Straits - Dire Straits [16Bit-44.1kHz]” are matched as “Dire Straits”), with source tags – bright where it plays on the chosen speaker, dim elsewhere. A tap plays it from the best source for that speaker (the music folder first, as it plays everywhere); a tag plays that source; if no source plays on that speaker, the card says which speakers each source plays on. Artists open in the music folder, or on Deezer / Spotify.
 
 ## 1.12.10 – 2026-10-29
 

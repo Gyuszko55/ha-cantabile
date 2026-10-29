@@ -28,8 +28,10 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
 - A VU-mérő a **valódi hangszintet** mutatja: az integráció a szerveren ugyanazt a streamet vagy fájlt elemzi.
 - REW / PLAY / FF / STOP / PAUSE / EJECT, SHUFFLE, REPEAT (1–5 kör vagy végtelen), FADE (Sonos-áttűnés), SLEEP.
 - Kazetta-polc (EJECT):
+  - **KERESÉS** – egy kereső minden forrásra: zenemappa, Deezer, Spotify, WiiM-presetek, Sonos-kedvencek és rádióadók; ugyanaz az album több forrásból egy sorba kerül forráscímkékkel, koppintásra a választott hangszórón szóló legjobb forrásból indul (vagy megmondja, melyik hangszórón szól);
   - **STREAMING** – a Sonos-kedvencek (listák, albumok);
   - **DEEZER** – a teljes Deezer-kínálat: toplista, keresés, előadó-oldalak (csak Sonoson);
+  - **WIIM** – a WiiM presetjei: amit a WiiM Home appban presetként mentesz (Tidal, Qobuz, Amazon Music, Deezer, rádió…), az a Cantabile-ből is szól a WiiM-en;
   - **NAS** – a zenemappa (előadó → album), azonnali kereséssel;
   - **TELEFON** – a telefon / gép zenéje: BT-n közvetlenül, más hangszórón átmeneti feltöltéssel (TEMP jelzés, 24 óra múlva törlődik), vagy véglegesen a zenemappába;
   - **SOR** – a lejátszási sor: ugrás, törlés, következőnek, sor végére (Sonos).

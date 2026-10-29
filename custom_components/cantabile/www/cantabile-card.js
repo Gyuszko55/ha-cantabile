@@ -130,6 +130,12 @@ const EN = {
   "Legalább egy hangszóró kell.": "At least one speaker is required.",
   "nem találom a kártyát ezen a vezérlőpulton": "the card was not found on this dashboard",
   "Áttekintés": "Overview",
+  "KERESÉS": "SEARCH",
+  "RÁDIÓK": "RADIO",
+  "Keresés mindenhol…": "Search everywhere…",
+  "Írd be, mit keresel – egyszerre keres a zenemappában, a Deezeren, a Spotifyn, a WiiM-presetek, a kedvencek és a rádiók között.": "Type what you're looking for – it searches the music folder, Deezer, Spotify, the WiiM presets, the favourites and the radio stations at once.",
+  "Nem érhető el most: {h}": "Not available right now: {h}",
+  "A(z) {h} hangszórón ez egyik forrásból sem szól – {l}.": "None of the sources plays this on {h} – {l}.",
   "WiiM-presetek": "WiiM presets",
   "WiiM-preset {n}": "WiiM preset {n}",
   "Nincs WiiM a hangszórók között.": "There is no WiiM among the speakers.",
@@ -1372,6 +1378,13 @@ class CantabileCard extends HTMLElement {
         .sorgomb { cursor: pointer; }
         .sorsor, .ktsor { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px; align-items: stretch; }
         .sorsor > button { width: 100%; }
+        /* KERESÉS fül: forrás-címkék (világos = ezen a hangszórón szól, halvány = máshol) */
+        .fchipek { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 3px; }
+        .ktsor.mindsor { grid-template-columns: minmax(0, 1fr); gap: 0; }
+        .mindsor .fchipek { justify-content: flex-start; padding: 0 0 6px 10px; margin-top: -2px; }
+        .fchip { font: 700 calc(9px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .08em; padding: 4px 5px; border-radius: 3px;
+          border: 1px solid rgba(255,216,146,.25); color: rgba(240,224,196,.45); cursor: pointer; white-space: nowrap; }
+        .fchip.ok { border-color: #c9a14a; color: #ffd892; background: rgba(255,216,146,.1); }
         .huzhato .sorsor { grid-template-columns: 24px minmax(0, 1fr) auto; position: relative; }
         .sorsor .foga { display: grid; align-content: center; justify-items: center; gap: 3px; cursor: grab; touch-action: none; border-radius: 3px;
           background: rgba(255,255,255,.04); }
@@ -3426,18 +3439,146 @@ class CantabileCard extends HTMLElement {
   // WiiM (a HA wiim-integrációja): a WiiM Home appban bármelyik zenei szolgáltatásból mentett presetek kazettaként
   _wiim(h) { return !!h && h.entity !== HELYI && this._hass?.entities?.[h.entity]?.platform === "wiim"; }
 
+  async _wiimPresetek(cel) {
+    const r = await this._hass.callWS({ type: "media_player/browse_media", entity_id: cel.entity, media_content_id: "wiim_library/library_root/favorites", media_content_type: "playlist" });
+    return (r.children || []).filter((x) => x.can_play).map((x) => ({ cim: x.title, alcim: T("WiiM-preset {n}", { n: x.media_content_id }), forras: "stream", tipus: "wiim_preset", id: String(x.media_content_id), kep: x.thumbnail || null }));
+  }
+
+  // ---- KERESÉS fül: egy keresőmező, minden forrásban egyszerre (NAS, Deezer, Spotify, WiiM-presetek, Sonos-kedvencek, rádiók).
+  // Az azonos album / szám egy sorba kerül, címkékkel, hogy honnan érhető el; koppintásra az ezen a hangszórón szóló
+  // legjobb forrásból indul (a NAS mindenhol szól), a címkére koppintva abból; ha sehol nem szól itt, megmondja, hol igen.
+  _forrasSzol(forras, hsz) {
+    if (forras === "nas" || forras === "radio") return true;
+    if (!hsz || hsz.entity === HELYI) return false;
+    if (forras === "wiim") return this._wiim(hsz);
+    if (forras === "spotify") return hsz.mod === "sonos" || !!(this._stream?.spotify_entity && this._spotifyEszkoz(hsz));
+    return hsz.mod === "sonos";                                  // deezer, sonos-kedvenc
+  }
+
+  async _mindRajz(lista) {
+    const pl = this._polc, kerdes = (pl.keres || "").trim(), hsz = this._hangszoro();
+    if (KERES_NORM(kerdes).length < 2) {
+      lista.innerHTML = `<div class="puzenet">${T("Írd be, mit keresel – egyszerre keres a zenemappában, a Deezeren, a Spotifyn, a WiiM-presetek, a kedvencek és a rádiók között.")}</div>`;
+      return;
+    }
+    lista.innerHTML = `<div class="puzenet">${T("Keresés mindenhol…")}</div>`;
+    const szavak = KERES_NORM(kerdes).split(/\s+/).filter(Boolean), illik = (t) => { const k = KERES_NORM(t); return szavak.every((w) => k.includes(w)); };
+    const kulcs = (...t) => t.map((x) => KERES_NORM(String(x || "").replace(/\[[^\]]*\]|\([^)]*\)/g, " ").replace(/^\s*\d{1,3}[\s.\-_]+/, "")).replace(/[^\p{L}\p{N}]+/gu, "")).join("|");
+    const nas = this._config.magno?.nas, q = encodeURIComponent(kerdes), orszag = this._orszag();
+    const wiimCel = this._wiim(hsz) ? hsz : this._kimenetek.find((h) => this._wiim(h));
+    const kerdesek = {
+      nas: nas && HELYI_TAR(nas) ? this._nasLista() : null,
+      dz: this._config.deezer !== false && this._vanSonos() ? Promise.all(["album&limit=12", "track&limit=15", "artist&limit=6"].map((t) => this._dz(`/search/${t.split("&")[0]}?q=${q}&${t.split("&")[1]}`))) : null,
+      sp: this._szolgLatszik("spotify") ? this._hass.callWS({ type: "cantabile/spotify", ut: `/search?q=${q}&type=artist,album,track&limit=8&market=${orszag}` }) : null,
+      wiim: wiimCel ? this._wiimPresetek(wiimCel) : null,
+      kedv: this._vanSonos() ? this._streamKazettak() : null,
+      rb: this._rb(`/json/stations/search?name=${q}&limit=8&hidebroken=true&order=clickcount&reverse=true`),
+    };
+    const nevek = Object.keys(kerdesek), eredm = await Promise.allSettled(nevek.map((k) => kerdesek[k] || Promise.resolve(null)));
+    if (this._polc !== pl || pl.ful !== "mind" || (pl.keres || "").trim() !== kerdes) return;
+    const v = Object.fromEntries(nevek.map((k, i) => [k, eredm[i].status === "fulfilled" ? eredm[i].value : null]));
+    const hibak = nevek.filter((k, i) => kerdesek[k] && eredm[i].status === "rejected").map((k) => ({ nas: T("Zenemappa"), dz: "Deezer", sp: "Spotify", wiim: "WiiM", kedv: T("Sonos kedvencek"), rb: "Radio Browser" })[k]);
+
+    // összefésülés: kulcs = előadó + cím; forrásonként egy kazetta (a NAS-számnál az albuma, ettől a számtól)
+    const albumok = new Map(), szamok = new Map(), eloadok = new Map();
+    const tesz = (tar, k, alap, forras, kaz) => { if (!tar.has(k)) tar.set(k, { ...alap, f: {} }); const x = tar.get(k); if (!x.f[forras]) x.f[forras] = kaz; if (!x.kep && kaz.kep) x.kep = kaz.kep; };
+    if (v.nas) {
+      const MAX = 25;
+      v.nas.m.filter((x) => !x.rel.includes("/") && illik(x.nev)).slice(0, 6).forEach((x) => tesz(eloadok, kulcs(x.nev), { cim: x.nev }, "nas", { ut: [{ id: `${nas}/${x.rel}`, cim: x.nev }] }));
+      // a mappanévből a tiszta albumcím: „(1978) Dire Straits - Dire Straits [16Bit-44.1kHz]” → „Dire Straits” (1978)
+      const albumNev = (nev, el) => {
+        const ev = (/\((\d{4})\)|^(\d{4})\b/.exec(nev) || [])[1] || (/^(\d{4})\b/.exec(nev) || [])[1] || "";
+        let c = nev.replace(/\[[^\]]*\]|\([^)]*\)/g, " ").replace(/^\s*\d{4}\s*[-–.]\s*/, "").replace(/\s+/g, " ").trim();
+        if (el && KERES_NORM(c).startsWith(KERES_NORM(el) + " ") && / [-–] /.test(c)) c = c.replace(/^.*? [-–] /, "");
+        return { c: c || nev, ev };
+      };
+      v.nas.m.filter((x) => x.rel.includes("/") && illik(x.rel)).slice(0, MAX).forEach((x) => {
+        const el = x.rel.split("/")[0], { c, ev } = albumNev(x.nev, el);
+        tesz(albumok, kulcs(el, c), { cim: c, al: [el, ev].filter(Boolean).join(" · ") }, "nas", { cim: c, alcim: el, forras: "nas", id: `${nas}/${x.rel}` });
+      });
+      v.nas.f.filter((x) => illik(x.rel)).slice(0, MAX).forEach((x) => {
+        const t = x.rel.split("/"), el = t[0], alb = t.length > 2 ? albumNev(t[t.length - 2], el).c : "", cim = x.nev.replace(/^\s*\d{1,3}[\s.\-_]+/, "");
+        tesz(szamok, kulcs(el, cim), { cim, al: [el, alb].filter(Boolean).join(" · ") }, "nas", { nasSzam: x.rel });
+      });
+    }
+    if (v.dz) {
+      const [aa, sa, ea] = v.dz;
+      (ea?.data || []).filter((x) => illik(x.name)).forEach((x) => tesz(eloadok, kulcs(x.name), { cim: x.name }, "deezer", { ut: [{ id: String(x.id), cim: x.name, kep: x.picture_medium }], kep: x.picture_medium }));
+      (aa?.data || []).filter((x) => illik(`${x.artist?.name} ${x.title}`)).forEach((x) => tesz(albumok, kulcs(x.artist?.name, x.title), { cim: x.title, al: x.artist?.name || "" }, "deezer", { cim: x.title, alcim: x.artist?.name || "", forras: "stream", tipus: "deezer", id: x.link, kep: x.cover_medium || null }));
+      (sa?.data || []).filter((x) => illik(`${x.artist?.name} ${x.title} ${x.album?.title}`)).forEach((x) => tesz(szamok, kulcs(x.artist?.name, x.title), { cim: x.title, al: [x.artist?.name, x.album?.title].filter(Boolean).join(" · ") }, "deezer",
+        { cim: x.album?.title || x.title, alcim: x.artist?.name || "", forras: "stream", tipus: "deezer", id: `https://www.deezer.com/album/${x.album?.id}`, kep: x.album?.cover_medium || null, dzSzam: x.id, dzAlbum: x.album?.id }));
+    }
+    if (v.sp) {
+      const sp = (tip, id) => ({ id: `https://open.spotify.com/${tip}/${id}`, uri: `spotify:${tip}:${id}`, mtype: tip, forras: "stream", tipus: "spotify" });
+      (v.sp.artists?.items || []).filter((x) => illik(x.name)).forEach((x) => tesz(eloadok, kulcs(x.name), { cim: x.name }, "spotify", { ut: [{ id: x.id, cim: x.name }], kep: x.images?.[1]?.url || null }));
+      (v.sp.albums?.items || []).filter((x) => illik(`${x.artists?.[0]?.name} ${x.name}`)).forEach((x) => tesz(albumok, kulcs(x.artists?.[0]?.name, x.name), { cim: x.name, al: x.artists?.[0]?.name || "" }, "spotify", { cim: x.name, alcim: x.artists?.[0]?.name || "", kep: x.images?.[1]?.url || x.images?.[0]?.url || null, ...sp("album", x.id) }));
+      (v.sp.tracks?.items || []).filter((x) => illik(`${x.artists?.[0]?.name} ${x.name} ${x.album?.name}`)).forEach((x) => tesz(szamok, kulcs(x.artists?.[0]?.name, x.name), { cim: x.name, al: [x.artists?.[0]?.name, x.album?.name].filter(Boolean).join(" · ") }, "spotify", { cim: x.name, alcim: x.artists?.[0]?.name || "", kep: x.album?.images?.[1]?.url || null, ...sp("track", x.id) }));
+    }
+    const presetek = [...(v.wiim || []).filter((k) => illik(k.cim)).map((k) => ({ k, f: "wiim" })), ...(v.kedv || []).filter((k) => illik(k.cim)).map((k) => ({ k, f: "sonos" }))];
+    const adok = [...this._config.adok.map((a, i) => ({ a, i })).filter((x) => illik(x.a.nev) || illik(x.a.rovid || "")).map((x) => ({ cim: x.a.nev, al: x.a.virt ? "WEB" : `${MHZ(x.a.frekvencia)} MHz`, sajat: x.i })),
+      ...(v.rb || []).filter((t) => t.url_resolved || t.url).map((t) => ({ cim: (t.name || "").trim(), al: [t.countrycode, t.codec, t.bitrate ? `${t.bitrate} kbps` : ""].filter(Boolean).join(" · "), rb: t }))];
+
+    const SORREND = ["nas", "deezer", "spotify", "wiim", "sonos"], CIMKE = { nas: "NAS", deezer: "DEEZER", spotify: "SPOTIFY", wiim: "WIIM", sonos: "SONOS" };
+    const cimkek = (x) => SORREND.filter((f) => x.f[f]).map((f) => `<span class="fchip${this._forrasSzol(f, hsz) ? " ok" : ""}" data-f="${f}">${CIMKE[f]}</span>`).join("");
+    const MAXS = 20, eL = [...eloadok.values()].slice(0, 10), aL = [...albumok.values()].slice(0, MAXS), sL = [...szamok.values()].slice(0, MAXS);
+    const csoport = (cim, db, belso) => db ? `<h5 class="kcsop">${cim}<span>${db}</span></h5>${belso}` : "";
+    const sor = (t, i, x) => `<div class="ktsor mindsor"><button data-${t}="${i}"><b>${ESC(x.cim)}</b><small>${ESC(x.al || "")}</small></button><span class="fchipek" data-${t}c="${i}">${cimkek(x)}</span></div>`;
+    lista.innerHTML = (hibak.length ? `<div class="puzenet">${T("Nem érhető el most: {h}", { h: hibak.join(", ") })}</div>` : "")
+      + ((eL.length + aL.length + sL.length + adok.length + presetek.length === 0) ? `<div class="puzenet">${T("Nincs találat erre: „{q}”.", { q: ESC(kerdes) })}</div>`
+      : csoport("ARTISTS", eL.length, `<div class="eloadok">${eL.map((x, i) => `<button data-e="${i}">${ESC(x.cim)} <small>${SORREND.filter((f) => x.f[f]).map((f) => CIMKE[f]).join(" · ")}</small></button>`).join("")}</div>`)
+        + csoport("ALBUMS", aL.length, `<div class="ktalal">${aL.map((x, i) => sor("a", i, x)).join("")}</div>`)
+        + csoport("TRACKS", sL.length, `<div class="ktalal">${sL.map((x, i) => sor("s", i, x)).join("")}</div>`)
+        + csoport(T("RÁDIÓK"), adok.length, `<div class="ktalal">${adok.map((x, i) => `<div class="ktsor"><button data-r="${i}"><b>${ESC(x.cim)}</b><small>${ESC(x.al)}</small></button></div>`).join("")}</div>`)
+        + csoport("PRESETS", presetek.length, `<div class="kazettak">${presetek.map((x, i) => this._kazettaCsempe(x.k, i)).join("")}</div>`));
+    lista.scrollTop = 0;
+
+    // indítás: a megadott forrásból, vagy az ezen a hangszórón szóló első forrásból; ha egyik sem szól itt, megmondja, hol
+    const indit = async (x, forras) => {
+      const valaszt = forras || SORREND.find((f) => x.f[f] && this._forrasSzol(f, hsz));
+      if (!valaszt) {
+        const hol = SORREND.filter((f) => x.f[f]).map((f) => `${CIMKE[f]}: ${this._kepesek({ forras: "stream", tipus: f === "wiim" ? "wiim_preset" : f })}`).join(" · ");
+        return this._uzen(T("A(z) {h} hangszórón ez egyik forrásból sem szól – {l}.", { h: KN(hsz), l: hol }));
+      }
+      const kaz = x.f[valaszt];
+      if (kaz.nasSzam) {
+        const t = kaz.nasSzam.split("/"), mappa = t.slice(0, -1).join("/"), id = mappa ? `${nas}/${mappa}` : nas, fajl = `${nas}/${kaz.nasSzam}`, sz = await this._albumSzamok(id);
+        let kezdo = sz.findIndex((y) => y === fajl || SAFE_DECODE(y) === fajl);
+        if (kezdo < 0) kezdo = sz.findIndex((y) => SAFE_DECODE(y).endsWith(`/${t[t.length - 1]}`));
+        this._polcZar();
+        return this._betolt({ cim: mappa ? mappa.split("/").pop() : "NAS", alcim: mappa ? mappa.split("/")[0] : "", forras: "nas", id, szamok: sz.length ? sz : [fajl] }, Math.max(0, kezdo));
+      }
+      let kezdo = 0;
+      if (kaz.dzSzam && kaz.dzAlbum) { try { kezdo = Math.max(0, ((await this._dz(`/album/${kaz.dzAlbum}/tracks?limit=200`)).data || []).findIndex((t) => t.id === kaz.dzSzam)); } catch (e) { /* az album elejéről */ } }
+      this._polcZar();
+      return this._betolt(kaz, kezdo);
+    };
+    const elem = { a: aL, s: sL };
+    lista.querySelectorAll("[data-a], [data-s]").forEach((b) => b.addEventListener("click", () => { const k = b.dataset.a != null ? "a" : "s"; indit(elem[k][Number(b.dataset[k])]); }));
+    lista.querySelectorAll(".fchipek .fchip").forEach((c) => c.addEventListener("click", () => {
+      const sz = c.parentElement, k = sz.dataset.ac != null ? "a" : "s"; indit(elem[k][Number(sz.dataset[`${k}c`])], c.dataset.f);
+    }));
+    lista.querySelectorAll("[data-e]").forEach((b) => b.addEventListener("click", () => {
+      // előadó: a zenemappában ha ott van, különben a Deezer / Spotify előadó-oldala
+      const x = eL[Number(b.dataset.e)], f = ["nas", "deezer", "spotify"].find((y) => x.f[y]);
+      pl.ful = f; pl.ut = x.f[f].ut; pl.dzKeres = ""; pl.keres = ""; this._polcRajz();
+    }));
+    lista.querySelectorAll("[data-r]").forEach((b) => b.addEventListener("click", () => {
+      const x = adok[Number(b.dataset.r)]; this._polcZar();
+      if (this._mod !== "radio") this.shadowRoot.querySelector(".elo:not(.rejt) .valto")?.click();
+      if (x.sajat != null) this._hangol(x.sajat); else this._netIndit(x.rb);
+    }));
+    lista.querySelectorAll(".kazettak .kt").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._betolt(presetek[Number(b.dataset.i)].k); }));
+  }
+
   async _wiimRajz(lista) {
     const pl = this._polc, hsz = this._hangszoro();
     const cel = this._wiim(hsz) ? hsz : this._kimenetek.find((h) => this._wiim(h));
     if (!cel) { lista.innerHTML = `<div class="puzenet">${T("Nincs WiiM a hangszórók között.")}</div>`; return; }
     lista.innerHTML = `<div class="puzenet">${T("Betöltés…")}</div>`;
-    let elemek;
-    try {
-      const r = await this._hass.callWS({ type: "media_player/browse_media", entity_id: cel.entity, media_content_id: "wiim_library/library_root/favorites", media_content_type: "playlist" });
-      elemek = (r.children || []).filter((x) => x.can_play);
-    } catch (err) { lista.innerHTML = `<div class="puzenet">${T("A WiiM-presetek nem olvashatók: {h}", { h: ESC(err?.message || err) })}</div>`; return; }
+    let kaz;
+    try { kaz = await this._wiimPresetek(cel); }
+    catch (err) { lista.innerHTML = `<div class="puzenet">${T("A WiiM-presetek nem olvashatók: {h}", { h: ESC(err?.message || err) })}</div>`; return; }
     if (this._polc !== pl || pl.ful !== "wiim") return;
-    const kaz = elemek.map((x) => ({ cim: x.title, alcim: T("WiiM-preset {n}", { n: x.media_content_id }), forras: "stream", tipus: "wiim_preset", id: String(x.media_content_id), kep: x.thumbnail || null }));
     lista.innerHTML = (this._wiim(hsz) ? "" : `<div class="puzenet">${T("A WiiM-presetek a(z) {h} hangszórón szólnak – válts rá.", { h: ESC(KN(cel)) })}</div>`)
       + (kaz.length ? `<div class="kazettak">${kaz.map((k, i) => this._kazettaCsempe(k, i)).join("")}</div>` : "")
       + `<div class="puzenet">${kaz.length ? "" : T("Még nincs WiiM-preset.") + " "}${T("Presetet a WiiM Home appban menthetsz – bármelyik zenei szolgáltatásból (Tidal, Qobuz, Amazon, Deezer, rádió…).")}</div>`;
@@ -3647,6 +3788,7 @@ class CantabileCard extends HTMLElement {
     const ut = (pl.ful === "nas" || pl.ful === "deezer" || szolg) && pl.ut.length
       ? `<button data-vissza>${T("‹ Vissza")}</button>${ESC(pl.ut.map((x) => x.cim).join(" › "))}`
       : pl.ful === "sor" ? ""
+      : pl.ful === "mind" ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés mindenhol…")}" value="${ESC(pl.keres || "")}">`
       : pl.ful === "wiim" ? T("WiiM-presetek")
       : pl.ful === "deezer" ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés a Deezeren…")}" value="${ESC(pl.keres || "")}">`
       : szolg ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés: {s}…", { s: szolgNev })}" value="${ESC(pl.keres || "")}">`
@@ -3654,6 +3796,7 @@ class CantabileCard extends HTMLElement {
       : (pl.ful === "tel" ? T("Saját zene") : pl.ful === "nas" ? T("Zenemappa") : T("Sonos kedvencek"));
     p.innerHTML = `
       <div class="pfej">
+        <button class="pful ${pl.ful === "mind" ? "akt" : ""}" data-ful="mind">${T("KERESÉS")}</button>
         ${this._vanSonos() ? `<button class="pful ${pl.ful === "stream" ? "akt" : ""}" data-ful="stream">STREAMING</button>` : ""}
         ${this._config.deezer !== false && this._vanSonos() ? `<button class="pful ${pl.ful === "deezer" ? "akt" : ""}" data-ful="deezer">DEEZER</button>` : ""}
         ${this._szolgLatszik("spotify") ? `<button class="pful ${pl.ful === "spotify" ? "akt" : ""}" data-ful="spotify" title="${T("kísérleti")}">SPOTIFY<sup>β</sup></button>` : ""}
@@ -3677,10 +3820,11 @@ class CantabileCard extends HTMLElement {
       // gépelés közben csak a találati lista frissül (a mező és a billentyűzet marad)
       kereso.addEventListener("input", () => {
         pl.keres = kereso.value; clearTimeout(this._keresIdo);
-        this._keresIdo = setTimeout(() => (KERES_NORM(pl.keres).length >= 2 ? (pl.ful === "deezer" ? this._deezerRajz(lista) : szolg ? this._szolgRajz(lista, pl.ful) : this._keresRajz(lista)) : this._polcRajz()), pl.ful === "deezer" || szolg ? 450 : 180);
+        this._keresIdo = setTimeout(() => (pl.ful === "mind" ? this._mindRajz(lista) : KERES_NORM(pl.keres).length >= 2 ? (pl.ful === "deezer" ? this._deezerRajz(lista) : szolg ? this._szolgRajz(lista, pl.ful) : this._keresRajz(lista)) : this._polcRajz()), pl.ful === "deezer" || szolg || pl.ful === "mind" ? 450 : 180);
       });
       kereso.addEventListener("keydown", (e) => { if (e.key === "Enter") kereso.blur(); });
     }
+    if (pl.ful === "mind") return this._mindRajz(lista);
     if (pl.ful === "deezer") return this._deezerRajz(lista);
     if (szolg) return this._szolgRajz(lista, pl.ful);
     if (KERES_NORM(pl.keres || "").length >= 2 && !(pl.ful === "nas" && pl.ut.length)) return this._keresRajz(lista);
