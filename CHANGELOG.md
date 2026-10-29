@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.12.14 – 2026-10-29
 
 - Voice search: every search box on the tape shelf (SEARCH, NAS, Deezer, Spotify, Tidal), in NET and in the ⚙ station search has a microphone button. Speak, and the recognised text goes into the box and is searched straight away. Recognition uses the speech-to-text of the default Assist voice assistant (streamed over the websocket, `assist_pipeline/run`, STT stage only); if there is none, the browser's own recogniser (Web Speech). Recording stops when you stop talking, on a second tap or after 10 s; missing https, a denied microphone or no recogniser give a clear message.
 
