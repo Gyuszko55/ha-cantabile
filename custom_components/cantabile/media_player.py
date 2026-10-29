@@ -39,6 +39,8 @@ _LOGGER = logging.getLogger(__name__)
 TUKOR_CSEND = 600          # mp: ennyi csend után a tükör véget ér (a TV elengedi a képernyőt)
 # Sonos-rádió és más élő adások azonosítói (a tükörben „ON AIR” jelenik meg)
 RADIO_ID = re.compile(r"^(x-rincon-mp3radio|x-sonosapi-stream|x-sonosapi-radio|x-sonosapi-hls|aac|hls-radio):", re.I)
+# a Sonos szolgáltatás-azonosítója (sid=…) → a zeneszolgáltató neve (a kártya forrás-dobozával egyezően)
+SONOS_SID = {2: "Deezer", 9: "Spotify", 12: "Spotify", 174: "TIDAL", 204: "Apple Music", 284: "YouTube Music", 160: "SoundCloud"}
 
 TAMOGATOTT = (
     MediaPlayerEntityFeature.PLAY_MEDIA | MediaPlayerEntityFeature.PLAY | MediaPlayerEntityFeature.PAUSE
@@ -377,9 +379,36 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             meta = {k: v for k, v in extra.items() if v}
         if not radio:
             meta.pop("station", None)
+        meta["source"] = await self._tukor_forras(st, mcid, fajl, radio)
         if self._tukor is None or self._tukor_kulcs != kulcs:
             return                                  # közben új szám jött, vagy véget ért a tükör
         self.uzen({"cmd": "mirror", "meta": {k: v for k, v in meta.items() if not k.startswith("_")}, **allas})
+
+    async def _tukor_forras(self, st: Any, mcid: str, fajl: str | None, radio: bool) -> str:
+        """„Sonos 2 · Deezer”: hol szól (a kártyán beállított név) és honnan jön (NAS, a Sonos-szolgáltató, rádió)."""
+        from .music import HibaUzenet, kartya
+
+        hol = None
+        with contextlib.suppress(HibaUzenet, Exception):
+            c = await kartya(self.hass)
+            h = next((h for h in c.get("hangszorok", []) if h.get("entity") == st.entity_id and not h.get("tagok")), None)
+            hol = h and (h.get("rovid") or h.get("nev"))
+        hol = hol or st.attributes.get("friendly_name") or st.entity_id
+        if fajl:
+            honnan = "NAS"
+        elif radio:
+            honnan = "Radio"
+        elif m := re.search(r"[?&]sid=(\d+)", mcid):
+            honnan = SONOS_SID.get(int(m.group(1)))
+        elif mcid.startswith(("spotify:", "x-sonos-spotify:")) or "open.spotify.com" in mcid:
+            honnan = "Spotify"
+        elif "deezer.com" in mcid:
+            honnan = "Deezer"
+        elif "tidal.com" in mcid:
+            honnan = "TIDAL"
+        else:
+            honnan = st.attributes.get("app_name") or None
+        return " · ".join(x for x in (hol, honnan) if x)
 
     # ---- vezérlés ----
     async def async_play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:

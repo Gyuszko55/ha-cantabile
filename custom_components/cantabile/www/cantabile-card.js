@@ -5173,7 +5173,7 @@ class CantabileTv extends HTMLElement {
       sr.querySelector(".elo").textContent = radio ? (m.title ? m.station : m.artist || "") : m.artist || "";
       sr.querySelector(".alb").textContent = [m.album, m.year].filter(Boolean).join("  ·  ");
       const khz = m.rate ? `${(m.rate / 1000).toLocaleString("en", { maximumFractionDigits: 1 })} kHz${m.bits ? ` / ${m.bits} bit` : ""}` : "";
-      const csip = [m.codec, khz, m.kbps ? `${m.kbps} kbps` : "", m.track ? `TRACK ${m.track}` : "", m.genre ? String(m.genre).split(" / ")[0] : "", radio ? "INTERNET RADIO" : ""].filter(Boolean);
+      const csip = [m.source ? `▶ ${m.source}` : "", m.codec, khz, m.kbps ? `${m.kbps} kbps` : "", m.track ? `TRACK ${m.track}` : "", m.genre ? String(m.genre).split(" / ")[0] : "", radio ? "INTERNET RADIO" : ""].filter(Boolean);
       sr.querySelector(".csipek").innerHTML = csip.map((x) => `<span>${ESC(String(x).toUpperCase())}</span>`).join("");
       const bor = sr.querySelector(".bor"), kep = m.cover || (radio ? m.image : "") || "";
       bor.classList.toggle("ures", !kep);

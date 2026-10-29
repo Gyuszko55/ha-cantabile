@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Cantabile TV mirror shows where the music plays and where it comes from, as a tag under the track details: “▶ SONOS 2 · DEEZER”, “▶ SONOS 1 · NAS”, “▶ SONOS 1 · RADIO” (the speaker's name from the card; the service from the music folder, the Sonos service id – Deezer, Spotify, TIDAL, Apple Music, YouTube Music, SoundCloud – or the link).
+
 ## 1.12.16 – 2026-10-29
 
 - Cantabile TV mirror after an update: a Cast receiver only reconnects after a Home Assistant restart and keeps running the old card code, which doesn't know the mirror. The TV page now tells the server what it can do (`features` in `cantabile/tv/subscribe`); if an older page is running when a mirror should start, Cantabile casts the page again (with the fresh card) and then starts the mirror.
