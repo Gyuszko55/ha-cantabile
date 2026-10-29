@@ -199,7 +199,7 @@ class TvKozpont:
         return mcid
 
     # ---- a szám adatai ----
-    async def adatok(self, mcid: str, fajl: str | None, extra: dict[str, Any]) -> dict[str, Any]:
+    async def adatok(self, mcid: str, fajl: str | None, extra: dict[str, Any], hatter: bool = True) -> dict[str, Any]:
         meta: dict[str, Any] = {k: v for k, v in (extra or {}).items() if v not in (None, "")}
         if fajl:
             meta = {**await self._cimkek(fajl), **meta}
@@ -225,16 +225,21 @@ class TvKozpont:
             meta.setdefault("kind", "stream")
             if not meta.get("station"):
                 meta["station"] = await self._adonev(mcid)
-        eloado = meta.get("artist")
+        eloado = str(meta.get("artist") or "")
         if eloado:
-            meta.setdefault("artist_image", await self._deezer_kep("artist", eloado))
-            # a TV-oldal váltakozó háttérképei: a NAS-on az előadó / album mappájának képei, aztán a TheAudioDB fanartjai
-            hatter = await self.hass.async_add_executor_job(_helyi_hatterek, fajl) if fajl else []
-            meta["backgrounds"] = list(dict.fromkeys(
-                [async_sign_path(self.hass, f"{KEP_URL}?f={quote(k, safe='')}", ALAIRAS) for k in hatter]
-                + await self._adb_hatterek(eloado)))[:10]
-            if not meta.get("cover") and meta.get("album"):
-                meta["cover"] = await self._deezer_kep("album", f'artist:"{eloado}" album:"{meta["album"]}"')
+            # a képkeresések egyszerre futnak (egy lassú szolgáltatás ne késleltesse sorban a lejátszást); a váltakozó
+            # háttérképek (NAS-mappa + TheAudioDB) csak a Cast-os TV-oldalnak kellenek, a DLNA-snak nem
+            async def semmi() -> Any:
+                return None
+            albumker = self._deezer_kep("album", f'artist:"{eloado}" album:"{meta["album"]}"') if not meta.get("cover") and meta.get("album") else semmi()
+            kep, adb, alb = await asyncio.gather(self._deezer_kep("artist", eloado), self._adb_hatterek(eloado) if hatter else semmi(), albumker)
+            meta.setdefault("artist_image", kep)
+            if alb:
+                meta["cover"] = alb
+            if hatter:
+                helyi = await self.hass.async_add_executor_job(_helyi_hatterek, fajl, list(self.hass.config.media_dirs.values())) if fajl else []
+                meta["backgrounds"] = list(dict.fromkeys(
+                    [async_sign_path(self.hass, f"{KEP_URL}?f={quote(k, safe='')}", ALAIRAS) for k in helyi] + (adb or [])))[:10]
         return meta
 
     async def _cimkek(self, fajl: str) -> dict[str, Any]:
@@ -325,10 +330,13 @@ class TvKozpont:
         if tarolt and time.monotonic() - tarolt[0] < 86400:
             return tarolt[1]
         kepek: list[str] = []
+        sikeres = False
         try:
             sess = async_get_clientsession(self.hass)
             async with asyncio.timeout(8), sess.get(f"{AUDIODB}/search.php", params={"s": eloado}) as r:
+                r.raise_for_status()
                 talalat = ((await r.json(content_type=None)) or {}).get("artists") or []
+            sikeres = True
             a = next((x for x in talalat if str(x.get("strArtist") or "").lower() == kulcs), talalat[0] if talalat else {})
             kepek = [a[k] for k in ("strArtistFanart", "strArtistFanart2", "strArtistFanart3", "strArtistFanart4", "strArtistWideThumb")
                      if str(a.get(k) or "").startswith("https://")]
@@ -336,7 +344,8 @@ class TvKozpont:
             _LOGGER.debug("Cantabile TV: TheAudioDB-kép (%s) nem jött", eloado, exc_info=True)
         if len(self._adb) > 500:
             self._adb.clear()
-        self._adb[kulcs] = (time.monotonic(), kepek)
+        # a hibát (időtúllépés, túl sok kérés) csak 10 percig jegyzi meg, a sikeres választ egy napig
+        self._adb[kulcs] = (time.monotonic() if sikeres else time.monotonic() - 86400 + 600, kepek)
         return kepek
 
     # ---- DLNA mód: a szám adatlapja képként (tv_kep.py) ----
@@ -386,8 +395,18 @@ class TvKozpont:
                         try:
                             _, hiba = await asyncio.wait_for(p.communicate(), 180)
                         except TimeoutError:
-                            p.kill()
+                            with contextlib.suppress(ProcessLookupError):
+                                p.kill()
+                            await p.wait()
                             hiba = b"timeout"
+                        except asyncio.CancelledError:
+                            # megszakított kérés: az ffmpeg ne írjon tovább a közös ideiglenes fájlba
+                            with contextlib.suppress(ProcessLookupError):
+                                p.kill()
+                            with contextlib.suppress(OSError):
+                                os.remove(ideig)
+                            self._video_zar.pop(cel, None)
+                            raise
                         if p.returncode == 0 and os.path.exists(ideig):
                             await self.hass.async_add_executor_job(os.replace, ideig, cel)
                             break
@@ -415,7 +434,9 @@ class TvKozpont:
         """Az adatlap képfájlja a tárban (szükség esetén megrajzolja)."""
         from . import tv_kep
 
-        kulcs = hashlib.sha1(json.dumps({k: v for k, v in meta.items() if (not k.startswith("_") or k == "_cover_file") and k != "backgrounds"},
+        # az aláírt címek (authSig) másodpercenként változnak: a kulcsba nem kerülhetnek, különben sosem lenne tártalálat
+        kulcs = hashlib.sha1(json.dumps({k: v for k, v in meta.items() if (not k.startswith("_") or k == "_cover_file") and k != "backgrounds"
+                                         and not (isinstance(v, str) and "authSig=" in v)},
                                         sort_keys=True, default=str).encode()).hexdigest()[:20]
         tar = self.hass.config.path(".cache", "cantabile_tv")
         cel = os.path.join(tar, f"dlna_{kulcs}.jpg")
@@ -551,6 +572,12 @@ async def beagyazott(hass: HomeAssistant, ut: str) -> str | None:
             with contextlib.suppress(ProcessLookupError):
                 p.kill()
             await p.wait()
+        except asyncio.CancelledError:
+            with contextlib.suppress(ProcessLookupError):
+                p.kill()
+            with contextlib.suppress(OSError):
+                os.remove(ideig)
+            raise
 
         def helyere() -> None:
             if p.returncode == 0 and os.path.exists(ideig):
@@ -566,11 +593,14 @@ async def beagyazott(hass: HomeAssistant, ut: str) -> str | None:
 HATTER_NEV = re.compile(r"^(fanart|backdrop|background|artist|extrafanart)[-_ ]?\d*\.(jpe?g|png|webp)$", re.I)
 
 
-def _helyi_hatterek(fajl: str) -> list[str]:
-    """Kodi-szokás szerinti háttérképek az album és az előadó mappájában (fanart.jpg, backdrop2.jpg, extrafanart/…)."""
+def _helyi_hatterek(fajl: str, media_dirs: list[str]) -> list[str]:
+    """Kodi-szokás szerinti háttérképek az album és az előadó mappájában (fanart.jpg, backdrop2.jpg, extrafanart/…).
+    Csak a médiamappán belül keres (a médiamappa gyökerében sem – az nem egy előadó mappája)."""
     kepek: list[str] = []
+    gyokerek = [os.path.normpath(os.path.abspath(m)) for m in media_dirs]
+    belul = lambda m: any(m.startswith(g + os.sep) for g in gyokerek)  # noqa: E731
     album = os.path.dirname(fajl)
-    for mappa in (album, os.path.dirname(album)):
+    for mappa in [m for m in (album, os.path.dirname(album)) if belul(m)]:
         for hely in (mappa, os.path.join(mappa, "extrafanart")):
             try:
                 nevek = sorted(os.listdir(hely))

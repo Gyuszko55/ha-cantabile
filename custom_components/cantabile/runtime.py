@@ -163,6 +163,7 @@ class Cantabile:
         for e in [entity_id] if entity_id else list(self._sorozat):
             if (t := self._sorozat.pop(e, None)) and not t.done():
                 t.cancel()
+            self._sorrend.pop(e, None)         # a leállított kazetta nyoma se maradjon (a „következő” ne indítsa újra)
 
     @callback
     def add_tracks(self, entity_id: str, tracks: list[str]) -> None:
@@ -179,7 +180,7 @@ class Cantabile:
     def ugrik(self, entity_id: str, lepes: int) -> bool:
         """Következő / előző szám a sorozatlejátszásban (a szóló számhoz képest); False, ha nincs futó sorozat."""
         s = self._sorrend.get(entity_id)
-        if s is None or not s.szamok:
+        if s is None or not s.szamok or not self.tracks_running(entity_id):
             return False
         most = s.szamok.index(s.most) if s.most in s.szamok else 0
         self.play_tracks(entity_id, s.szamok, max(0, min(len(s.szamok) - 1, most + lepes)))

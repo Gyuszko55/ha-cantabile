@@ -262,7 +262,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         cim = await kp.feloldas(media_id, self.entity_id)
         src, fajl = kp.forras(cim)
         extra = kwargs.get("extra") or {}
-        meta = await kp.adatok(cim, fajl, extra.get("metadata") or extra)
+        meta = await kp.adatok(cim, fajl, extra.get("metadata") or extra, hatter=not self.dlna)
         if self.dlna:
             await self._dlna_lejatszas(media_id, meta, fajl)
             return
@@ -312,7 +312,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             cim = await kp.feloldas(kov, self.entity_id)
             _, fajl = kp.forras(cim)
             if fajl:
-                await kp.dlna_video(await kp.adatok(cim, fajl, {}), fajl)
+                await kp.dlna_video(await kp.adatok(cim, fajl, {}, hatter=False), fajl)
         except Exception:  # noqa: BLE001
             _LOGGER.debug("Cantabile TV: a következő szám előkészítése nem sikerült (%s)", kov, exc_info=True)
 

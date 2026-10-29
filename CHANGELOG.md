@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.12.12 – unreleased
+
+Fixes from a full review:
+
+- Unavailable speaker: a tape or station gives one message, no second "didn't start playing" warning, and no tape is saved as if loaded.
+- The start watchdog stops when you press STOP / PAUSE / POWER or change speaker, accepts a paused player, waits 35 s for Spotify Connect.
+- Expected failures stay quiet (group split, the seek after moving playback, background queue fill, stopping the sequencer); seeking is skipped on players that can't seek.
+- SEARCH: each source gets at most 6 s, so a slow Radio Browser doesn't hold up the rest; a music-folder error is reported; the source choice follows a speaker change; "‹ Back" from an artist page returns to the results; years in folder names are only taken from “(1979)” or a leading “1979 - ” (so “2050 Before the Massacre” stays intact), titles starting with numbers (“50 Cent”) match correctly.
+- WiiM queue: reloads only when a new preset / album starts, not on every track.
+- Cantabile TV page: a late background image can't overwrite the new track's; the new background fades in over the old one (no dimming); when every background fails the record artwork is shown; the screen wake lock is requested once and released if playback paused meanwhile.
+- DLNA TVs: the track-card cache key no longer contains signed (time-stamped) addresses, so pre-encoded videos and cards are reused instead of encoded again.
+- After a tape is stopped (e.g. switching to radio), "next" on a TV no longer restarts the old tape.
+- TV playback starts faster: the artist picture, album cover and TheAudioDB lookups run in parallel, and TheAudioDB is skipped for DLNA TVs; a failed TheAudioDB lookup is retried after 10 min instead of a day.
+- Interrupted cover extraction / video encoding stops ffmpeg and removes its temporary file; local fanart is only looked up inside the media folders.
+
 ## 1.12.11 – 2026-10-29
 
 - WIIM tab on the tape shelf (when a WiiM is among the speakers): the WiiM's presets as tapes – anything saved as a preset in the WiiM Home app, from any of its music services (Tidal, Qobuz, Amazon Music, Deezer, radio…), plays from Cantabile on the WiiM. On another speaker the card says where they play.
