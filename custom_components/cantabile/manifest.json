@@ -27,5 +27,5 @@
     "async-upnp-client"
   ],
   "single_config_entry": true,
-  "version": "1.12.16"
+  "version": "1.12.17"
 }

@@ -40,6 +40,8 @@ TUKOR_CSEND = 600          # mp: ennyi csend után a tükör véget ér (a TV el
 # Sonos-rádió és más élő adások azonosítói (a tükörben „ON AIR” jelenik meg)
 RADIO_ID = re.compile(r"^(x-rincon-mp3radio|x-sonosapi-stream|x-sonosapi-radio|x-sonosapi-hls|aac|hls-radio):", re.I)
 # a Sonos szolgáltatás-azonosítója (sid=…) → a zeneszolgáltató neve (a kártya forrás-dobozával egyezően)
+# ami a tükörhöz kell a TV-oldaltól: ha valamelyik hiányzik (régebbi kártyakód fut a TV-n), az oldal újra kimegy
+TUKOR_KEPES = {"mirror", "source"}
 SONOS_SID = {2: "Deezer", 9: "Spotify", 12: "Spotify", 174: "TIDAL", 204: "Apple Music", 284: "YouTube Music", 160: "SoundCloud"}
 
 TAMOGATOTT = (
@@ -291,7 +293,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         """A TV-oldal hang nélkül a `cel` hangszórót mutatja (DLNA-s TV-n nincs ilyen: ott a TV maga játszik)."""
         if self.dlna or self.oldal is None or cel == self.entity_id or cel == self._tukor:
             return
-        if "mirror" not in self.oldal_kepes:
+        if not TUKOR_KEPES <= self.oldal_kepes:
             # régi oldal fut a TV-n: újraküldjük a friss kártyával, és utána indul a tükör
             if self._ujrakuldes is None or self._ujrakuldes.done():
                 self._ujrakuldes = self.hass.async_create_background_task(self._friss_oldallal_tukroz(cel), f"cantabile_tv_ujrakuld_{self.entity_id}")
@@ -312,7 +314,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         except Exception as err:  # noqa: BLE001 – a TV elérhetetlen lett: nincs tükör
             _LOGGER.warning("Cantabile TV: a TV-oldal frissítése nem sikerült (%s): %s", self.cast, err)
             return
-        if "mirror" in self.oldal_kepes:
+        if TUKOR_KEPES <= self.oldal_kepes:
             self.tukroz(cel)
 
     @callback

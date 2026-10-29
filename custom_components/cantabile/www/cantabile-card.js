@@ -5303,7 +5303,7 @@ class CantabileTv extends HTMLElement {
 }
 
 // amit ez a TV-oldal tud (a szerver ebből látja, ha egy frissítés után még a régi kód fut a TV-n, és újraküldi)
-const TV_KEPES = ["mirror"];
+const TV_KEPES = ["mirror", "source"];
 
 // a hang, az elemző és a szóló szám az oldalhoz tartozik, nem a kártyapéldányhoz (lásd a BT kimenetnél is)
 const TV_KOZOS = {};

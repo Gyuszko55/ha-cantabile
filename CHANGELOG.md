@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.12.17 – 2026-10-29
 
+- A TV page that predates this tag is cast again once before mirroring (the page now also reports `source`).
 - Cantabile TV mirror shows where the music plays and where it comes from, as a tag under the track details: “▶ SONOS 2 · DEEZER”, “▶ SONOS 1 · NAS”, “▶ SONOS 1 · RADIO” (the speaker's name from the card; the service from the music folder, the Sonos service id – Deezer, Spotify, TIDAL, Apple Music, YouTube Music, SoundCloud – or the link).
 
 ## 1.12.16 – 2026-10-29

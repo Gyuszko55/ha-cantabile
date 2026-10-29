@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.core import HomeAssistant
 
 DOMAIN = "cantabile"
-VERSION = "1.12.16"
+VERSION = "1.12.17"
 
 # a kártya és a betűkészlet a saját statikus útvonalon
 STATIC_URL = "/cantabile_static"
