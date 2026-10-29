@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.12.18 – 2026-10-30
 
 - GENRE tab on the tape shelf (next to NAS): the music folder's albums by genre, from the music files' own genre tags. The genre of an album is read from its first file (ffprobe) in the background, a few at a time; the first time the tab shows the progress, after that the genres are kept in Home Assistant's storage and only new or changed album folders are read again. Several genres in one tag (“Rock; Blues”, “Pop/Rock”) put the album under each (up to three); ID3v1 numbers become names, spelling variants (“Hip Hop” / “Hip-Hop”, “RnB” / “R&B”) are merged. Albums without a genre tag are under “No genre”. “↻ Read again” rescans every album. New websocket command `cantabile/genres`.
 
