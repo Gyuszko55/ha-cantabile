@@ -355,7 +355,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         if elso:
             self.uzen({"cmd": "mirror", **allas})       # a TV-oldal azonnal elhallgat; az adatok utána jönnek
         kulcs = (a.get("media_content_id"), a.get("media_title"), a.get("media_artist"), a.get("media_album_name"))
-        if kulcs != self._tukor_kulcs and any(kulcs[1:]):
+        if kulcs != self._tukor_kulcs and any(kulcs):            # a NAS-számnál a Sonos csak a címet adja (cím, előadó nélkül)
             self._tukor_kulcs = kulcs
             self.hass.async_create_background_task(self._tukor_meta(st, allas, kulcs), f"cantabile_tv_tukor_{self.entity_id}")
         elif not elso:

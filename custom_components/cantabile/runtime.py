@@ -241,7 +241,7 @@ class Cantabile:
                         alap = None if fajlos or not st else lenyomat(st)
 
                 def masik(st: State | None) -> bool:
-                    if not st or st.state not in AKTIV:
+                    if not st or st.state not in AKTIV or st.attributes.get("mirror_of"):
                         return True
                     if fajlos:                       # a lejátszó a fájl nevét mutatja: ha már nem ezt, más szól
                         return not sajat(st)
@@ -249,8 +249,8 @@ class Cantabile:
 
                 await var(self.hass, entity_id, masik)
                 st = self.hass.states.get(entity_id)
-                if st and st.state in AKTIV:
-                    return          # más szól a lejátszón: a magnó leáll
+                if st and (st.state in AKTIV or st.attributes.get("mirror_of")):
+                    return          # más szól a lejátszón, vagy a TV tükörre váltott: a magnó leáll
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001

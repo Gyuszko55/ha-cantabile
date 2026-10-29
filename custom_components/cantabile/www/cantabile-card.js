@@ -2436,13 +2436,16 @@ class CantabileCard extends HTMLElement {
     if (uj.entity === HELYI && regi && regi.entity !== HELYI) this._btElotte = this._kimenetek.indexOf(regi);
     // a választó csak irányít: ami szól (vagy épp átvitel alatt van), az megy át az új kimenetre. A váltások sorban
     // futnak, így gyors kapcsolgatásnál sem indul el két helyen, és nem vész el az adó.
+    // a TV, amelyről elváltottunk (vagy amelyik az előzőt tükrözte), hang nélkül tovább mutatja, ami most szól – átvitelnél
+    // csak utána, amikor a régi sorozatlejátszó már leállt (különben a TV elhallgatását számváltásnak venné)
+    const kovet = () => {
+      if (regi && regi !== uj && regi.entity !== HELYI && uj.entity !== HELYI && this._ent && !this._nincsIntegracio)
+        this._hass.callWS({ type: "cantabile/tv/follow", source: regi.entity, target: uj.entity }).catch(() => {});
+    };
     if (atvisz && regi && regi !== uj) {
       this._valtSor = (this._valtSor || Promise.resolve()).then(() => this._atviszHaKell(regi, uj))
-        .catch((e) => this._uzen(T("Az átváltás nem sikerült: {h}", { h: e?.message || e })));
-    } else this._csoportAllit(uj);
-    // a TV, amelyről elváltottunk (vagy amelyik az előzőt tükrözte), hang nélkül tovább mutatja, ami most szól
-    if (regi && regi !== uj && regi.entity !== HELYI && uj.entity !== HELYI && this._ent && !this._nincsIntegracio)
-      this._hass.callWS({ type: "cantabile/tv/follow", source: regi.entity, target: uj.entity }).catch(() => {});
+        .catch((e) => this._uzen(T("Az átváltás nem sikerült: {h}", { h: e?.message || e }))).then(kovet);
+    } else { this._csoportAllit(uj); kovet(); }
     // a régi hangszóró foglalása: ha átváltás után már nem szól, elengedjük (ami az új állásnak is tagja, az marad)
     if (regi && regi !== uj && regi.entity !== HELYI) {
       const marad = uj.tagok || [uj.entity], ids = (regi.tagok || [regi.entity]).filter((e) => !marad.includes(e));

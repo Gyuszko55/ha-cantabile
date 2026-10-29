@@ -201,8 +201,8 @@ class TvKozpont:
     def _sajat_hostok(self) -> set[str]:
         hostok = set()
         for u in (self.hass.config.internal_url, self.hass.config.external_url):
-            if u:
-                hostok.add(urlsplit(u).netloc)
+            if u and u.strip():
+                hostok.add(urlsplit(u.strip()).netloc)            # a beállításban maradt szóköz ne rontsa el
         with contextlib.suppress(Exception):
             from homeassistant.helpers.network import get_url
             hostok.add(urlsplit(get_url(self.hass)).netloc)

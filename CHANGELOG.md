@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- TV mirror started and stopped at once when the TV was playing a music-folder tape: the sequence player took the TV going quiet for the end of the track and sent the next one to the TV, which ended the mirror. The card now starts the mirror only after moving the music, and the sequence player stops when its TV switches to mirroring.
+- TV mirror of a Sonos playing from the music folder showed no details: Sonos reports no title / artist for these files, and the mirror waited for them. It now reads the file's own tags whenever the track changes.
+- Cantabile's own address was not recognised when the Home Assistant internal URL setting ended in a space.
 - Cantabile TV clock: after midnight the TV showed “24:04” instead of “0:04” (the Cast receiver's older Chrome turns `hour12: false` into a 24-hour cycle). The clock and the SLEEP time now use the 0–23 hour cycle, without a leading zero.
 - An older TV page is now also cast again when playback starts on the TV (not only before mirroring), so a fix like this one reaches the TV by itself.
 
