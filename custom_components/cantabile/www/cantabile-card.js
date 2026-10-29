@@ -2191,7 +2191,7 @@ class CantabileCard extends HTMLElement {
         if (!this._ent?.sleep) throw new Error(T("A Cantabile integráció nincs beállítva (Beállítások → Eszközök és szolgáltatások)."));
         await this._hass.callService("cantabile", "sleep_timer", { entity_id: hsz.entity, minutes: iso ? kov : 0 });
       }
-      this._uzen(iso ? T("Kikapcsol {p} perc múlva ({t}).", { p: kov, t: ujVege.toLocaleTimeString(NYELV(), { hour: "2-digit", minute: "2-digit", ...ORA_OPC(this._hass) }) }) : T("Időzített kikapcsolás törölve."));
+      this._uzen(iso ? T("Kikapcsol {p} perc múlva ({t}).", { p: kov, t: ujVege.toLocaleTimeString(NYELV(), { hour: "numeric", minute: "2-digit", ...ORA_OPC(this._hass) }) }) : T("Időzített kikapcsolás törölve."));
     } catch (e) { this._uzen(T("Időzítő: {h}", { h: e?.message || e })); }
     this._alvasRajz();
   }
@@ -4883,11 +4883,12 @@ const TV_SVG_LEMEZ = `<svg viewBox="0 0 200 200"><defs><radialGradient id="tvl" 
 
 // országok, ahol a 12 órás kijelzés a szokás (a többiben 24 órás)
 const ORA12 = ["US", "CA", "AU", "NZ", "IN", "PH", "PK", "BD", "EG", "SA", "MY", "CO", "MX", "JO", "OM", "QA", "KW", "AE", "SV", "HN", "NI"];
-// 12 / 24 órás: a HA-profil beállítása, különben a HA-ban megadott ország szokása (pl. HU → 24, US → 12)
+// 12 / 24 órás: a HA-profil beállítása, különben a HA-ban megadott ország szokása (pl. HU → 24, US → 12). Óraciklussal, nem
+// `hour12`-vel: a `hour12: false` angol nyelven a Chrome-ban 24-es ciklust ad, éjfél után „24:04”-et írna „0:04” helyett
 const ORA_OPC = (h) => {
   const tf = h?.locale?.time_format, orszag = String(h?.config?.country || "").toUpperCase();
   const h12 = tf === "12" ? true : tf === "24" ? false : orszag ? ORA12.includes(orszag) : undefined;
-  return h12 !== undefined ? { hour12: h12 } : {};
+  return h12 !== undefined ? { hourCycle: h12 ? "h12" : "h23" } : {};
 };
 
 class CantabileTv extends HTMLElement {
@@ -5024,7 +5025,7 @@ class CantabileTv extends HTMLElement {
     if (window.ResizeObserver) new ResizeObserver(meret).observe(this);
     const ora = () => {
       const d = new Date(), nyelv = this._h?.locale?.language || "en";
-      const o = d.toLocaleTimeString(nyelv, { hour: "2-digit", minute: "2-digit", ...ORA_OPC(this._h) });
+      const o = d.toLocaleTimeString(nyelv, { hour: "numeric", minute: "2-digit", ...ORA_OPC(this._h) });
       sr.querySelector(".o").textContent = o; sr.querySelector(".o2").textContent = o;
       sr.querySelector(".d").textContent = d.toLocaleDateString(nyelv, { weekday: "long", month: "long", day: "numeric" }).toUpperCase();
     };
@@ -5349,7 +5350,7 @@ class CantabileTv extends HTMLElement {
 }
 
 // amit ez a TV-oldal tud (a szerver ebből látja, ha egy frissítés után még a régi kód fut a TV-n, és újraküldi)
-const TV_KEPES = ["mirror", "source"];
+const TV_KEPES = ["mirror", "source", "clock24"];
 
 // a hang, az elemző és a szóló szám az oldalhoz tartozik, nem a kártyapéldányhoz (lásd a BT kimenetnél is)
 const TV_KOZOS = {};

@@ -40,8 +40,9 @@ TUKOR_CSEND = 600          # mp: ennyi csend után a tükör véget ér (a TV el
 # Sonos-rádió és más élő adások azonosítói (a tükörben „ON AIR” jelenik meg)
 RADIO_ID = re.compile(r"^(x-rincon-mp3radio|x-sonosapi-stream|x-sonosapi-radio|x-sonosapi-hls|aac|hls-radio):", re.I)
 # a Sonos szolgáltatás-azonosítója (sid=…) → a zeneszolgáltató neve (a kártya forrás-dobozával egyezően)
-# ami a tükörhöz kell a TV-oldaltól: ha valamelyik hiányzik (régebbi kártyakód fut a TV-n), az oldal újra kimegy
-TUKOR_KEPES = {"mirror", "source"}
+# amit a TV-oldaltól várunk: ha valamelyik hiányzik (egy frissítés után még a régebbi kártyakód fut a TV-n), az oldal a
+# következő lejátszáskor / tükrözéskor újra kimegy (a Cast-vevő a HA újraindulásakor csak újracsatlakozik, a kódot nem tölti újra)
+TUKOR_KEPES = {"mirror", "source", "clock24"}
 SONOS_SID = {2: "Deezer", 9: "Spotify", 12: "Spotify", 174: "TIDAL", 204: "Apple Music", 284: "YouTube Music", 160: "SoundCloud"}
 
 TAMOGATOTT = (
@@ -416,6 +417,8 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
     async def async_play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
         self.tukor_vege(kuld=False)
         kp = kozpont(self.hass)
+        if not self.dlna and self.oldal is not None and not TUKOR_KEPES <= self.oldal_kepes:
+            await kp.ujrakuld(self)                 # régebbi TV-oldal fut: a friss kártyával indul
         cim = await kp.feloldas(media_id, self.entity_id)
         src, fajl = kp.forras(cim)
         extra = kwargs.get("extra") or {}

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Cantabile TV clock: after midnight the TV showed “24:04” instead of “0:04” (the Cast receiver's older Chrome turns `hour12: false` into a 24-hour cycle). The clock and the SLEEP time now use the 0–23 hour cycle, without a leading zero.
+- An older TV page is now also cast again when playback starts on the TV (not only before mirroring), so a fix like this one reaches the TV by itself.
+
 ## 1.12.18 – 2026-10-30
 
 - GENRE tab on the tape shelf (next to NAS): the music folder's albums by genre, from the music files' own genre tags. The genre of an album is read from its first file (ffprobe) in the background, a few at a time; the first time the tab shows the progress, after that the genres are kept in Home Assistant's storage and only new or changed album folders are read again. Several genres in one tag (“Rock; Blues”, “Pop/Rock”) put the album under each (up to three); ID3v1 numbers become names, spelling variants (“Hip Hop” / “Hip-Hop”, “RnB” / “R&B”) are merged. Albums without a genre tag are under “No genre”. “↻ Read again” rescans every album. New websocket command `cantabile/genres`.
