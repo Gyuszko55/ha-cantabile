@@ -1585,7 +1585,8 @@ class CantabileCard extends HTMLElement {
           letter-spacing: .32em; color: rgba(255,190,90,.78); }
         .uzfej i { width: 6px; height: 6px; border-radius: 50%; background: #ffb020; box-shadow: 0 0 6px #ffb020; animation: uzpislog 1.6s ease-in-out infinite; }
         .uzszoveg { font: 500 calc(14.5px * var(--bk, 1))/1.4 "Exo 2", "Cantabile Sans", Arial, sans-serif; letter-spacing: .015em; color: #f3ead8; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
-        .uzgomb { margin-top: 9px; padding: 5px 12px; border-radius: 4px; border: 1px solid rgba(255,176,32,.6); background: rgba(255,176,32,.12); cursor: pointer;
+        .uzgombok { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+        .uzgomb { padding: 5px 12px; border-radius: 4px; border: 1px solid rgba(255,176,32,.6); background: rgba(255,176,32,.12); cursor: pointer;
           font: 600 calc(12px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; letter-spacing: .06em; color: #ffcf7a; }
         .uzgomb:focus-visible { outline: 2px solid #ffb020; outline-offset: 2px; }
         .uzido { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; transform-origin: left center;
@@ -1872,6 +1873,10 @@ class CantabileCard extends HTMLElement {
   // mely hangszórókon játszható le egy kazetta / adó (a hibaüzenetben ajánlja): a streamek (Deezer, Tidal, Spotify-link)
   // csak Sonoson, a Spotify Spotify Connecten is; a NAS, a telefon és a rádió bármelyiken (elérhetőn)
   _kepesek(kaz, kiveve = null) {
+    return this._kepesLista(kaz, kiveve).map((h) => KN(h)).join(", ") || T("egyik sem");
+  }
+
+  _kepesLista(kaz, kiveve = null) {
     const ok = (h) => {
       if (h.tagok || (kiveve && h.entity === kiveve.entity)) return false;
       if (h.entity !== HELYI && this._hass?.states[h.entity]?.state === "unavailable") return false;
@@ -1880,7 +1885,26 @@ class CantabileCard extends HTMLElement {
       if (kaz.tipus === "wiim_preset") return this._wiim(h);
       return h.mod === "sonos" || (kaz.tipus === "spotify" && !!this._spotifyEszkoz(h));
     };
-    return (this._kimenetek || []).filter(ok).map((h) => KN(h)).join(", ") || T("egyik sem");
+    return (this._kimenetek || []).filter(ok);
+  }
+
+  // „▶ Nappali” gombok a „nem játszható itt” üzenetbe: átvált arra a hangszóróra (ami eddig szólt, leáll), és elindítja
+  _valtGombok(lista, indit) {
+    return lista.filter((h) => !this._foglalo(h)).map((h) => ({ szoveg: `▶ ${KN(h)}`, fn: () => this._valtIndit(this._kimenetek.indexOf(h), indit) }));
+  }
+
+  async _valtIndit(i, indit) {
+    const cel = this._kimenetek[i], regi = this._hangszoro();
+    if (!cel) return;
+    const fr = this._foglalo(cel);
+    if (fr) return this._foglaltUzen(fr);
+    if (regi && regi !== cel && SZOL(this._allapot(regi))) {
+      this._szkriptLeallit(); this._kezi = null;
+      try { await this._hiv("media_player", "media_stop", { entity_id: regi.tagok || regi.entity }, { csendes: true }); } catch (e) { /* a régi elhallgat vagy nem – az új indul */ }
+    }
+    this._kimenetValt(i, false);
+    if (this._kimenetek[this._hsz] !== cel) return;            // nem váltott (pl. nem tud zenét fogadni) – erről már szólt
+    return indit();
   }
 
   // a hangszóró elfogadta a parancsot, de nem kezdett játszani („visszadobta”): rövid várakozás után szól, és ajánl helyette
@@ -2984,7 +3008,8 @@ class CantabileCard extends HTMLElement {
       this._frissit();
     } catch (err) {
       const m = err?.message || String(err);
-      this._uzen(kaz?.tipus === "deezer" && !err?.hely ? T("A Deezer nem indult el ({h}). A Sonos appban kösd be a Deezer-fiókot (Beállítások → Szolgáltatások), vagy a ⚙ beállításokban rejtsd el a DEEZER fület.", { h: m }) : m);
+      this._uzen(kaz?.tipus === "deezer" && !err?.hely ? T("A Deezer nem indult el ({h}). A Sonos appban kösd be a Deezer-fiókot (Beállítások → Szolgáltatások), vagy a ⚙ beállításokban rejtsd el a DEEZER fület.", { h: m }) : m,
+        err?.hely ? this._valtGombok(this._kepesLista(kaz, hsz), () => this._betolt(kaz, kezdo)) : null);
     }
   }
 
@@ -3010,7 +3035,7 @@ class CantabileCard extends HTMLElement {
 
   // üzenet a lejátszón: külön réteg a kártya fölött (az elrendezést nem érinti), a kártya látható részén; becsúszik, majd elhalványul.
   // Ha a kártya épp nem látszik (pl. a lapozó másik lapján), a HA saját értesítője jön.
-  // `gomb`: {szoveg, fn} – egy művelet az üzenetben (pl. „Átveszem”)
+  // `gomb`: {szoveg, fn} vagy ezek listája – műveletek az üzenetben (pl. „Átveszem”, „▶ Nappali”)
   _uzen(szoveg, gomb = null) {
     const kartya = this.shadowRoot?.querySelector("ha-card"), r = kartya?.getBoundingClientRect();
     const fent = r ? Math.max(0, -r.top) : 0, lent = r ? Math.min(r.height, innerHeight - r.top) : 0;
@@ -3022,15 +3047,19 @@ class CantabileCard extends HTMLElement {
     if (!reteg) {
       reteg = document.createElement("div");
       reteg.className = "uzreteg";
-      reteg.innerHTML = `<div class="uzablak" role="status" aria-live="polite"><div class="uzfej"><i></i>CANTABILE</div><div class="uzszoveg"></div><button class="uzgomb" type="button" hidden></button><div class="uzido"></div></div>`;
+      reteg.innerHTML = `<div class="uzablak" role="status" aria-live="polite"><div class="uzfej"><i></i>CANTABILE</div><div class="uzszoveg"></div><div class="uzgombok" hidden></div><div class="uzido"></div></div>`;
       reteg.querySelector(".uzablak").addEventListener("click", () => this._uzenZar());
-      reteg.querySelector(".uzgomb").addEventListener("click", (e) => { e.stopPropagation(); const f = this._uzenGombFn; this._uzenZar(); f?.(); });
+      reteg.querySelector(".uzgombok").addEventListener("click", (e) => {
+        const b = e.target.closest(".uzgomb"); if (!b) return;
+        e.stopPropagation(); const f = this._uzenGombok?.[Number(b.dataset.i)]?.fn; this._uzenZar(); f?.();
+      });
       kartya.appendChild(reteg);
     }
-    const ablak = reteg.querySelector(".uzablak"), ido = Math.max(gomb ? 9000 : 0, Math.min(10000, 4000 + String(szoveg).length * 55));
+    const ablak = reteg.querySelector(".uzablak"), ido = Math.max(gomb ? 12000 : 0, Math.min(10000, 4000 + String(szoveg).length * 55));
     reteg.querySelector(".uzszoveg").textContent = szoveg;
-    const gb = reteg.querySelector(".uzgomb");
-    gb.hidden = !gomb; gb.textContent = gomb?.szoveg || ""; this._uzenGombFn = gomb?.fn || null;
+    const gombok = this._uzenGombok = [].concat(gomb || []).slice(0, 4), gb = reteg.querySelector(".uzgombok");
+    gb.hidden = !gombok.length;
+    gb.innerHTML = gombok.map((g, i) => `<button class="uzgomb" type="button" data-i="${i}">${ESC(g.szoveg)}</button>`).join("");
     reteg.style.top = `${Math.round(fent + (lent - fent) * 0.3)}px`;
     const csik = reteg.querySelector(".uzido");
     csik.style.animation = "none"; void csik.offsetWidth; csik.style.animation = `uzfogy ${ido}ms linear forwards`;
@@ -3830,7 +3859,8 @@ class CantabileCard extends HTMLElement {
       const valaszt = forras || SORREND.find((f) => x.f[f] && this._forrasSzol(f, hsz));
       if (!valaszt) {
         const hol = SORREND.filter((f) => x.f[f]).map((f) => `${CIMKE[f]}: ${this._kepesek({ forras: "stream", tipus: f === "wiim" ? "wiim_preset" : f })}`).join(" · ");
-        return this._uzen(T("A(z) {h} hangszórón ez egyik forrásból sem szól – {l}.", { h: KN(hsz), l: hol }));
+        const kepes = this._kimenetek.filter((h) => h !== hsz && !h.tagok && h.entity !== HELYI && this._hass?.states[h.entity]?.state !== "unavailable" && SORREND.some((f) => x.f[f] && this._forrasSzol(f, h)));
+        return this._uzen(T("A(z) {h} hangszórón ez egyik forrásból sem szól – {l}.", { h: KN(hsz), l: hol }), this._valtGombok(kepes, () => indit(x)));
       }
       const kaz = x.f[valaszt];
       if (kaz.nasSzam) {

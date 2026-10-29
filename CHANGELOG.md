@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- "Doesn't play here" messages offer the way out: when a search result or a tape plays only on other speakers (e.g. a Deezer album while a TV is selected), the message has a ▶ button for each speaker it plays on. A tap switches to that speaker – what was playing on the old one stops – and starts it straight away, so there is no need to leave the shelf and search again.
+
 ## 1.12.14 – 2026-10-29
 
 - Voice search: every search box on the tape shelf (SEARCH, NAS, Deezer, Spotify, Tidal), in NET and in the ⚙ station search has a microphone button. Speak, and the recognised text goes into the box and is searched straight away. Recognition uses the speech-to-text of the default Assist voice assistant (streamed over the websocket, `assist_pipeline/run`, STT stage only); if there is none, the browser's own recogniser (Web Speech). Recording stops when you stop talking, on a second tap or after 10 s; missing https, a denied microphone or no recogniser give a clear message.
