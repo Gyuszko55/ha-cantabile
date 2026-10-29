@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.12.16 – 2026-10-29
 
 - Cantabile TV mirror after an update: a Cast receiver only reconnects after a Home Assistant restart and keeps running the old card code, which doesn't know the mirror. The TV page now tells the server what it can do (`features` in `cantabile/tv/subscribe`); if an older page is running when a mirror should start, Cantabile casts the page again (with the fresh card) and then starts the mirror.
 
