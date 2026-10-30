@@ -1,108 +1,168 @@
 # Cantabile
 
-**An old hi-fi radio and cassette deck – brushed silver or nineties black – for your Home Assistant dashboard** – preset buttons on an FM dial,
-internet radio, a cassette deck with turning reels and real VU meters, your own music folder, Deezer, Spotify and Tidal, and voice control.
+**An old hi-fi radio and cassette deck for your Home Assistant dashboard** – an FM dial with preset buttons, internet
+radio, a cassette deck with turning reels and real VU meters, and a music library that brings your own music folder,
+Music Assistant, Deezer, Spotify and Tidal together: search, artists, genres, an endless party mix with guest requests,
+and playlists. With voice control, Cantabile TV and a brushed silver or nineties black front panel.
 
 *Magyar leírás: [README.hu.md](README.hu.md)*
 
-![Cantabile demo: loading a tape from the shelf, scanning, repeat and shuffle, moving the tape to another speaker, voice control and the radio](docs/images/demo.gif)
+![Cantabile demo: the library opens with EJECT, a genre and an album, the tape plays, scanning, repeat and shuffle, the tape moves to another speaker, voice control, the radio and the party](docs/images/demo.gif)
 
-![Cantabile radio: FM dial with preset buttons, signal meter, volume and speaker selector](docs/images/radio.png)
+![Cantabile radio with the black front panel: FM dial with preset buttons, signal meter, volume and speaker selector](docs/images/radio.png)
 
-![Cantabile cassette deck: turning reels, VU meters, piano-key transport](docs/images/tape.png)
+![Cantabile cassette deck with the black front panel: turning reels, moving-coil VU meters, piano-key transport](docs/images/tape.png)
 
-![Cantabile cassette deck with the black front panel (finish: black) and the fluorescent (VFD) display](docs/images/tape-black.png)
+*All pictures show the black front panel – finely brushed black with black keys and knobs (⚙ → Front panel, or `finish: black`); the default is brushed silver.*
 
-<p align="center"><img src="docs/images/phone.png" alt="Cantabile radio on a phone" width="320"></p>
+## The library
 
-## What you get
+**EJECT** on the tape deck opens the library: a smoked-glass window over the deck – **SEARCH · ARTISTS · GENRES · PARTY ·
+PLAYLISTS · SOURCES · QUEUE**. It is organised by what you want to hear, not by where the music comes from: an artist,
+a genre, a party or a playlist brings together the music folder, Music Assistant (and the services linked in it) and
+Deezer. Each item shows where it plays; on a speaker that can't play it, the card says so and offers one that can.
 
-**Library** – a smoked-glass window: SEARCH everywhere · ARTISTS (music folder + Music Assistant + Deezer, artist page with
-shuffle, artist radio and similar artists) · GENRES (genre families with pictures; own albums, shuffle, Deezer chart, radios, artists) · PARTY (endless mix from the music folder on the
-server, guests request songs from their phones via a QR code) · PLAYLISTS (own mixed-source playlists, Music Assistant / Deezer and
-Sonos favourites) · SOURCES (each source on its own) · QUEUE.
+![The GENRES tab: big picture tiles for the genre families, with the number of own albums and the sources](docs/images/library-genres.png)
 
-**Radio**
-- FM-style glass dial with a moving pointer, preset buttons, a volume knob and a tuning wheel.
-- **NET**: thousands of internet stations from the [Radio Browser](https://www.radio-browser.info) directory
-  (your country, worldwide, by genre, by name). Any station can be put on a preset button.
+**SEARCH** – one search over every source: music folder, Music Assistant, Deezer, Spotify, WiiM presets, Sonos
+favourites and radio stations. The same album from several sources is one row with source tags, and a tap plays it from
+the best source for the chosen speaker. An artist opens the shared artist page. Every search box has a 🎤 button for
+**voice search** (the speech-to-text of your Assist pipeline, or the browser's own; the microphone needs https).
+
+**ARTISTS** – one A–Z list from the music folder (`artist/album/track`) and the Music Assistant library, with coloured
+source dots and a letter index; typing filters it and also lists matching Deezer artists. The **artist page** has a
+portrait, the sources, **▶ SHUFFLE** (all the artist's tracks from the music folder, shuffled, as a cassette that plays
+on any speaker), **◉ RADIO** (Deezer artist radio: the artist and similar ones), then the music-folder albums, the
+Music Assistant albums not already in the folder, the Deezer top tracks and albums, and **SIMILAR ARTISTS**.
+
+![An artist page: portrait, sources, SHUFFLE and RADIO, the music-folder albums and the Deezer albums](docs/images/library-artist.png)
+
+**GENRES** – genre families as big picture tiles, the way Deezer shows them (Pop, Rock, Jazz, Metal, Electro…, with
+Deezer's pictures). Your music files' genre tags are often very fine – *Art Rock*, *Glam Rock*, *Symphonic Gothic Metal*,
+*Neo Soul* – so Cantabile puts each tag into its family; what fits none is listed under MORE GENRES. The families with
+the most albums of your own come first. A **genre page** has **▶ SHUFFLE** (the genre's own albums, shuffled) and
+**◉ RADIO** (Deezer genre radio), chips for the tags inside the family (All · Rock 48 · Classic Rock 21 · …), your
+albums, and from Deezer the genre's CHART, PLAYLISTS, RADIOS and ARTISTS. The tags are read once per album in the
+background and kept; the tab works without a music folder too (Deezer only).
+
+![A genre page: the Rock family with its tags, SHUFFLE and RADIO, and the own albums](docs/images/library-genre.png)
+
+**PARTY** – an endless mix from the music folder that runs on the server, so it keeps playing when the card is closed.
+Pick the whole library or one or more genre families and start it on the selected speaker (or the Sonos multiroom
+group). The same track doesn't come back for a long time, the same artist never twice in a row; on Sonos the next
+track always waits in the speaker's own queue (no gap). The tape shows a PARTY cassette: FF skips, STOP ends it, PLAY
+restarts it, and switching speakers takes the party along.
+**Guest requests**: the tab shows a QR code. Guests scan it on the home Wi-Fi and get a page on their phone – no
+Home Assistant account – with what plays now, a search in the music folder and a *Request* button (with an optional
+name). Each guest can have 3 requests waiting (30 in all); requests play next, in order, marked *♥ … requested it*.
+*GUESTS: OFF* pauses requests and makes the old link and QR code invalid; the link ends with the party.
+
+![PARTY running: now playing with the guest who asked for it, the requests coming up and the QR code for guests](docs/images/library-party.png)
+
+**PLAYLISTS** – every playlist in one place:
+- **My playlists** – Cantabile's own, stored on the server, so every card and every user sees the same ones. Tracks can
+  come from the music folder, Deezer and Music Assistant mixed. **＋ THE TRACK PLAYING** and **＋ THE WHOLE QUEUE** add
+  to an existing playlist or a new one. A playlist's page lists its tracks with source dots and plays from the top or
+  from any track; its owner (or an admin) can rename it, delete it and remove tracks.
+- Playing a mixed playlist plays what the speaker can: on Sonos the music folder and Deezer (in the Sonos queue), on a
+  Music Assistant player the Music Assistant tracks, elsewhere the music folder. The card says how many were skipped.
+- **Music Assistant** – the playlists in the Music Assistant library, including your Deezer, Spotify, Tidal… favourites
+  when those services are linked in Music Assistant.
+- **Sonos favourites** – the playlists saved in the Sonos app.
+
+![The PLAYLISTS tab: own playlists with covers and sources, adding the track playing or the whole queue, and the Music Assistant playlists](docs/images/library-playlists.png)
+
+**SOURCES** – each source on its own, as before: STREAMING (Sonos favourites), DEEZER (charts, search, artist pages),
+SPOTIFY and TIDAL (experimental), WIIM (the WiiM's presets), MA (the Music Assistant library), NAS (the music folder:
+artist → album, with instant search) and PHONE (music from the phone or computer: on BT directly, on other speakers
+through a temporary upload; or uploaded to the music folder). The row reopens the source used last.
+
+**QUEUE** – the current queue: jump, remove, play next, add to the end, and reorder by dragging (⋮⋮) on Sonos, WiiM and
+BT; for a Music Assistant queue the current and next track.
+
+<p align="center"><img src="docs/images/phone.png" alt="Cantabile radio on a phone" width="300">&nbsp;&nbsp;<img src="docs/images/phone-genres.png" alt="The GENRES tab on a phone" width="300"></p>
+
+## Radio
+
+- FM-style glass dial with a moving pointer, preset buttons, a volume knob and a **Gyro tuning wheel**.
+- **NET**: thousands of internet stations from the [Radio Browser](https://www.radio-browser.info) directory (your
+  country, worldwide, by genre, by name).
 - The tuning wheel steps to the next / previous station of a Radio Browser list (the NET list you last played from, or
-  your country's), starting from the station that plays; it starts when you
-  stop turning. Like it? A long press on a preset button saves it there – also over an older station (with Undo).
+  your country's), starting from the station that plays; the station starts when you stop turning. The list is also
+  kept in the browser, so the wheel works while Radio Browser is down.
+- **Save a station**: a long press on a preset button saves the NET station that plays there – also over an older one,
+  with *Undo* in the message; a long press on an empty slot adds it (admins).
 - SIGNAL meter that follows the real stream bitrate.
 
-**Cassette deck**
+## Cassette deck
+
+![Cassette deck with the fluorescent (VFD) display](docs/images/tape-vfd.png)
+
 - Cassette window with turning reels, two moving-coil VU meters *or* a fluorescent (VFD) display.
 - The VU meters show the **real audio level**: the integration analyses the same stream or file on the server.
 - REW / PLAY / FF / STOP / PAUSE / EJECT, SHUFFLE, REPEAT (1–5 rounds or endless), FADE (Sonos crossfade), SLEEP.
-- The tape shelf (EJECT):
-  - **GENRE** – the music folder's albums by genre, from the music files' own genre tags (read once per album in the background, then kept; the tab shows the progress the first time); tap a genre, then an album;
-  - **SEARCH** – one search over every source: music folder, Deezer, Spotify, WiiM presets, Sonos favourites and radio stations; the same album from several sources is one row with source tags, and a tap plays it from the best source for the chosen speaker (or says which speakers can play it). Every search box (also NET and ⚙ stations) has a 🎤 button for **voice search**: speak, and the recognised text is searched straight away. It uses the speech-to-text of your default Assist voice assistant, or the browser's own recogniser if there is none; the microphone needs https. A recogniser set to your language may spell foreign artist names phonetically – correct the text in the box;
-  - **STREAMING** – your Sonos favourites (playlists and albums);
-  - **DEEZER** – the whole Deezer catalogue: charts, search, artist pages (Sonos only);
-  - **WIIM** – the WiiM's presets: anything saved as a preset in the WiiM Home app (Tidal, Qobuz, Amazon Music, Deezer, radio…) plays from Cantabile on the WiiM;
-  - **NAS** – your music folder (artist → album), with instant search;
-  - **PHONE** – music from the phone / computer: on BT directly, on any other speaker via a temporary upload (TEMP on the tape, deleted after 24 h); or upload it to the music folder for good;
-  - **QUEUE** – the current queue: jump, remove, play next, add to end (Sonos).
-- **QUEUE reorder**: drag a track by its handle (⋮⋮) – Sonos, WiiM and BT.
 - **Gapless**: Sonos (its own queue) and WiiM (the next track is handed over in advance via DLNA); near-gapless on BT.
+- **LYRICS**: tap the song title on the cassette (or the radio's now-playing line) – the lyrics come from
+  [LRCLIB](https://lrclib.net); on the tape the current line is highlighted and follows the music.
 - **Announcements**: music is turned down while Assist (e.g. Voice PE) or a TTS message speaks (Cantabile options).
 - **After a Home Assistant restart** a playing music-folder queue on Sonos continues by itself after the current track.
-- **LYRICS**: tap the song title on the cassette (or the radio's now-playing line when it shows a song) – the lyrics
-  come from [LRCLIB](https://lrclib.net); on the tape the current line is highlighted and follows the music.
 
-**Look**
-- Two front panels: brushed **silver** (old hi-fi) or finely brushed **black** (1990s) with black keys and knobs –
-  ⚙ → *Front panel*, or `finish: black` in YAML.
-- Each speaker has a **card name** of up to 8 characters (e.g. *Lounge*): it goes on the rotary selector, the header and
-  the cassette, while voice control keeps using the full name.
-- **Music Assistant (optional)**: if Music Assistant is set up in Home Assistant, the tape shelf has an **MA** tab –
-  search and library (albums, artists, playlists, tracks, radio) with covers; it plays on a Music Assistant player with
-  MA's own queue (QUEUE shows the current and next track), and switching between MA players moves the queue.
+## Speakers, inputs and sound
+
+- Sonos (full feature set, including multiroom grouping), and any other media player that can play a URL (WiiM,
+  LinkPlay, DLNA, Cast, Music Assistant, Squeezebox…). **BT** plays on the device the card is open on.
+- **Switching speakers carries the music over**, like a real speaker selector – a tape, a station, a party, a playlist,
+  and a Music Assistant queue: to another Music Assistant player, or to the same device's other player (Sonos ↔ its
+  Music Assistant player), or, for music-folder tracks, Cantabile takes over from the same track and position.
+- Each speaker has a **card name** of up to 8 characters (e.g. *Lounge*) for the selector, the header and the cassette;
+  voice control keeps using the full name.
+- **INPUT · TONE** – the flip-down lower panel, like the hinged flap of an old hi-fi: the speaker's own **inputs**
+  (e.g. NET · BT IN · LINE IN on a WiiM) and **BASS / TREBLE** knobs (−10…+10; Sonos bass / treble, WiiM 10-band EQ).
+  The volume is kept when the input changes. While a speaker plays from its own input the tape shows it (“BT IN”) with
+  the title the phone sends; STOP pauses, and switching speakers pauses it (switching back resumes).
+  > **Bluetooth pairing:** Cantabile doesn't pair or pick the Bluetooth device. Pair your phone / tablet with the speaker
+  > in its Bluetooth settings (or the speaker's app); BT IN only switches the speaker to its Bluetooth input.
+- **PAIR** (WiiM): switches to BT IN and guides you through connecting a phone – the speaker's Bluetooth name, pairing
+  mode switched on by itself, an *Open* button for the Bluetooth settings on Android, the known devices and a live
+  “✓ Connected” status.
+- **EQ** (WiiM): a ten-band graphic equalizer, the WiiM's built-in sounds and your own **profiles**, plus **AUTO** – a
+  profile per source and per music-folder genre. On Sonos the panel has **LOUDNESS**.
 - **ⓘ Signal path**: the button before ⚙ shows, live, where the sound comes from, what happens to it and where it plays
   (source → processing → output, with the EQ / tone and whether the VU meter is real).
-- **Messages on the player**: hints and errors appear in a smoked-glass window on the card itself, then fade out
-  (tap to close); when the card isn't visible, Home Assistant's own notification is used.
+- **Messages on the player**: hints and errors appear in a smoked-glass window on the card, then fade out.
+- **Speaker lock** for several users – see *Notes*.
 
-**Speakers**
-- Sonos (full feature set, including grouping as “Both”), and any other media player that can play a URL
-  (e.g. WiiM – albums are played track by track by the integration).
-- **BT**: play on the device the card is open on (headphones, Bluetooth speaker).
-- Switching speakers carries the music over, like a real speaker selector.
-- **INPUT · TONE** – the flip-down lower panel (the tab at the bottom of either front panel), like the hinged flap of
-  an old hi-fi: the speaker's own **inputs** (e.g. NET · BT IN · LINE IN on a WiiM) and **BASS / TREBLE** knobs (−10…+10).
-  Sonos uses its own bass / treble; a WiiM its 10-band EQ (BASS: 31–250 Hz, TREBLE: 2–16 kHz; both at 0 turns the EQ off).
-  The volume is kept when the input changes (a WiiM remembers a separate volume per input), and starting music from the
-  card switches the speaker back to the network. The panel closes with CLOSE, or by itself after 20 s without a touch.
-  It appears only on speakers that have something to set; inputs and tone respect the speaker lock.
-  While a speaker plays from its own input the tape deck shows the input as the source (“BT IN”) with the title the
-  phone sends; the VU meter is simulated there (the sound never passes the server), STOP pauses, and switching to
-  another speaker pauses it (switching back resumes).
-  > **Bluetooth pairing:** Cantabile doesn't pair or pick the Bluetooth device. Pair and connect your phone / tablet with
-  > the speaker in the phone's Bluetooth settings (or the speaker's app, e.g. WiiM Home); BT IN only switches the
-  > speaker to its Bluetooth input, and what plays into it is chosen on the phone.
-- **PAIR** (next to the inputs, WiiM): switches to BT IN and guides you through connecting the phone / tablet – the
-  speaker's Bluetooth name, pairing mode switched on by itself (the light flashes green), an *Open* button for the Bluetooth settings on Android, the known devices and a live
-  “✓ Connected” status.
-- **EQ** (second tab of the panel, WiiM): a graphic equalizer with ten sliders, the WiiM's built-in sounds and your own
-  **profiles** (STORE / DEL, shared by every card), plus **AUTO**: a profile per source (radio, NAS, Deezer, BT IN…) and
-  per genre of the music-folder album – it switches when the source or the album changes. BASS / TREBLE and the sliders
-  move together. On Sonos the panel has a **LOUDNESS** key instead.
+## Music Assistant (optional)
 
-**TV (Cantabile TV)**
-- TVs become speakers, with the track on the screen: on **Cast** devices (TV sticks, Android TV boxes, Nest Hub) a
-  full-screen TV page – artist image, cover, title, artist, album, format, an equalizer that follows the music and a
-  progress bar; on **DLNA** TVs a full-screen still track card. See *TV players* below.
+If the Music Assistant integration is set up in Home Assistant, Cantabile uses it as a source next to its own:
+the ARTISTS list and the artist pages include the Music Assistant library, PLAYLISTS lists its playlists, and the
+**MA** tab under SOURCES has search and the library (albums, artists, playlists, tracks, radio) with covers.
+Music Assistant content plays on Music Assistant players with Music Assistant's own queue.
+
+**Streaming services through Music Assistant**: link Deezer, Spotify, Tidal, Qobuz, YouTube Music… in Music Assistant
+(*Settings → Music providers*) and their catalogue, your favourites and your playlists appear in Cantabile – without
+keys in Cantabile. Deezer, for example, is linked with its ARL token (copied from the deezer.com browser cookie).
+Flow and mixes appear in PLAYLISTS once you ♥ them in Music Assistant. Note that a Deezer account plays in one place at
+a time.
+
+Cantabile only uses Home Assistant's official Music Assistant services – it has no Music Assistant client of its own.
+
+## TV (Cantabile TV)
+
+TVs become speakers, with the track on the screen: on **Cast** devices (TV sticks, Android TV boxes, Nest Hub) a
+full-screen TV page – artist image, cover, title, artist, album, format, an equalizer that follows the music and a
+progress bar; on **DLNA** TVs a full-screen still track card. See *TV players* below.
 
 ![Cantabile TV on a Cast TV: artist image, cover, track details, equalizer and progress bar](docs/images/tv-cast.png)
 
-**Voice**
-- An Assist tool for any LLM conversation agent (Google Gemini, OpenAI, Anthropic, Ollama…):
-  *“Play Queen in the living room”*, *“Put on the Kind of Magic album”*, *“Turn on Jazz FM in the bedroom”*,
-  *“Play Adele from Deezer”*, *“Play Daft Punk from Spotify”*. Anything not in your music folder is looked up on Deezer;
-  Spotify and Tidal are used when you ask for them (on Sonos).
+## Voice
 
-Front-panel labels are always English, like on a real old hi-fi; settings, messages and tooltips follow your Home Assistant language: **Hungarian** or **English**.
+An Assist tool for any LLM conversation agent (Google Gemini, OpenAI, Anthropic, Ollama…): *“Play Queen in the living
+room”*, *“Put on the Kind of Magic album”*, *“Turn on Jazz FM in the bedroom”*, *“Play Adele from Deezer”*. Anything not
+in your music folder is looked up on Deezer; Spotify and Tidal are used when you ask for them (on Sonos).
+
+Front-panel labels are always English, like on a real old hi-fi; settings, messages and tooltips follow your Home
+Assistant language: **Hungarian** or **English**.
 
 ## Requirements and compatibility
 
@@ -138,6 +198,7 @@ Front-panel labels are always English, like on a real old hi-fi; settings, messa
 | The card | Served by the integration and registered as a dashboard resource automatically (YAML-mode resources: add `/cantabile_static/cantabile-card.js` as a *module* yourself). |
 | Fonts | *Arimo* (the card's Arial-size sans, so phone font settings don't change the look), *Great Vibes*, *Michroma*, *Exo 2* – bundled and served locally (SIL OFL), nothing is loaded from Google. |
 | Python package `async-upnp-client` | Installed by Home Assistant from the manifest (normally already present); used for gapless playback on DLNA / WiiM / LinkPlay. |
+| Python package `segno` | Installed by Home Assistant from the manifest; draws the QR code of the PARTY guest page. |
 | Entities and services | Repeat rounds, sleep timer, voice-started station; `cantabile.play`, `cantabile.sleep_timer` … (see *Entities and services*). |
 | Assist tool | The *Cantabile* LLM API for voice control – appears in your conversation agent's options. |
 | Free online sources (no account, no key) | [Radio Browser](https://www.radio-browser.info) (stations), the public Deezer catalogue API (search), [LRCLIB](https://lrclib.net) (lyrics). |
@@ -152,6 +213,8 @@ Front-panel labels are always English, like on a real old hi-fi; settings, messa
 | A music folder | NAS / PHONE tabs (optional) | See *Connecting a music library (NAS)* below. |
 | **Cast TV** (Cantabile TV, optional) | the live TV page | A Cast device with a screen (Chromecast / Google TV, Android TV box or stick, Nest Hub) set up with the **Google Cast** integration; Home Assistant reachable from the TV over **https** (Home Assistant Cloud, or your own external URL with a certificate); the `cantabile-tv` dashboard (see *TV players*). |
 | **DLNA TV** (Cantabile TV, optional) | the still track card | A TV with a DLNA renderer, set up with the **DLNA Digital Media Renderer** integration; Home Assistant's **internal URL** reachable from the TV over the LAN; `ffmpeg` on the host (it makes the track-card videos – without it the TV gets the music and the cover only); about 1.5 GB of disk for the video cache. |
+| Home Assistant's **internal URL** | PARTY guest requests (optional) | *Settings → System → Network*: the guests' phones open the QR code's link on the home Wi-Fi. |
+| **Music Assistant** | the MA source, its playlists and the streaming services linked in it (optional) | The Music Assistant add-on / server and Home Assistant's *Music Assistant* integration. |
 | A conversation agent | voice control (optional) | E.g. *Google Gemini*, *OpenAI*, *Anthropic*, *Ollama*; then turn on **Cantabile** in its options (see *Voice control*). |
 | Streaming accounts / keys | DEEZER, SPOTIFY, TIDAL (optional) | See the next section. |
 
@@ -303,6 +366,9 @@ After setting up the integration, open your conversation agent's options (e.g. *
 | A TV only plays the sound (e.g. “Default Media Receiver” on screen) | The card uses the TV's own Cast / DLNA player: switch the speaker to its “Cantabile TV · …” player (⚙ shows a *Switch* button). |
 | The Cast TV shows nothing / “dashboard not found” | Create the `cantabile-tv` dashboard with the `tv` view (see *TV players*), and check that Home Assistant is reachable from the TV over https. |
 | Music folder is empty | Check the media-source path in ⚙ and that the folder is visible under **Media**. |
+| GENRES shows only Deezer tiles | The music files have no genre tags, or the first reading is still running (the tab shows the progress). |
+| The PARTY QR code doesn't open on a phone | The phone must be on the home Wi-Fi, and Home Assistant's *internal URL* must be set (Settings → System → Network). |
+| A playlist plays only some tracks | Each speaker plays what it can: Sonos the music folder and Deezer, a Music Assistant player the MA tracks, others the music folder. |
 
 ## Card configuration (YAML)
 
@@ -373,6 +439,8 @@ The earlier Hungarian keys (`hangszorok`, `adok`, `magno`, `nas` …) are accept
   Voice requests (`cantabile.play`, the Assist tool) don't take a speaker someone else is using. The BT output is never
   locked. Locks live in memory: after a Home Assistant restart every speaker is free.
 - **Security**: the BT radio proxy (`/api/cantabile/stream`) and the temporary upload (`/api/cantabile/upload`) need a logged-in user; the proxy only passes audio, the upload folder is capped at 2 GB and cleared after 24 hours.
+  The PARTY guest page (`/api/cantabile/party/<token>`) needs no login: it is protected by its random link, works only while the party runs (and guests are on), and can only show what plays, search the music folder and add requests (3 per guest, 30 in all). *GUESTS: OFF* makes the old link invalid.
+- **Playlists and the party** live on the server: playlists are kept in Home Assistant's storage (`cantabile_listak`), a party ends with a Home Assistant restart.
 - Radio Browser, Deezer and LRCLIB are public directories; Cantabile sends them only your search terms (for lyrics:
   artist, title, album and length of the song). Lyrics are cached in memory only.
 

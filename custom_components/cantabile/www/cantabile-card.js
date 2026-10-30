@@ -361,7 +361,7 @@ const EN = {
   "Ebben a zenetárban nincs keresés – böngéssz a mappák között (töröld a keresőt).": "This library can't be searched – browse the folders instead (clear the search box).",
   "Ezt, ami most szól, nem tudom átvinni a(z) {h} hangszóróra – a(z) {r} szól tovább.": "I can't move what's playing now to {h} – it keeps playing on {r}.",
   "Üres hely – koppints, és a NET-katalógusból tegyél ide adót": "Empty slot – tap to put a station here from the NET catalogue",
-  "Régi hi-fi rádió és tape deck (ezüst vagy fekete): adógombok, NET-rádió, forgó kazetta, valódi VU-mérők, NAS, Deezer, Spotify és Tidal.": "Old hi-fi radio and tape deck (silver or black): station buttons, NET radio, turning cassette, real VU meters, NAS, Deezer, Spotify and Tidal.",
+  "Régi hi-fi rádió és tape deck (ezüst vagy fekete) zenetárral: előadók, műfajok, party vendégkívánságokkal, listák – zenemappa, Music Assistant, Deezer, Spotify, Tidal; NET-rádió, valódi VU-mérők.": "Old hi-fi radio and tape deck (silver or black) with a music library: artists, genres, a party with guest requests, playlists – music folder, Music Assistant, Deezer, Spotify, Tidal; NET radio, real VU meters.",
   "A(z) {h} nem tud zenét fogadni a Cantabile-tól (nincs lejátszás-indítás funkciója) – válassz másik lejátszót a ⚙ beállításokban.": "{h} can't receive music from Cantabile (it has no play-media function) – pick another player in ⚙ settings.",
   "A KÁRTYÁN (MAX. 8)": "ON CARD (MAX. 8)",
   "max. 8": "max. 8",
@@ -3693,7 +3693,7 @@ class CantabileCard extends HTMLElement {
     if (this._mod !== "magno") { this._mod = "magno"; this._frissit(); }
     const ful = TAR.olvas("tablet-magno-ful");
     const lehet = ["eloado", "mind", "party", "listak", "nas", "tel", ...(this._config.magno?.nas || this._config.deezer !== false ? ["mufaj"] : []), ...(this._vanSonos() ? ["stream", ...(this._config.deezer !== false ? ["deezer"] : [])] : []), ...["spotify", "tidal"].filter((x) => this._szolgLatszik(x)), ...(this._maInfo?.available ? ["ma"] : [])];
-    this._polc = { ful: lehet.includes(ful) ? ful : this._vanSonos() ? "stream" : "nas", ut: [] };
+    this._polc = { ful: lehet.includes(ful) ? ful : "eloado", ut: [] };
     this._polcRajz();
     // a Music Assistant (ha van) fülét az első megnyitáskor tudjuk meg: utána megjelenik a fejlécben
     this._maInfoLeker().then(() => {
@@ -6798,7 +6798,7 @@ if (!customElements.get("cantabile-card")) {
   if (!customElements.get("tablet-radio")) customElements.define("tablet-radio", class extends CantabileCard {});
   window.customCards = window.customCards || [];
   window.customCards.push({ type: "cantabile-card", name: "Cantabile", preview: true,
-    description: T("Régi hi-fi rádió és tape deck (ezüst vagy fekete): adógombok, NET-rádió, forgó kazetta, valódi VU-mérők, NAS, Deezer, Spotify és Tidal.") });
+    description: T("Régi hi-fi rádió és tape deck (ezüst vagy fekete) zenetárral: előadók, műfajok, party vendégkívánságokkal, listák – zenemappa, Music Assistant, Deezer, Spotify, Tidal; NET-rádió, valódi VU-mérők.") });
 }
 
 // ---------------------------------------------------------------------------------------------------------------
