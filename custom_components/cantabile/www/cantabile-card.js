@@ -5125,6 +5125,12 @@ class CantabileCard extends HTMLElement {
           : `<div class="puzenet">${T("A QR-kódhoz a Home Assistant belső címe kell (Beállítások → Rendszer → Hálózat).")}</div>${p.url ? `<code>${ESC(p.url)}</code>` : ""}`)
           : `<div class="puzenet">${T("A vendégkívánságok szünetelnek – a régi QR-kód már nem érvényes.")}</div>`}</div>
       </div>`;
+      // a QR-kód a dobozhoz méreteződjön: méret helyett viewBox (különben a CSS-méret levágja)
+      lista.querySelectorAll(".pqr svg").forEach((sv) => {
+        const w = sv.getAttribute("width"), h = sv.getAttribute("height");
+        if (!sv.getAttribute("viewBox") && w && h) sv.setAttribute("viewBox", `0 0 ${parseFloat(w)} ${parseFloat(h)}`);
+        sv.removeAttribute("width"); sv.removeAttribute("height");
+      });
       lista.querySelectorAll("[data-pa]").forEach((b) => b.addEventListener("click", async () => {
         const a = b.dataset.pa;
         try {

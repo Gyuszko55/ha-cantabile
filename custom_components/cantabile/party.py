@@ -303,7 +303,7 @@ def _qr(szoveg: str) -> str | None:
         import segno
     except ImportError:
         return None
-    return segno.make(szoveg, error="m").svg_inline(scale=5, border=2, dark="#15161a", light="#f3ead8")
+    return segno.make(szoveg, error="m").svg_inline(scale=5, border=2, dark="#15161a", light="#f3ead8", omitsize=True)
 
 
 def regisztral(hass: HomeAssistant) -> None:
