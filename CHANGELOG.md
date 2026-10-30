@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.12.21 – 2026-10-30
 
 - **EQ tab** on the INPUT · TONE panel (WiiM / LinkPlay), like an old graphic equalizer: a profile display with ◀ ▶, EQ ON, STORE, DEL, AUTO and ten lit sliders (31 Hz – 16 kHz; drag, scroll, double-tap = 0). BASS / TREBLE and the sliders move together: the knobs show the average of their bands, and turning a knob moves its sliders. The EQ is per input, as the WiiM keeps it.
 - **Music profiles**: the WiiM's built-in sounds (Flat, Rock, Jazz, Classical, Vocal Booster, Loudness …) and your own profiles – STORE saves the current sliders under a name (kept in Home Assistant, shared by every card), DEL removes it.
