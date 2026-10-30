@@ -6952,8 +6952,8 @@ class CantabileTv extends HTMLElement {
       .marka { font: 400 46px/1 "Great Vibes", "Brush Script MT", cursive; color: #f3ead8; text-shadow: 0 2px 10px rgba(0,0,0,.6); }
       .ora { font: 400 24px/1 Michroma, "Cantabile Sans", Arial, sans-serif; letter-spacing: .08em; color: #f3ead8; text-align: right; }
       .ora small { display: block; margin-top: 8px; font-size: 11px; letter-spacing: .3em; color: rgba(243,234,216,.6); }
-      .jobb { display: flex; align-items: flex-start; gap: 16px; }
-      .ido { display: flex; align-items: center; gap: 8px; color: #f3ead8; }
+      .osor { display: flex; align-items: center; justify-content: flex-end; gap: 18px; }
+      .ido { display: inline-flex; align-items: center; gap: 8px; color: #f3ead8; }
       .ido[hidden] { display: none; }
       .ido .iko { width: 38px; height: 38px; margin-top: -8px; filter: drop-shadow(0 2px 6px rgba(0,0,0,.5)); }
       .ido .iko svg { width: 100%; height: 100%; display: block; }
@@ -6992,7 +6992,7 @@ class CantabileTv extends HTMLElement {
     </style>
     <div class="v ures2">
       <div class="alt lat"><div class="lem">${TV_SVG_LEMEZ}</div></div><div class="hat"></div><div class="hat"></div><div class="sot"></div>
-      <div class="fej"><div class="marka">Cantabile</div><div class="jobb"><div class="ido" hidden><span class="iko"></span><span class="fok"></span></div><div class="ora"><span class="o"></span><small class="d"></small></div></div></div>
+      <div class="fej"><div class="marka">Cantabile</div><div class="ora"><div class="osor"><span class="ido" hidden><span class="iko"></span><span class="fok"></span></span><span class="o"></span></div><small class="d"></small></div></div>
       <div class="var"><b class="o2"></b><small>CANTABILE · READY</small></div>
       <div class="tart"><div class="bor ures"><div class="lem">${TV_SVG_LEMEZ}</div></div>
         <div class="adat"><div class="cimke"><i></i><span class="ck">NOW PLAYING</span></div><div class="cim"></div><div class="elo"></div><div class="alb"></div><div class="csipek"></div></div></div>
