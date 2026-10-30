@@ -7348,7 +7348,9 @@ class CantabileTv extends HTMLElement {
 }
 
 // amit ez a TV-oldal tud (a szerver ebből látja, ha egy frissítés után még a régi kód fut a TV-n, és újraküldi)
-const TV_KEPES = ["mirror", "source", "clock24"];
+// a TV-oldal képességei; a „v:…” a betöltött kártyakód változata (a szerver ebből látja, ha a TV-n régi kód fut, és újraküldi)
+const KARTYA_V = (() => { try { return new URL(import.meta.url).search || "?"; } catch (e) { return "?"; } })();
+const TV_KEPES = ["mirror", "source", "clock24", "weather", `v:${KARTYA_V}`];
 
 // a hang, az elemző és a szóló szám az oldalhoz tartozik, nem a kártyapéldányhoz (lásd a BT kimenetnél is)
 const TV_KOZOS = {};

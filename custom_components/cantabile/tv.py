@@ -41,8 +41,9 @@ from homeassistant.components.http.auth import async_sign_path
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.event import async_track_time_interval
 
-from .const import DOMAIN, szoveg
+from .const import CARD_URL, DOMAIN, VERSION, szoveg
 from .library import media_ut
 
 if TYPE_CHECKING:
@@ -137,20 +138,59 @@ class TvKozpont:
         jelolt.oldal_be(conn, msg_id)
         return jelolt
 
-    async def ujrakuld(self, lj: CantabileTv) -> None:
+    def kartya_v(self) -> str:
+        """A vezérlőpult-erőforrás mostani címének változat-része (pl. „?v=2.1.0”) – ezt tölti be egy frissen kiküldött oldal."""
+        res = getattr(self.hass.data.get("lovelace"), "resources", None)
+        try:
+            for elem in res.async_items() if res is not None else []:
+                url = str(elem.get("url", ""))
+                if url.split("?")[0] == CARD_URL:
+                    return url[len(CARD_URL):] or "?"
+        except Exception:  # noqa: BLE001 – YAML-módú vagy még nem betöltött erőforrások
+            pass
+        return f"?v={VERSION}"
+
+    def regi_kod(self, lj: CantabileTv) -> bool:
+        """A TV-n futó oldal régebbi kártyakóddal fut (nincs változata, vagy más, mint a mostani erőforrásé)."""
+        if lj.dlna or lj.oldal is None:
+            return False
+        v = next((k[2:] for k in lj.oldal_kepes if k.startswith("v:")), None)
+        return v != self.kartya_v()
+
+    @callback
+    def _frissit_ellenoriz(self, _now: Any = None) -> None:
+        """Percenként: ahol a TV-n régi kártyakód fut és épp nem szól semmi, az oldalt újraküldi (változatonként egyszer)."""
+        v = self.kartya_v()
+        for lj in list(self.lejatszok.values()):
+            if lj.ujratoltve == v or not self.regi_kod(lj) or lj.friss_szolt():
+                continue
+            if lj.ujrakuldes_fut():
+                continue
+            lj.ujratoltve = v
+            _LOGGER.info("Cantabile TV: %s régi kártyakóddal fut, újraküldöm az oldalt (%s)", lj.entity_id, v)
+            lj.ujrakuldes_indit()
+
+    async def ujrakuld(self, lj: CantabileTv, folytatva: bool = True) -> None:
         """A TV-n futó oldal régebbi kártyakóddal fut (egy frissítés után a Cast-vevő csak újracsatlakozik, a kódot nem tölti
         újra): bezárja és újra kiküldi, így a TV a friss kártyát tölti be."""
+        folytat = lj.pillanat() if folytatva else None   # ha szól: mit és honnan – az új oldalon onnan megy tovább
+        lj.ujratolt = folytat is not None                # közben ne legyen „ki” (a sorozatlejátszó ne lépjen tovább)
         try:
-            await self.hass.services.async_call("media_player", "turn_off", {"entity_id": lj.cast}, blocking=True)
-        except HomeAssistantError as err:
-            _LOGGER.debug("Cantabile TV: a régi oldal bezárása nem sikerült (%s): %s", lj.cast, err)
-        for _ in range(20):                                # a régi oldal kapcsolata megszűnik
-            if lj.oldal is None:
-                break
-            await asyncio.sleep(0.5)
-        lj.oldal = None
-        await asyncio.sleep(2)
-        await self.oldalt_kuld(lj)
+            try:
+                await self.hass.services.async_call("media_player", "turn_off", {"entity_id": lj.cast}, blocking=True)
+            except HomeAssistantError as err:
+                _LOGGER.debug("Cantabile TV: a régi oldal bezárása nem sikerült (%s): %s", lj.cast, err)
+            for _ in range(20):                                # a régi oldal kapcsolata megszűnik
+                if lj.oldal is None:
+                    break
+                await asyncio.sleep(0.5)
+            lj.oldal = None
+            await asyncio.sleep(2)
+            await self.oldalt_kuld(lj)
+            if folytat:
+                lj.folytat(folytat)
+        finally:
+            lj.ujratolt = False
 
     async def oldalt_kuld(self, lj: CantabileTv) -> None:
         """Kiküldi a TV-oldalt a Cast-eszközre, és megvárja, amíg bejelentkezik."""
@@ -818,8 +858,29 @@ def ws_follow(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: di
     conn.send_result(msg["id"])
 
 
+@websocket_api.websocket_command({vol.Required("type"): "cantabile/tv/reload", vol.Required("entity_id"): str})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_reload(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """A TV-oldal újraküldése a friss kártyakóddal; ha szól, ugyanonnan folytatja."""
+    kp = kozpont(hass)
+    lj = kp.lejatszok.get(msg["entity_id"])
+    if lj is None or lj.dlna:
+        conn.send_error(msg["id"], "no_tv", szoveg(hass, "no_tv"))
+        return
+    lj.ujratoltve = kp.kartya_v()
+    try:
+        await kp.ujrakuld(lj)
+    except HomeAssistantError as err:
+        conn.send_error(msg["id"], "reload_failed", str(err))
+        return
+    conn.send_result(msg["id"], {"reloaded": True})
+
+
 def regisztral(hass: HomeAssistant) -> None:
-    hass.data[DOMAIN]["tv"] = TvKozpont(hass)
+    kp = hass.data[DOMAIN]["tv"] = TvKozpont(hass)
+    # a régi kártyakóddal futó, épp nem szóló TV-oldalak újraküldése (frissítés után)
+    async_track_time_interval(hass, kp._frissit_ellenoriz, timedelta(seconds=60))
     hass.http.register_view(TvKep(hass))
     hass.http.register_view(TvBetu())
     hass.http.register_view(TvVideo(hass))
@@ -827,3 +888,4 @@ def regisztral(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_subscribe)
     websocket_api.async_register_command(hass, ws_report)
     websocket_api.async_register_command(hass, ws_follow)
+    websocket_api.async_register_command(hass, ws_reload)
