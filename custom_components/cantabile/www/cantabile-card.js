@@ -335,6 +335,19 @@ const EN = {
   "A zenemappa műfajai a GENRE fülön gyűlnek össze; ha nincs zenemappa, csak a forrás szerinti profil működik.": "The music folder's genres are collected on the GENRE tab; without a music folder only the profile by source works.",
   "Automatikus profil: a műfaj (zenemappa) erősebb a forrásnál. Csak forrás- vagy albumváltáskor vált, a kézi állítás addig megmarad.": "Automatic profile: the genre (music folder) wins over the source. It changes only when the source or the album changes; a manual setting stays until then.",
   "Elmentve: {n}": "Saved: {n}",
+  "várja a telefont / tabletet": "waiting for a phone / tablet",
+  "Telefon / tablet csatlakoztatása Bluetooth-on – útmutató": "Connect a phone / tablet over Bluetooth – guide",
+  "még nincs": "none yet",
+  "Átváltás Bluetooth-bemenetre…": "Switching to the Bluetooth input…",
+  "✓ Csatlakozott: {n} – indítsd a zenét az eszközön, a(z) {h} szól.": "✓ Connected: {n} – start the music on the device, {h} plays it.",
+  "A(z) {h} most látható és párosítható – várja az eszközt.": "{h} is now visible and can be paired – waiting for the device.",
+  "A telefonon / tableten nyisd meg a Bluetooth-beállításokat": "On the phone / tablet, open the Bluetooth settings",
+  "Megnyitás": "Open",
+  "Válaszd ki a listából:": "Pick from the list:",
+  "(első alkalommal: párosítás).": "(the first time: pair).",
+  "Indítsd a zenét az eszköz bármelyik appjában – a hang a hangszóróból szól. A kártyán a kazetta „BT IN”-t mutat.": "Start the music in any app on the device – the sound comes from the speaker. On the card the cassette shows “BT IN”.",
+  "ISMERT ESZKÖZÖK": "KNOWN DEVICES",
+  "Párosítás nélkül, Wi-Fi-n: a zenei app hangszóró-ikonjával (Spotify Connect, TIDAL Connect, AirPlay) válaszd a(z) {n} hangszórót; vagy a kártya PHONE fülén játszd le az eszköz saját fájljait.": "Without pairing, over Wi-Fi: pick {n} with the music app's speaker icon (Spotify Connect, TIDAL Connect, AirPlay); or play the device's own files from the card's PHONE tab.",
   "A(z) {h} a(z) {b} bemenetről szólt – ez nem vihető át, szüneteltettem. Ha visszaváltasz rá, onnan folytatja.": "{h} was playing from its {b} input – that can't be moved, so it's paused. Switch back to it and it carries on."
 };
 // felirat a Home Assistant nyelvén: a forrásszöveg magyar, angolul az EN szótárból ({x} = behelyettesítés)
@@ -1679,9 +1692,25 @@ class CantabileCard extends HTMLElement {
         .ftolo.ki .ffog::after { background: #6b3a35; box-shadow: none; }
         .fauto-lap { flex: 1 1 100%; display: flex; flex-direction: column; gap: 8px; min-width: 0; max-height: 250px; }
         .fedel.autolap .fzar { position: absolute; right: 16px; top: 30px; }
+        .fedel:not(.fulos).autolap .fzar { top: 14px; }
+        .fbtall { font-weight: 600; color: #8a5a00; } .fbtall.ok { color: #1d7a3a; }
+        small .fbtall { letter-spacing: .04em; text-transform: none; }
+        .fbtlep { margin: 0; padding-left: 22px; display: grid; gap: 6px; font: 500 calc(13px * var(--bk, 1))/1.35 "Cantabile Sans", Arial, sans-serif; color: #2b2e33; }
+        .fbtlep b { font-weight: 700; color: #000; }
+        .fbtnyit { display: inline-block; margin-left: 6px; padding: 2px 10px; border-radius: 3px; border: 1px solid #7c8189; background: linear-gradient(180deg, #fafbfc, #d5d8dc);
+          color: #2b2e33; text-decoration: none; font-weight: 700; font-size: calc(11px * var(--bk, 1)); letter-spacing: .06em; }
+        .fbtism { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font: 600 calc(12px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; color: #4a4e55; }
+        .fbtism small { text-align: left; margin-right: 4px; }
+        .fbtism .ok { color: #1d7a3a; }
+        .fbtmas { text-align: left; flex-basis: auto; font-size: calc(11.5px * var(--bk, 1)); }
+        :host([fekete]) .fbtlep { color: #d5d8dc; } :host([fekete]) .fbtlep b { color: #fff; }
+        :host([fekete]) .fbtall { color: #ffb547; } :host([fekete]) .fbtall.ok, :host([fekete]) .fbtism .ok { color: #6fdc8c; }
+        :host([fekete]) .fbtism { color: #9a9ea5; }
+        :host([fekete]) .fbtnyit { background: linear-gradient(180deg, #34373c, #1c1e21); color: #e8eaed; border-color: #000; }
         .fedel.autolap .fafej { padding-right: 64px; }
         .fafej { display: flex; align-items: center; gap: 10px; font: 500 calc(11px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; color: #4a4e55; }
-        .fafej .bill { flex: none; height: 30px; min-width: 56px; padding: 10px 6px 3px; }
+        .fedel .fafej .bill { flex: none; height: 30px; min-width: 56px; max-width: 80px; padding: 10px 6px 3px; }
+        .fedel .fbt-lap { max-height: none; }
         .fakol { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; overflow-y: auto; overscroll-behavior: contain; min-height: 0; padding-right: 4px; }
         .fakol small { text-align: left; margin-bottom: 4px; }
         .fasor { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid rgba(0,0,0,.08);
@@ -4585,7 +4614,8 @@ class CantabileCard extends HTMLElement {
 
   _fedelZar() {
     const p = this.shadowRoot?.getElementById("fedel");
-    this._fedelE = null; this._eqNev = null; this._eqTorol = false; clearTimeout(this._fedelIdo);
+    this._fedelE = null; this._eqNev = null; this._eqTorol = false; clearTimeout(this._fedelIdo); this._btFigyel(null);
+    if (this._fedelLap === "bt") this._fedelLap = "alap";
     if (!p || p.hidden) return;
     p.classList.remove("nyitva");
     setTimeout(() => { if (!this._fedelE) { p.hidden = true; p.innerHTML = ""; } }, 450);
@@ -4593,7 +4623,7 @@ class CantabileCard extends HTMLElement {
 
   // tétlenség után magától becsukódik; minden érintés újraindítja az órát
   _fedelEbreszt() {
-    const MP = this._fedelLap === "auto" || this._eqNev != null ? 60 : 20, p = this.shadowRoot.getElementById("fedel"), cs = p?.querySelector(".fido");
+    const MP = this._fedelLap === "auto" || this._fedelLap === "bt" || this._eqNev != null ? 60 : 20, p = this.shadowRoot.getElementById("fedel"), cs = p?.querySelector(".fido");
     clearTimeout(this._fedelIdo);
     this._fedelIdo = setTimeout(() => this._fedelZar(), MP * 1000);
     if (cs) { p.style.setProperty("--fido", `${MP}s`); cs.style.animation = "none"; void cs.offsetWidth; cs.style.animation = ""; }
@@ -4632,7 +4662,7 @@ class CantabileCard extends HTMLElement {
     const p = this.shadowRoot.getElementById("fedel"), e = this._fedelE;
     if (!p || !e) return;
     const t = this._vezTar?.[e], adat = t?.adat, src = this._hass?.states[e]?.attributes?.source;
-    const lap = adat?.eq ? this._fedelLap || "alap" : "alap";
+    const lap = this._fedelLap === "bt" && adat?.bt ? "bt" : adat?.eq && ["eq", "auto"].includes(this._fedelLap) ? this._fedelLap : "alap";
     const kulcs = JSON.stringify([e, adat, src, lap, this._hangTar?.[e], this._eqTar?.[e], this._eqProf, this._eqNev, this._eqTorol, this._eqMufajok?.length]);
     if (p.dataset.k === kulcs && p.innerHTML) return;
     p.dataset.k = kulcs;
@@ -4640,11 +4670,14 @@ class CantabileCard extends HTMLElement {
     if (!adat) { p.innerHTML = `<div class="fmeg">${t?.tolt !== false ? T("Olvasom a hangszóró beállításait…") : T("Ezen a hangszórón nincs állítható bemenet vagy hangszín.")}</div>${zar}`; return this._fedelEbreszt(); }
     const fulek = adat.eq ? `<div class="ffulek">${[["alap", "INPUT · TONE"], ["eq", "EQ"]].map(([l, n]) => `<button class="fful${lap === l || (l === "eq" && lap === "auto") ? " akt" : ""}" data-l="${l}">${n}</button>`).join("")}</div>` : "";
     p.classList.toggle("fulos", !!adat.eq);
-    p.classList.toggle("autolap", lap === "auto");
-    if (lap === "eq") p.innerHTML = fulek + this._eqLapHtml(e, adat) + zar;
+    p.classList.toggle("autolap", lap === "auto" || lap === "bt");
+    if (lap === "bt") p.innerHTML = fulek + this._btLapHtml(e, adat, src) + zar;
+    else if (lap === "eq") p.innerHTML = fulek + this._eqLapHtml(e, adat) + zar;
     else if (lap === "auto") p.innerHTML = fulek + this._autoLapHtml(e) + zar;
     else {
-      const bem = adat.inputs.length ? `<div class="fbem"><div class="fbill">${adat.inputs.map((n) => `<button class="bill fbe${n === src || (n === "Network" && !adat.inputs.includes(src)) ? " akt" : ""}" data-n="${ESC(n)}" title="${ESC(T("Bemenet: {b}", { b: n }))}"><span class="led"></span><b>${ESC(BEMENET_NEV(n))}</b></button>`).join("")}</div><small>INPUT</small></div>` : "";
+      const btKi = adat.bt && src === "Bluetooth" ? adat.bt.devices.find((d) => d.connected) : null;
+      const btSor = adat.bt && src === "Bluetooth" ? `<span class="fbtall${btKi ? " ok" : ""}">${btKi ? `✓ ${ESC(btKi.name)}` : ESC(T("várja a telefont / tabletet"))}</span>` : "";
+      const bem = adat.inputs.length ? `<div class="fbem"><div class="fbill">${adat.inputs.map((n) => `<button class="bill fbe${n === src || (n === "Network" && !adat.inputs.includes(src)) ? " akt" : ""}" data-n="${ESC(n)}" title="${ESC(T("Bemenet: {b}", { b: n }))}"><span class="led"></span><b>${ESC(BEMENET_NEV(n))}</b></button>`).join("")}${adat.bt ? `<button class="bill fpair" title="${T("Telefon / tablet csatlakoztatása Bluetooth-on – útmutató")}"><span class="led"></span><b>PAIR</b></button>` : ""}</div><small>INPUT${btSor ? " · BT: " : ""}${btSor}</small></div>` : "";
       const ertek = (f) => (adat.eq ? this._eqFok(e, f) : this._hangTar?.[e]?.[f] ?? adat.tone?.[f] ?? 0);
       const tarcsa = (f, cim, felirat) => {
         let jel = "";
@@ -4677,6 +4710,24 @@ class CantabileCard extends HTMLElement {
       <div class="ftolok">${tolok}</div></div>`;
   }
 
+  // PAIR: lépésenkénti útmutató a telefon / tablet Bluetooth-csatlakoztatásához. A párosítást mindig a telefon kezdeményezi
+  // (a weboldal nem fér a Bluetoothhoz) – a kártya BT-re váltja a hangszórót, megmondja a nevét, és figyeli, ki csatlakozik
+  _btLapHtml(e, adat, src) {
+    const bt = adat.bt, nev = bt.name || this._hszNev(e), ki = bt.devices.find((d) => d.connected), android = /Android/i.test(navigator.userAgent || "");
+    const ismert = bt.devices.length ? bt.devices.map((d) => `<span class="${d.connected ? "ok" : ""}">${d.connected ? "✓ " : ""}${ESC(d.name)}</span>`).join("") : `<span>${T("még nincs")}</span>`;
+    const allapot = src !== "Bluetooth" ? T("Átváltás Bluetooth-bemenetre…")
+      : ki ? T("✓ Csatlakozott: {n} – indítsd a zenét az eszközön, a(z) {h} szól.", { n: ki.name, h: this._hszNev(e) })
+      : T("A(z) {h} most látható és párosítható – várja az eszközt.", { h: this._hszNev(e) });
+    return `<div class="fauto-lap fbt-lap"><div class="fafej"><button class="bill fvissza-bt"><span class="led"></span><b>‹ INPUT</b></button><span class="fbtall${ki ? " ok" : ""}">${ESC(allapot)}</span></div>
+      <ol class="fbtlep">
+        <li>${T("A telefonon / tableten nyisd meg a Bluetooth-beállításokat")}${android ? ` <a class="fbtnyit" href="intent:#Intent;action=android.settings.BLUETOOTH_SETTINGS;end">${T("Megnyitás")}</a>` : ""}.</li>
+        <li>${T("Válaszd ki a listából:")} <b>${ESC(nev)}</b> ${T("(első alkalommal: párosítás).")}</li>
+        <li>${T("Indítsd a zenét az eszköz bármelyik appjában – a hang a hangszóróból szól. A kártyán a kazetta „BT IN”-t mutat.")}</li>
+      </ol>
+      <div class="fbtism"><small>${T("ISMERT ESZKÖZÖK")}</small>${ismert}</div>
+      <div class="fmeg fbtmas">${T("Párosítás nélkül, Wi-Fi-n: a zenei app hangszóró-ikonjával (Spotify Connect, TIDAL Connect, AirPlay) válaszd a(z) {n} hangszórót; vagy a kártya PHONE fülén játszd le az eszköz saját fájljait.", { n: nev })}</div></div>`;
+  }
+
   // AUTO lap: forrásonként és műfajonként egy profil; a műfaj erősebb (zenemappából szóló albumnál)
   _autoLapHtml(e) {
     const pr = this._eqProf;
@@ -4706,6 +4757,13 @@ class CantabileCard extends HTMLElement {
       if (c(".fful")) { this._fedelLap = c(".fful").dataset.l; this._eqNev = null; this._eqTorol = false; if (this._fedelLap === "eq") this._eqProfilok(); return this._fedelRajz(); }
       const b = c(".fbe");
       if (b && !b.classList.contains("akt")) return this._bemenetValt(e, b.dataset.n);
+      if (c(".fpair")) {
+        this._fedelLap = "bt";
+        if (this._hass.states[e]?.attributes?.source !== "Bluetooth") this._bemenetValt(e, "Bluetooth");
+        this._btFigyel(e); return this._fedelRajz();
+      }
+      if (c(".fvissza-bt")) { this._fedelLap = "alap"; this._btFigyel(null); return this._fedelRajz(); }
+      if (c(".fbtnyit")) return;            // a hivatkozás nyissa meg a beállításokat
       if (c(".floud")) { const most = this._eqTar?.[e]?.__loud ?? this._vezTar?.[e]?.adat?.loudness; return this._eqKuldj(e, { loudness: !most }, { __loud: !most }); }
       if (c(".feqbe")) return this._eqKuldj(e, { on: !this._eqBe(e) }, { __be: !this._eqBe(e) });
       if (c(".feqlep")) {
@@ -4732,6 +4790,16 @@ class CantabileCard extends HTMLElement {
       this._hass.callWS({ type: "cantabile/eq/auto/set", kind: s.dataset.kind, key: s.dataset.key, profile: s.value })
         .then(() => this._eqProfilok(true)).catch((err) => this._hivHiba(this._fedelE, err));
     });
+  }
+
+  // amíg a PAIR-útmutató nyitva van, 3 mp-enként megnézi, csatlakozott-e már az eszköz
+  _btFigyel(e) {
+    clearInterval(this._btIdo); this._btIdo = null;
+    if (!e) return;
+    this._btIdo = setInterval(() => {
+      if (this._fedelE !== e || this._fedelLap !== "bt") { clearInterval(this._btIdo); this._btIdo = null; return; }
+      this._vezerlok(e);
+    }, 3000);
   }
 
   async _eqProfilok(friss = false) {

@@ -111,14 +111,32 @@ async def allapot(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
     if platform == "sonos":
         lista = [s for s in lista if BEMENET_RE.match(s)]
     bemenetek: list[str] = []
+    allas: dict[str, Any] = {}
+    if host:
+        try:
+            allas = await _wiim(hass, host, "getStatusEx")
+            allas = allas if isinstance(allas, dict) else {}
+        except HomeAssistantError:
+            _LOGGER.debug("Cantabile: a WiiM állapota nem olvasható (%s)", entity_id, exc_info=True)
     if lista:
         bemenetek = lista
-    elif host:
+    elif allas:
         try:
-            plm = int(str((await _wiim(hass, host, "getStatusEx") or {}).get("plm_support", "0")), 0)
+            plm = int(str(allas.get("plm_support", "0")), 0)
             bemenetek = [WIIM_HALO] + [n for b, n in WIIM_PLM if plm & b]
-        except (HomeAssistantError, ValueError, AttributeError):
+        except ValueError:
             _LOGGER.debug("Cantabile: a WiiM bemenetei nem olvashatók (%s)", entity_id, exc_info=True)
+    bt: dict[str, Any] | None = None
+    if host and "Bluetooth" in bemenetek:
+        # a párosításhoz: a WiiM Bluetooth-neve és az ismert (párosított) eszközök, hogy melyik csatlakozik most
+        try:
+            tort = await _wiim(hass, host, "getbthistory")
+            bt = {"name": allas.get("DeviceName") or allas.get("ssid") or "",
+                  "devices": [{"name": str(d.get("name") or "?"), "connected": str(d.get("ct")) == "1"}
+                              for d in (tort.get("list") or [] if isinstance(tort, dict) else [])
+                              if str(d.get("role", "")).lower() == "audio source"]}
+        except HomeAssistantError:
+            _LOGGER.debug("Cantabile: a WiiM Bluetooth-állapota nem olvasható (%s)", entity_id, exc_info=True)
     if platform == "sonos" and bemenetek:
         bemenetek = ["Network", *bemenetek]          # a Sonos „vissza a hálózatra” állása: a bemenetről zene indításával
     hang: dict[str, Any] | None = None
@@ -146,7 +164,7 @@ async def allapot(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
         except HomeAssistantError:
             _LOGGER.debug("Cantabile: a WiiM EQ-ja nem olvasható (%s)", entity_id, exc_info=True)
     return {"inputs": bemenetek if len(bemenetek) > 1 else [], "source": a.get("source"), "tone": hang, "min": -HATAR, "max": HATAR,
-            "eq": eq, "loudness": hangossag}
+            "eq": eq, "loudness": hangossag, "bt": bt}
 
 
 _LISTAK: dict[str, list[str]] = {}

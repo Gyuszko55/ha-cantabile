@@ -68,6 +68,8 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
   > **Bluetooth-párosítás:** a Cantabile nem párosít és nem választ Bluetooth-eszközt. A telefont / tabletet a telefon
   > Bluetooth-beállításaiban (vagy a hangszóró appjában, pl. WiiM Home) párosítsd és csatlakoztasd a hangszóróhoz; a BT IN
   > csak a hangszóró Bluetooth-bemenetére vált, hogy mi szóljon rajta, azt a telefonon választod ki.
+- **PAIR** (a bemenetek mellett, WiiM): BT IN-re vált, és végigvezet a telefon / tablet csatlakoztatásán – a hangszóró
+  Bluetooth-neve, Androidon *Megnyitás* gomb a Bluetooth-beállításokhoz, az ismert eszközök és élő „✓ Csatlakozott” jelzés.
 - **EQ** (a fedél második füle, WiiM): grafikus equalizer tíz tolókarral, a WiiM beépített hangzásai és saját
   **profilok** (STORE / DEL, közös minden kártyán), valamint **AUTO**: profil forrásonként (rádió, NAS, Deezer, BT IN…) és
   a zenemappás album műfaja szerint – forrás- vagy albumváltáskor vált. A BASS / TREBLE és a tolókarok együtt mozognak.

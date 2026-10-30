@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **PAIR** key next to the inputs (speakers with a Bluetooth input, e.g. WiiM): one tap switches the speaker to BT IN and opens a step-by-step guide to connect a phone or tablet – with the speaker's exact Bluetooth name, an “Open” button for the Bluetooth settings on Android, the known (paired) devices, and a live status that shows “✓ Connected: <device>” as soon as it connects (checked every 3 s while the guide is open). It also lists the no-pairing ways over Wi-Fi (Spotify Connect, TIDAL Connect, AirPlay, the card's PHONE tab). On BT IN the INPUT line shows the connected device. Pairing itself always starts on the phone – a web page has no access to Bluetooth.
+- `cantabile/controls` returns `bt` (the speaker's Bluetooth name and its known source devices) for WiiM / LinkPlay speakers.
+
 ## 1.12.21 – 2026-10-30
 
 - **EQ tab** on the INPUT · TONE panel (WiiM / LinkPlay), like an old graphic equalizer: a profile display with ◀ ▶, EQ ON, STORE, DEL, AUTO and ten lit sliders (31 Hz – 16 kHz; drag, scroll, double-tap = 0). BASS / TREBLE and the sliders move together: the knobs show the average of their bands, and turning a knob moves its sliders. The EQ is per input, as the WiiM keeps it.
