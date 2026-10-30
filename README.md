@@ -18,7 +18,8 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
 ## What you get
 
 **Library** – a smoked-glass window: SEARCH everywhere · ARTISTS (music folder + Music Assistant + Deezer, artist page with
-shuffle, artist radio and similar artists) · GENRES (genre families with pictures; own albums, shuffle, Deezer chart, radios, artists) · SOURCES (each source on its own) · QUEUE.
+shuffle, artist radio and similar artists) · GENRES (genre families with pictures; own albums, shuffle, Deezer chart, radios, artists) · PARTY (endless mix from the music folder on the
+server, guests request songs from their phones via a QR code) · SOURCES (each source on its own) · QUEUE.
 
 **Radio**
 - FM-style glass dial with a moving pointer, preset buttons, a volume knob and a tuning wheel.

@@ -36,7 +36,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
-from . import atmeneti, foglalas, halkitas, hangszin, library, ma, llm, lyrics, music, sonossor, streaming, tovabbito, tv, vu
+from . import atmeneti, foglalas, halkitas, hangszin, library, ma, llm, lyrics, music, party, sonossor, streaming, tovabbito, tv, vu
 from .const import (
     CARD_URL, CONF_DUCK_LEVEL, CONF_DUCK_SOURCES, CONF_LLM_API, DOMAIN, DUCK_LEVEL_DEFAULT, STATIC_URL, UID_NET, UID_ROUNDS,
     UID_SLEEP, VERSION,
@@ -69,6 +69,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     tv.regisztral(hass)
     hangszin.regisztral(hass)
     ma.regisztral(hass)
+    party.regisztral(hass)
 
     @websocket_api.websocket_command({vol.Required("type"): "cantabile/info"})
     @callback
@@ -151,6 +152,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: CantabileConfigEntry) ->
     rt.start()
     zene = music.regisztral(hass, rt)
     entry.async_on_unload(zene.stop)
+    hass.data[DOMAIN]["zene"] = zene
+    entry.async_on_unload(party.kozpont(hass).stop)
 
     async def play_tracks(call: ServiceCall) -> None:
         for e in call.data["entity_id"]:

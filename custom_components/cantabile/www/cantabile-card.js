@@ -185,6 +185,29 @@ const EN = {
   "Sor végére": "Add to end of queue",
   "ELŐADÓK": "ARTISTS",
   "MŰFAJOK": "GENRES",
+  "Végtelen keverés · vendégkívánságok": "Endless mix · guest requests",
+  "Végtelen keverés a zenemappából: ugyanaz a szám sokáig nem jön újra, ugyanaz az előadó nem jön kétszer egymás után. Akkor is szól, ha a kártyát bezárod. A vendégek a telefonjukkal kérhetnek számot (QR-kód).": "Endless mix from the music folder: the same track won't come back for a long time, the same artist never twice in a row. It keeps playing when you close the card. Guests can request songs from their phones (QR code).",
+  "MIBŐL SZÓLJON?": "PLAY FROM",
+  "EGÉSZ ZENETÁR": "WHOLE LIBRARY",
+  "▶ PARTY INDUL · {h}": "▶ START PARTY · {h}",
+  "A PARTY a zenemappából szól – adj meg zenemappát (⚙ → Tape deck → Zenemappa).": "PARTY plays from the music folder – set one (⚙ → Tape deck → Music folder).",
+  "A PARTY hangszórón szól, nem ezen a készüléken – válassz hangszórót.": "PARTY plays on a speaker, not on this device – pick a speaker.",
+  "PARTY szól: {h}": "PARTY on: {h}",
+  "MOST SZÓL": "NOW PLAYING",
+  "SORON KÖVETKEZŐ KÍVÁNSÁGOK": "REQUESTED NEXT",
+  "Még nincs kívánság.": "No requests yet.",
+  "♥ {n} kérte": "♥ requested by {n}",
+  "⏭ KÖVETKEZŐ": "⏭ NEXT",
+  "■ PARTY VÉGE": "■ END PARTY",
+  "VENDÉGEK: BE": "GUESTS: ON",
+  "VENDÉGEK: KI": "GUESTS: OFF",
+  "Kívánság: olvasd be a telefonoddal (az otthoni Wi-Fin).": "Requests: scan it with your phone (on the home Wi-Fi).",
+  "A vendégkívánságok szünetelnek – a régi QR-kód már nem érvényes.": "Guest requests are paused – the old QR code no longer works.",
+  "A QR-kódhoz a Home Assistant belső címe kell (Beállítások → Rendszer → Hálózat).": "The QR code needs Home Assistant's internal URL (Settings → System → Network).",
+  "{n} szám a válogatásban · indította: {g}": "{n} tracks in the mix · started by {g}",
+  "A PARTY nem indult: {h}": "PARTY didn't start: {h}",
+  "A PARTY átkerült ide: {h}.": "PARTY moved to {h}.",
+  "Mindjárt szól…": "Starting…",
   "Műfajok": "Genres",
   "TOVÁBBI MŰFAJOK": "MORE GENRES",
   "Nincs műfaj": "No genre",
@@ -1589,6 +1612,28 @@ class CantabileCard extends HTMLElement {
           border: 1px solid var(--fc); color: var(--fc); animation: konyvbe .4s ease; }
         .egomb { display: flex; flex-direction: column; gap: 6px; }
         .egomb .uzgomb { margin: 0; white-space: nowrap; }
+        .party { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 14px; align-items: start; }
+        .pkep { background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.3), rgba(0,0,0,.4)), linear-gradient(135deg, #b48cff, #ff7aa8, #ffb547); }
+        .pkep span { font-size: calc(30px * var(--bk, 1)); }
+        .psub { display: block; margin-top: 4px; font: 500 calc(12px * var(--bk, 1))/1.35 "Cantabile Sans", Arial, sans-serif; color: #c9bfa9; }
+        .pki { display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 9px; border: 1px solid rgba(180,140,255,.6); color: #d4c0ff; font: 600 calc(11px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; }
+        .pgombok { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+        .pgombok .uzgomb { margin: 0; }
+        .uzgomb.pvege { border-color: rgba(255,110,90,.7); color: #ffab9b; background: rgba(255,90,60,.1); }
+        .pkiv { padding: 6px 9px; border-radius: 4px; background: rgba(180,140,255,.07); border: 1px solid rgba(180,140,255,.18); min-width: 0; }
+        .pkiv b { display: block; font: 600 calc(12.5px * var(--bk, 1))/1.25 "Cantabile Sans", Arial, sans-serif; color: #f3ead8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pkiv small { display: block; color: #a99f8b; font: 500 calc(11px * var(--bk, 1))/1.25 "Cantabile Sans", Arial, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pinfo { padding: 10px 2px 0; font-size: calc(11.5px * var(--bk, 1)); }
+        .pjobb { display: grid; gap: 7px; justify-items: center; text-align: center; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,176,32,.35);
+          background: rgba(255,255,255,.03); box-shadow: 0 0 18px rgba(255,160,40,.12); }
+        .pqr svg { display: block; width: 150px; height: 150px; border-radius: 6px; box-shadow: 0 0 0 1px rgba(255,176,32,.5), 0 0 16px rgba(255,160,40,.25); }
+        .pjobb small { color: #e9dcc4; font: 500 calc(11.5px * var(--bk, 1))/1.35 "Cantabile Sans", Arial, sans-serif; }
+        .pjobb code { color: #a88f6b; font-size: calc(9.5px * var(--bk, 1)); overflow-wrap: anywhere; }
+        .pindul { margin-top: 14px; }
+        .uzgomb.pnagy { padding: 10px 20px; font-size: calc(14px * var(--bk, 1)); box-shadow: 0 0 16px rgba(255,160,40,.25); }
+        .pval button { border-color: rgba(255,176,32,.3); background: rgba(255,176,32,.05); }
+        .pval button.akt { background: rgba(255,176,32,.2); border-color: rgba(255,176,32,.8); color: #ffe2a8; }
+        :host([keskeny]) .party { grid-template-columns: 1fr; }
         .mcsempek { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
         .mcs { position: relative; height: 74px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; overflow: hidden; cursor: pointer; padding: 0; text-align: left;
           background: radial-gradient(circle at 80% 20%, rgba(255,255,255,.25), transparent 60%), var(--c, #555); box-shadow: 0 4px 10px rgba(0,0,0,.4); -webkit-tap-highlight-color: transparent; }
@@ -2649,6 +2694,17 @@ class CantabileCard extends HTMLElement {
       if (!eszk) { this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); this._uzen(T("A Spotify Connect-lejátszás csak Spotify Connect-hangszóróra vihető át – a(z) {r} szól tovább.", { r: KN(regi) })); return this._frissit(); }
       return this._hiv("media_player", "select_source", { entity_id: this._stream.spotify_entity, source: eszk });
     }
+    // PARTY: a régi hangszórón leáll, az újon ugyanazzal a válogatással indul
+    const pk = TAR.json("tablet-magno-kazetta");
+    if (pk?.party && pk.entity === regi.entity && uj.entity !== HELYI) {
+      const futo = await this._hass.callWS({ type: "cantabile/party/state" }).then((r) => r.parties.find((x) => x.entity_id === regi.entity), () => null);
+      if (futo) {
+        await this._hass.callWS({ type: "cantabile/party/stop", entity_id: regi.entity }).catch(() => {});
+        await this._hiv("media_player", "media_stop", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
+        if (await this._partyIndit(uj, pk.cfg)) this._uzen(T("A PARTY átkerült ide: {h}.", { h: KN(uj) }));
+        return;
+      }
+    }
     // Music Assistant sora: megkeressük, hogyan szólhat tovább az új kimeneten –
     //  1. MA-lejátszó, vagy a cél készüléknek van MA-párja (Sonos 1 ↔ Sonos MA, Technics ↔ WiiM MA): az MA viszi át;
     //  2. nincs MA-pár (TV, BT…), de a szám a zenemappából szól: a Cantabile veszi át ugyanattól a számtól és ponttól;
@@ -3315,6 +3371,11 @@ class CantabileCard extends HTMLElement {
       const p = SZOL(s) ? this._hiv("media_player", "media_pause", e) : Promise.resolve();
       return p.then(() => this._elenged([hsz.entity]));
     }
+    if (kaz?.party && (k === "stop" || k === "ff" || (k === "play" && !SZUNETEL(s) && !SZOL(s)))) {
+      if (k === "play") return this._partyIndit(hsz, kaz.cfg);
+      if (k === "ff") return this._hass.callWS({ type: "cantabile/party/skip", entity_id: hsz.entity }).catch(() => this._hiv("media_player", "media_next_track", e));
+      await this._hass.callWS({ type: "cantabile/party/stop", entity_id: hsz.entity }).catch(() => {});
+    }
     if (k === "stop") { this._szkriptLeallit(); return this._hiv("media_player", "media_stop", e); }
     if (k === "pause") return this._hiv("media_player", SZUNETEL(s) ? "media_play" : "media_pause", e);
     const sorHely = (Number(a.queue_position) || 1) - 1;
@@ -3574,7 +3635,7 @@ class CantabileCard extends HTMLElement {
   _polcNyit() {
     if (this._mod !== "magno") { this._mod = "magno"; this._frissit(); }
     const ful = TAR.olvas("tablet-magno-ful");
-    const lehet = ["eloado", "mind", "nas", "tel", ...(this._config.magno?.nas || this._config.deezer !== false ? ["mufaj"] : []), ...(this._vanSonos() ? ["stream", ...(this._config.deezer !== false ? ["deezer"] : [])] : []), ...["spotify", "tidal"].filter((x) => this._szolgLatszik(x)), ...(this._maInfo?.available ? ["ma"] : [])];
+    const lehet = ["eloado", "mind", "party", "nas", "tel", ...(this._config.magno?.nas || this._config.deezer !== false ? ["mufaj"] : []), ...(this._vanSonos() ? ["stream", ...(this._config.deezer !== false ? ["deezer"] : [])] : []), ...["spotify", "tidal"].filter((x) => this._szolgLatszik(x)), ...(this._maInfo?.available ? ["ma"] : [])];
     this._polc = { ful: lehet.includes(ful) ? ful : this._vanSonos() ? "stream" : "nas", ut: [] };
     this._polcRajz();
     // a Music Assistant (ha van) fülét az első megnyitáskor tudjuk meg: utána megjelenik a fejlécben
@@ -4696,6 +4757,7 @@ class CantabileCard extends HTMLElement {
       : (pl.ful === "nas" || pl.ful === "deezer" || szolg) && pl.ut.length
       ? `<button data-vissza>${T("‹ Vissza")}</button>${ESC(pl.ut.map((x) => x.cim).join(" › "))}`
       : pl.ful === "sor" ? ""
+      : pl.ful === "party" ? T("Végtelen keverés · vendégkívánságok")
       : pl.ful === "mufaj" ? (pl.ut.length ? `<button data-vissza>${T("‹ Vissza")}</button>${ESC(pl.ut[0].cim)}` : T("Műfajok"))
       : pl.ful === "mind" ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés mindenhol…")}" value="${ESC(pl.keres || "")}">`
       : pl.ful === "wiim" ? T("WiiM-presetek")
@@ -4711,6 +4773,7 @@ class CantabileCard extends HTMLElement {
         <button class="pful ${pl.ful === "mind" ? "akt" : ""}" data-ful="mind">${T("KERESÉS")}</button>
         <button class="pful ${pl.ful === "eloado" ? "akt" : ""}" data-ful="eloado">${T("ELŐADÓK")}</button>
         ${nasGyoker || this._config.deezer !== false ? `<button class="pful ${pl.ful === "mufaj" ? "akt" : ""}" data-ful="mufaj">${T("MŰFAJOK")}</button>` : ""}
+        ${nasGyoker ? `<button class="pful ${pl.ful === "party" ? "akt" : ""}" data-ful="party">PARTY</button>` : ""}
         <button class="pful ${forrasban ? "akt" : ""}" data-ful="forras">${T("FORRÁSOK")}<i class="pnyil"></i></button>
         <button class="pful ${pl.ful === "sor" ? "akt" : ""}" data-ful="sor">QUEUE</button>
         <div class="put">${ut}</div>
@@ -4754,6 +4817,7 @@ class CantabileCard extends HTMLElement {
     }
     if (pl.ful === "mind") return this._mindRajz(lista);
     if (pl.ful === "eloado") return this._eloadoRajz(lista);
+    if (pl.ful === "party") return this._partyRajz(lista);
     if (pl.ful === "ma") return this._maRajz(lista);
     if (pl.ful === "deezer") return this._deezerRajz(lista);
     if (szolg) return this._szolgRajz(lista, pl.ful);
@@ -5008,6 +5072,96 @@ class CantabileCard extends HTMLElement {
       this._polcZar();
       this._betolt({ cim: T("{e} rádió", { e: e.cim }), alcim: T("{n} szám · hasonlók is", { n: t.length }), forras: "stream", tipus: "deezer", id: t[0].link, szamok: t.map((x) => x.link), kep: e.kep || null });
     } catch (err) { this._uzen(T("A Deezer most nem érhető el: {h}", { h: err?.message || err })); }
+  }
+
+  // ---- PARTY (party.py): végtelen keverés a zenemappából a szerveren, vendégkívánságok QR-kóddal ----
+  async _partyIndit(hsz, cfg) {
+    const nas = String(this._config.magno?.nas || "").replace(/\/$/, "");
+    if (!nas) { this._uzen(T("A PARTY a zenemappából szól – adj meg zenemappát (⚙ → Tape deck → Zenemappa).")); return false; }
+    if (!hsz || hsz.entity === HELYI) { this._uzen(T("A PARTY hangszórón szól, nem ezen a készüléken – válassz hangszórót.")); return false; }
+    const fr = this._foglaloIds(hsz.tagok || [hsz.entity]);
+    if (fr) { this._foglaltUzen(fr); return false; }
+    this._szkriptLeallit();
+    try {
+      await this._hass.callWS({ type: "cantabile/party/start", entity_id: hsz.entity, tagok: hsz.tagok || [hsz.entity], mod: hsz.mod === "sonos" ? "sonos" : "url",
+        mappa: nas, ...(cfg.albumok ? { albumok: cfg.albumok } : {}), cim: cfg.cim, hires: this._config.magno?.hires || null, device: ESZKOZ() });
+    } catch (err) {
+      const m = String(err?.message || err);
+      this._uzen(m.startsWith("busy:") ? T("A(z) {h} foglalt: {n} használja.", { h: KN(hsz), n: m.slice(5) }) : T("A PARTY nem indult: {h}", { h: m }));
+      return false;
+    }
+    TAR.ir("tablet-magno-kazetta", JSON.stringify({ cim: "PARTY", alcim: cfg.cim, forras: "nas", id: nas, entity: hsz.entity, party: true, cfg }));
+    if (this._mod !== "magno") { this._mod = "magno"; TAR.ir("tablet-radio-mod", this._mod); }
+    this._frissit();
+    return true;
+  }
+
+  async _partyRajz(lista) {
+    const pl = this._polc; if (!pl) return;
+    clearTimeout(this._partyIdo);
+    const friss = () => this._polc === pl && pl.ful === "party" && lista.isConnected;
+    const hsz = this._hangszoro(), e = hsz?.entity;
+    let r;
+    try { r = await this._hass.callWS({ type: "cantabile/party/state", qr: true }); }
+    catch (err) { if (friss()) lista.innerHTML = `<div class="puzenet">${T("Hiba: {h}", { h: ESC(err?.message || err) })}</div>`; return; }
+    if (!friss()) return;
+    const p = r.parties.find((x) => x.entity_id === e || (x.tagok || []).includes(e));
+    const masutt = r.parties.filter((x) => x !== p);
+    const masHtml = masutt.length ? `<div class="puzenet">${ESC(T("PARTY szól: {h}", { h: masutt.map((x) => this._hszNev(x.entity_id)).join(", ") }))}</div>` : "";
+    if (p) {
+      // fut: most szól, kívánságok, gombok; jobbra a QR-kód
+      const m = p.most;
+      lista.innerHTML = `<div class="party">
+        <div class="pbal">
+          <div class="ehos" style="--c:#b48cff"><div class="ekep pkep"><span>♫</span></div>
+            <div class="enev"><small>${T("MOST SZÓL")} · ${ESC(KN(hsz))}</small><b>${ESC(m ? m.cim : T("Mindjárt szól…"))}</b>
+              <span class="psub">${ESC(m ? [m.eloado, m.album].filter(Boolean).join(" · ") : "")}</span>${m?.ki ? `<span class="pki">${ESC(T("♥ {n} kérte", { n: m.ki }))}</span>` : ""}</div></div>
+          <div class="pgombok"><button class="uzgomb" data-pa="skip">${T("⏭ KÖVETKEZŐ")}</button><button class="uzgomb" data-pa="vendeg">${p.vendeg ? T("VENDÉGEK: BE") : T("VENDÉGEK: KI")}</button><button class="uzgomb pvege" data-pa="stop">${T("■ PARTY VÉGE")}</button></div>
+          <h5 class="kcsop"><i class="fp f-dz"></i>${T("SORON KÖVETKEZŐ KÍVÁNSÁGOK")}<span>${p.kivansag.length}</span></h5>
+          ${p.kivansag.length ? `<div class="ktalal">${p.kivansag.map((k, i) => `<div class="pkiv"><b>${i + 1}. ${ESC(k.cim)}</b><small>${ESC([k.eloado, k.ki ? `♥ ${k.ki}` : ""].filter(Boolean).join(" · "))}</small></div>`).join("")}</div>` : `<div class="puzenet">${T("Még nincs kívánság.")}</div>`}
+          <div class="puzenet pinfo">${ESC(p.cim)} · ${ESC(T("{n} szám a válogatásban · indította: {g}", { n: p.db, g: p.gazda || "?" }))}</div>${masHtml}
+        </div>
+        <div class="pjobb">${p.vendeg ? (p.qr ? `<div class="pqr">${p.qr}</div><small>${T("Kívánság: olvasd be a telefonoddal (az otthoni Wi-Fin).")}</small><code>${ESC(p.url || "")}</code>`
+          : `<div class="puzenet">${T("A QR-kódhoz a Home Assistant belső címe kell (Beállítások → Rendszer → Hálózat).")}</div>${p.url ? `<code>${ESC(p.url)}</code>` : ""}`)
+          : `<div class="puzenet">${T("A vendégkívánságok szünetelnek – a régi QR-kód már nem érvényes.")}</div>`}</div>
+      </div>`;
+      lista.querySelectorAll("[data-pa]").forEach((b) => b.addEventListener("click", async () => {
+        const a = b.dataset.pa;
+        try {
+          if (a === "skip") await this._hass.callWS({ type: "cantabile/party/skip", entity_id: p.entity_id });
+          else if (a === "vendeg") await this._hass.callWS({ type: "cantabile/party/guests", entity_id: p.entity_id, on: !p.vendeg });
+          else if (a === "stop") {
+            await this._hass.callWS({ type: "cantabile/party/stop", entity_id: p.entity_id });
+            await this._hiv("media_player", "media_stop", { entity_id: p.entity_id }).catch(() => {});
+          }
+        } catch (err) { this._maHiba(p.entity_id, err); }
+        setTimeout(() => friss() && this._partyRajz(lista), 1200);
+      }));
+      this._partyIdo = setTimeout(() => friss() && this._partyRajz(lista), 5000);
+      return;
+    }
+    // nem fut: miből szóljon (az egész zenetár vagy műfajcsaládok), indítás
+    let csal = [];
+    try { csal = (await this._mufajAdat()).l.filter((x) => x.albumok.length); } catch (_) { /* csak az egész zenetár */ }
+    if (!friss()) return;
+    const val = pl.partyVal = pl.partyVal || new Set();
+    const rajz = () => {
+      lista.innerHTML = `<div class="ehos" style="--c:#b48cff"><div class="ekep pkep"><span>♫</span></div>
+          <div class="enev"><small>CANTABILE</small><b>PARTY</b><span class="psub">${T("Végtelen keverés a zenemappából: ugyanaz a szám sokáig nem jön újra, ugyanaz az előadó nem jön kétszer egymás után. Akkor is szól, ha a kártyát bezárod. A vendégek a telefonjukkal kérhetnek számot (QR-kód).")}</span></div></div>
+        <h5 class="kcsop"><i class="fp f-nas"></i>${T("MIBŐL SZÓLJON?")}</h5>
+        <div class="malcim pval"><button class="${val.size ? "" : "akt"}" data-pv="">${T("EGÉSZ ZENETÁR")}</button>${csal.map((x, i) => `<button class="${val.has(x.id) ? "akt" : ""}" data-pv="${i}">${ESC(x.cim)} <small>${x.albumok.length}</small></button>`).join("")}</div>
+        <div class="tsor pindul"><button class="uzgomb pnagy" data-pi>${ESC(T("▶ PARTY INDUL · {h}", { h: KN(hsz) }))}</button></div>${masHtml}`;
+      lista.querySelectorAll("[data-pv]").forEach((b) => b.addEventListener("click", () => {
+        if (b.dataset.pv === "") val.clear(); else { const id = csal[Number(b.dataset.pv)].id; if (val.has(id)) val.delete(id); else val.add(id); }
+        rajz();
+      }));
+      lista.querySelector("[data-pi]").addEventListener("click", async () => {
+        const v = csal.filter((x) => val.has(x.id));
+        const cfg = v.length ? { cim: `PARTY · ${v.map((x) => x.cim).join(" + ")}`, albumok: [...new Set(v.flatMap((x) => x.albumok))] } : { cim: `PARTY · ${T("EGÉSZ ZENETÁR")}` };
+        if (await this._partyIndit(this._hangszoro(), cfg)) setTimeout(() => friss() && this._partyRajz(lista), 2500);
+      });
+    };
+    rajz();
   }
 
   // ---- MŰFAJOK: a Deezer mintájára nagy, képes műfajcsaládok; a zenefájlok (gyakran aprólékos) címkéi a családjukba kerülnek ----

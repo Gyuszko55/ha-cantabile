@@ -153,10 +153,19 @@ class Cantabile:
     # ---- sorozatlejátszó (sor nélküli lejátszók) ----
     @callback
     def play_tracks(self, entity_id: str, tracks: list[str], start: int = 0) -> None:
+        self.play_iter(entity_id, Sorrend(self, entity_id, list(tracks), max(0, int(start))))
+
+    @callback
+    def play_iter(self, entity_id: str, sorrend: Any) -> None:
+        """Sorozatlejátszás tetszőleges sorrendből (pl. a PARTY végtelen válogatása: `szamok` nélkül, mindig a következőt adja)."""
         self.stop_tracks(entity_id)
         self._sorozat[entity_id] = self.hass.async_create_background_task(
-            self._sorozat_fut(entity_id, list(tracks), max(0, int(start))), f"cantabile tracks {entity_id}"
+            self._sorozat_fut(entity_id, sorrend), f"cantabile tracks {entity_id}"
         )
+
+    def sorrend(self, entity_id: str) -> Any:
+        """A futó sorozat sorrendje (a PARTY ebből tudja, hogy még ő szól-e)."""
+        return self._sorrend.get(entity_id) if self.tracks_running(entity_id) else None
 
     @callback
     def stop_tracks(self, entity_id: str | None = None) -> None:
@@ -180,6 +189,9 @@ class Cantabile:
     def ugrik(self, entity_id: str, lepes: int) -> bool:
         """Következő / előző szám a sorozatlejátszásban (a szóló számhoz képest); False, ha nincs futó sorozat."""
         s = self._sorrend.get(entity_id)
+        if s is not None and getattr(s, "party", False) and lepes > 0 and self.tracks_running(entity_id):
+            self.play_iter(entity_id, s)     # PARTY: a következő válogatott szám
+            return True
         if s is None or not s.szamok or not self.tracks_running(entity_id):
             return False
         most = s.szamok.index(s.most) if s.most in s.szamok else 0
@@ -198,14 +210,14 @@ class Cantabile:
         t = self._sorozat.get(entity_id)
         return bool(t and not t.done())
 
-    async def _sorozat_fut(self, entity_id: str, szamok: list[str], kezdo: int) -> None:
+    async def _sorozat_fut(self, entity_id: str, sorrend: Any) -> None:
         try:
             dmr = None
             try:
                 dmr = await hezagmentes.wiim_renderelo(self.hass, entity_id)
             except Exception:  # noqa: BLE001
                 _LOGGER.debug("Cantabile: %s UPnP-n nem érhető el, számonként indítom", entity_id, exc_info=True)
-            self._sorrend[entity_id] = sorrend = Sorrend(self, entity_id, szamok, kezdo)
+            self._sorrend[entity_id] = sorrend
             if dmr is not None:
                 await hezagmentes.lejatszik(self.hass, dmr, entity_id, sorrend)
                 return

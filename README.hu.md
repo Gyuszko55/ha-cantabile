@@ -18,7 +18,8 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
 ## Mit tud
 
 **Zenetár** – füstüveg ablak: KERESÉS mindenhol · ELŐADÓK (zenemappa + Music Assistant + Deezer; az előadó lapján
-keverés, előadó-rádió, hasonló előadók) · MŰFAJOK (képes műfajcsaládok; saját albumok, keverés, Deezer-toplista, rádiók, előadók) · FORRÁSOK (minden forrás külön) · QUEUE.
+keverés, előadó-rádió, hasonló előadók) · MŰFAJOK (képes műfajcsaládok; saját albumok, keverés, Deezer-toplista, rádiók, előadók) · PARTY (végtelen keverés a zenemappából a
+szerveren, a vendégek QR-kóddal kérhetnek számot a telefonjukról) · FORRÁSOK (minden forrás külön) · QUEUE.
 
 **Rádió**
 - FM-skála mozgó mutatóval, adógombok, hangerő-forgatógomb, hangoló lendkerék.
