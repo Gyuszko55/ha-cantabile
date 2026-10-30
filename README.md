@@ -48,6 +48,9 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
   ⚙ → *Front panel*, or `finish: black` in YAML.
 - Each speaker has a **card name** of up to 8 characters (e.g. *Lounge*): it goes on the rotary selector, the header and
   the cassette, while voice control keeps using the full name.
+- **Music Assistant (optional)**: if Music Assistant is set up in Home Assistant, the tape shelf has an **MA** tab –
+  search and library (albums, artists, playlists, tracks, radio) with covers; it plays on a Music Assistant player with
+  MA's own queue (QUEUE shows the current and next track), and switching between MA players moves the queue.
 - **ⓘ Signal path**: the button before ⚙ shows, live, where the sound comes from, what happens to it and where it plays
   (source → processing → output, with the EQ / tone and whether the VU meter is real).
 - **Messages on the player**: hints and errors appear in a smoked-glass window on the card itself, then fade out

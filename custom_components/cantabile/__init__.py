@@ -13,7 +13,8 @@ kártyához a szerveren kell:
     sor-átrendezés (`cantabile.move_queue_item`, `cantabile.set_order`), halkítás bemondáskor (halkitas.py),
     hézagmentes WiiM-lejátszás (hezagmentes.py), rádióadó-továbbító a BT kimenethez (tovabbito.py), saját zene
     átmeneti feltöltése más hangszórókhoz (atmeneti.py), hangszóró-foglalás a felhasználók kártyái között (foglalas.py),
-    a hangszóró bemenete és hangszíne a kártya lenyíló előlapjához (hangszin.py).
+    a hangszóró bemenete és hangszíne a kártya lenyíló előlapjához (hangszin.py), a Music Assistant mint választható
+    forrás – ha be van állítva (ma.py).
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
-from . import atmeneti, foglalas, halkitas, hangszin, library, llm, lyrics, music, sonossor, streaming, tovabbito, tv, vu
+from . import atmeneti, foglalas, halkitas, hangszin, library, ma, llm, lyrics, music, sonossor, streaming, tovabbito, tv, vu
 from .const import (
     CARD_URL, CONF_DUCK_LEVEL, CONF_DUCK_SOURCES, CONF_LLM_API, DOMAIN, DUCK_LEVEL_DEFAULT, STATIC_URL, UID_NET, UID_ROUNDS,
     UID_SLEEP, VERSION,
@@ -67,6 +68,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     vu.regisztral(hass)
     tv.regisztral(hass)
     hangszin.regisztral(hass)
+    ma.regisztral(hass)
 
     @websocket_api.websocket_command({vol.Required("type"): "cantabile/info"})
     @callback
