@@ -347,6 +347,7 @@ const EN = {
   "(első alkalommal: párosítás).": "(the first time: pair).",
   "Indítsd a zenét az eszköz bármelyik appjában – a hang a hangszóróból szól. A kártyán a kazetta „BT IN”-t mutat.": "Start the music in any app on the device – the sound comes from the speaker. On the card the cassette shows “BT IN”.",
   "ISMERT ESZKÖZÖK": "KNOWN DEVICES",
+  "A(z) {h} egyszerre csak egy eszközt fogad, és most ez csatlakozik: {n}. Ha nem erről akarsz zenét küldeni, előbb ezen az eszközön kapcsold ki a Bluetooth-t (vagy a Bluetooth-beállításaiban bontsd a kapcsolatot) – addig a többi eszköz nem is látja a hangszórót. A hangszóró maga nem tudja leválasztani.": "{h} takes only one device at a time, and {n} is connected now. If you want to play from another device, first turn off Bluetooth on this one (or disconnect it in its Bluetooth settings) – until then other devices can't even see the speaker. The speaker itself can't disconnect it.",
   "Párosítás nélkül, Wi-Fi-n: a zenei app hangszóró-ikonjával (Spotify Connect, TIDAL Connect, AirPlay) válaszd a(z) {n} hangszórót; vagy a kártya PHONE fülén játszd le az eszköz saját fájljait.": "Without pairing, over Wi-Fi: pick {n} with the music app's speaker icon (Spotify Connect, TIDAL Connect, AirPlay); or play the device's own files from the card's PHONE tab.",
   "A(z) {h} a(z) {b} bemenetről szólt – ez nem vihető át, szüneteltettem. Ha visszaváltasz rá, onnan folytatja.": "{h} was playing from its {b} input – that can't be moved, so it's paused. Switch back to it and it carries on."
 };
@@ -1702,6 +1703,9 @@ class CantabileCard extends HTMLElement {
         .fbtism { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font: 600 calc(12px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; color: #4a4e55; }
         .fbtism small { text-align: left; margin-right: 4px; }
         .fbtism .ok { color: #1d7a3a; }
+        .fbtfoglalt { padding: 7px 10px; border-radius: 3px; border-left: 3px solid #c98a00; background: rgba(255,176,32,.14);
+          font: 500 calc(12px * var(--bk, 1))/1.4 "Cantabile Sans", Arial, sans-serif; color: #5a3d00; }
+        :host([fekete]) .fbtfoglalt { color: #ffd892; background: rgba(255,176,32,.1); }
         .fbtmas { text-align: left; flex-basis: auto; font-size: calc(11.5px * var(--bk, 1)); }
         :host([fekete]) .fbtlep { color: #d5d8dc; } :host([fekete]) .fbtlep b { color: #fff; }
         :host([fekete]) .fbtall { color: #ffb547; } :host([fekete]) .fbtall.ok, :host([fekete]) .fbtism .ok { color: #6fdc8c; }
@@ -4719,6 +4723,7 @@ class CantabileCard extends HTMLElement {
       : ki ? T("✓ Csatlakozott: {n} – indítsd a zenét az eszközön, a(z) {h} szól.", { n: ki.name, h: this._hszNev(e) })
       : T("A(z) {h} most látható és párosítható – várja az eszközt.", { h: this._hszNev(e) });
     return `<div class="fauto-lap fbt-lap"><div class="fafej"><button class="bill fvissza-bt"><span class="led"></span><b>‹ INPUT</b></button><span class="fbtall${ki ? " ok" : ""}">${ESC(allapot)}</span></div>
+      ${ki && src === "Bluetooth" ? `<div class="fbtfoglalt">${T("A(z) {h} egyszerre csak egy eszközt fogad, és most ez csatlakozik: {n}. Ha nem erről akarsz zenét küldeni, előbb ezen az eszközön kapcsold ki a Bluetooth-t (vagy a Bluetooth-beállításaiban bontsd a kapcsolatot) – addig a többi eszköz nem is látja a hangszórót. A hangszóró maga nem tudja leválasztani.", { h: nev, n: ki.name })}</div>` : ""}
       <ol class="fbtlep">
         <li>${T("A telefonon / tableten nyisd meg a Bluetooth-beállításokat")}${android ? ` <a class="fbtnyit" href="intent:#Intent;action=android.settings.BLUETOOTH_SETTINGS;end">${T("Megnyitás")}</a>` : ""}.</li>
         <li>${T("Válaszd ki a listából:")} <b>${ESC(nev)}</b> ${T("(első alkalommal: párosítás).")}</li>
