@@ -7,6 +7,7 @@
   - Tone: Sonos bass / treble entities; on a WiiM the 10-band EQ over its local HTTP API (BASS lifts or cuts 31–125 Hz and half of 250 Hz, TREBLE 4–16 kHz and half of 2 kHz; both at 0 turns the EQ off and restores “Flat”).
   - New websocket commands `cantabile/controls`, `cantabile/input/select`, `cantabile/tone/set` (the input switch claims the speaker, both respect the speaker lock).
   - While a speaker plays from its own input, the tape deck no longer shows the loaded cassette as playing: the display cassette carries the input as its source tag (“BT IN”, “LINE IN”), the title / artist the phone sends (or the input's name), “Bluetooth | A2DP” as format, and the VU label reads “BT IN · SIMULATED” – the sound goes straight from the phone to the speaker and never passes the server, so there is nothing to measure (the server-side analysis is not started for it).
+  - STOP on the tape deck while a speaker plays from its own input pauses it instead: a WiiM doesn't pass a stop on to the phone over Bluetooth, which then started again a few seconds later (a pause it does pass on); PLAY resumes.
   - Switching to another speaker while one plays from its own input (BT IN, LINE IN) no longer “carries over” the cassette loaded on the card: the input can't be moved, so that speaker is paused (on BT the phone pauses too), nothing starts on the new one, and switching back resumes it – unless music is carried back onto it.
 
 ## 1.12.19 – 2026-10-30

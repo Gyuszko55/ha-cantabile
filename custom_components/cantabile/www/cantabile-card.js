@@ -2935,6 +2935,9 @@ class CantabileCard extends HTMLElement {
     const e = { entity_id: hsz.entity };
     if (k === "eject") return this._polcNyit();
     if (k === "stop" || k === "pause") this._inditasJel = null;     // a felhasználó leállította: az indításfigyelő ne szóljon
+    // a hangszóró saját bemenetéről (BT IN, LINE IN) szól: a STOP szünet – a WiiM a stopot nem adja tovább a telefonnak, az pár
+    // másodperc múlva újraindulna; a szünetet igen, és a PLAY onnan folytatja
+    if (k === "stop" && this._bemenetrol(hsz.entity)) return SZOL(s) ? this._hiv("media_player", "media_pause", e) : undefined;
     if (k === "stop") { this._szkriptLeallit(); return this._hiv("media_player", "media_stop", e); }
     if (k === "pause") return this._hiv("media_player", SZUNETEL(s) ? "media_play" : "media_pause", e);
     const sorHely = (Number(a.queue_position) || 1) - 1;
