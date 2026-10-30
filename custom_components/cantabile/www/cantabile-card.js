@@ -3416,6 +3416,7 @@ class CantabileCard extends HTMLElement {
     this._polcRajz();
     // a Music Assistant (ha van) fülét az első megnyitáskor tudjuk meg: utána megjelenik a fejlécben
     this._maInfoLeker().then(() => {
+      if (this._maInfo?.available) this._maKonyvtar(this._polc?.maTip || "album").catch(() => {});
       const pf = this.shadowRoot.getElementById("polc");
       if (this._polc && this._maInfo?.available && pf && !pf.querySelector('[data-ful="ma"]')) {
         if (ful === "ma") this._polc.ful = "ma";
@@ -4811,6 +4812,17 @@ class CantabileCard extends HTMLElement {
     catch (_) { this._maInfo = { available: false, ido: Date.now() }; }
   }
 
+  // a könyvtár egy-egy típusa 5 percig megjegyezve (az első lekérés lassú lehet); a polc megnyitásakor előre letöltjük
+  _maKonyvtar(tip) {
+    this._maTar = this._maTar || {};
+    const t = this._maTar[tip];
+    if (t && Date.now() - t.ido < 300000) return t.p;
+    const p = this._hass.callWS({ type: "cantabile/ma/library", media_type: tip, limit: 150 });
+    this._maTar[tip] = { ido: Date.now(), p };
+    p.catch(() => { if (this._maTar[tip]?.p === p) delete this._maTar[tip]; });
+    return p;
+  }
+
   _maHiba(e, err) {
     const m = String(err?.message || "");
     if (m.startsWith("busy:")) this._uzen(T("A(z) {h} foglalt: {n} használja.", { h: this._hszNev(e), n: m.slice(5) }));
@@ -4840,7 +4852,7 @@ class CantabileCard extends HTMLElement {
         const sajat = (r.albums || []).filter((a) => a.artist.split(", ").includes(hely.cim));
         elemek = sajat.length ? sajat : r.albums || [];
       } else if (keres) cs = await this._hass.callWS({ type: "cantabile/ma/search", query: kerdes.trim(), limit: 12 });
-      else elemek = (await this._hass.callWS({ type: "cantabile/ma/library", media_type: tip, limit: 150 })).items || [];
+      else elemek = (await this._maKonyvtar(tip)).items || [];
       if (!friss()) return;
       // a címkézetlen fájlokból az MA név nélküli albumot / számot is felvesz – ezek üres csempék lennének
       elemek = elemek.filter((x) => x.name);

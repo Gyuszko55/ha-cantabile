@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- MA tab: the library list is fetched in the background when the shelf opens and kept for 5 minutes, so the tab shows up at once (the first request can take several seconds while Home Assistant / Music Assistant warm up).
 - MA tab: albums and tracks without a name (Music Assistant adds them from untagged files) are no longer shown as empty tiles.
 
 ## 2.0.0 – 2026-10-30
