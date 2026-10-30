@@ -188,7 +188,7 @@ class TvKozpont:
             await asyncio.sleep(2)
             await self.oldalt_kuld(lj)
             if folytat:
-                lj.folytat(folytat)
+                await lj.folytat(folytat)
         finally:
             lj.ujratolt = False
 

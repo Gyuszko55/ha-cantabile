@@ -296,11 +296,18 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         poz = float(self._poz or 0.0)
         if self._allapot == MediaPlayerState.PLAYING and self._poz_ido is not None:
             poz += (dt_util.utcnow() - self._poz_ido).total_seconds()
-        return {"src": self._src, "meta": self._meta, "poz": float(poz), "szunet": self._allapot == MediaPlayerState.PAUSED}
+        return {"src": self._src, "mcid": self._mcid, "meta": self._meta, "poz": float(poz), "szunet": self._allapot == MediaPlayerState.PAUSED}
 
-    @callback
-    def folytat(self, p: dict[str, Any]) -> None:
-        self.uzen({"cmd": "play", "src": p["src"], "meta": p["meta"], "t": time.time()})
+    async def folytat(self, p: dict[str, Any]) -> None:
+        src = p["src"]
+        if p.get("mcid"):                     # friss, aláírt cím (HA-újraindítás után a régi link már érvénytelen)
+            try:
+                kp = kozpont(self.hass)
+                src = kp.forras(await kp.feloldas(p["mcid"], self.entity_id))[0] or src
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Cantabile TV: a cím újrafeloldása nem sikerült (%s)", p["mcid"], exc_info=True)
+        self._src = src
+        self.uzen({"cmd": "play", "src": src, "meta": p["meta"], "t": time.time()})
         self._allapot = MediaPlayerState.PLAYING
 
         @callback
