@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.12.22 – 2026-10-30
 
 - **PAIR** key next to the inputs (speakers with a Bluetooth input, e.g. WiiM): one tap switches the speaker to BT IN and opens a step-by-step guide to connect a phone or tablet – with the speaker's exact Bluetooth name, an “Open” button for the Bluetooth settings on Android, the known (paired) devices, and a live status that shows “✓ Connected: <device>” as soon as it connects (checked every 3 s while the guide is open). It also lists the no-pairing ways over Wi-Fi (Spotify Connect, TIDAL Connect, AirPlay, the card's PHONE tab). On BT IN the INPUT line shows the connected device. Pairing itself always starts on the phone – a web page has no access to Bluetooth.
 - PAIR now also puts the speaker into **pairing mode** (WiiM `btavkenterpair` – the light flashes slowly green), so a new phone / tablet finds it: an already paired speaker only calls back its last device and isn't discoverable otherwise. The guide has a PAIRING MODE key to turn it on again if it timed out. New websocket command `cantabile/bt/pair`.
