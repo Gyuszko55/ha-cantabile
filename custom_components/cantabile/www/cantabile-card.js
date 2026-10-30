@@ -4751,7 +4751,7 @@ class CantabileCard extends HTMLElement {
     sr.querySelectorAll(".mg").forEach((b) => b.classList.toggle("akt", (b.dataset.k === "play" && szalagSzol) || (b.dataset.k === "pause" && szunet)));
     this._infoRajz(a, kaz, szalagSzol || szunet);
     sr.getElementById("mallapot").textContent = szalagSzol ? "PLAY" : szunet ? "PAUSE" : radioSzol ? "RADIO ON" : "STOP";
-    sr.getElementById("vufajta").textContent = !szalagSzol ? "TAPE · NORMAL" : this._jelAllapot === "elemzes" ? (this._config.magno?.vu_kijelzo === "fluor" ? "PEAK · dBFS" : "VU · NORMALIZED") : "VU · SIMULATED";
+    sr.getElementById("vufajta").textContent = !szalagSzol ? "TAPE · NORMAL" : this._vuFelirat();
     this._szalagRajz();
     this._jelFeliratkozas();
     this._animIndit();
@@ -4810,13 +4810,15 @@ class CantabileCard extends HTMLElement {
     // a betöltött kazetta szól-e még – ha közben mást indítottak (hanggal, a Sonos appból, másik eszközről), a kijelzőn
     // a ténylegesen szóló lista / album neve kell, nem a régi kazettáé
     const nasMost = /\/media\/local\//.test(id) || /\/media\/local\//.test(a.media_title || "");
-    const kaz = !kazTarolt || !megy ? kazTarolt
+    // a hangszóró saját bemenetéről (BT IN, LINE IN) szól: a forrás a bemenet, a betöltött kazetta nem szól
+    const bem = megy && hsz && hsz.entity !== HELYI && this._bemenetrol(hsz.entity) ? BEMENET_NEV(a.source) : "";
+    const kaz = bem ? null : !kazTarolt || !megy ? kazTarolt
       : kazTarolt.forras === "nas" ? (nasMost && (!kazTarolt.szamok?.length || this._szamIndex(kazTarolt, a) >= 0) ? kazTarolt : null)
       : kazTarolt.forras === "stream" ? (nasMost ? null : kazTarolt) : kazTarolt;
     const nas = kaz?.forras === "nas" || /\/media\/local\//.test(id) || /\/media\/local\//.test(a.media_title || "");
     const atm = kaz?.atmeneti || /\.cantabile_atmeneti\//.test(`${id} ${a.media_title || ""}`);
     const am = this._atmenetiAll;
-    const forras = atm && (megy || kaz) ? (am && am.kesz < am.db ? `TEMP ↑${am.kesz}/${am.db}` : "TEMP") : megy ? (nas ? "NAS" : SZOLGALTATO[sid] ? SZOLGALTATO[sid].split(" ")[0].toUpperCase() : kaz?.forras === "stream" ? (SZOLG_NEV[kaz.tipus] || "STREAM") : kaz?.forras === "tel" ? "PHONE" : "") : (kaz ? (kaz.forras === "nas" ? "NAS" : kaz.forras === "tel" ? "PHONE" : "STREAM") : "");
+    const forras = bem ? bem : atm && (megy || kaz) ? (am && am.kesz < am.db ? `TEMP ↑${am.kesz}/${am.db}` : "TEMP") : megy ? (nas ? "NAS" : SZOLGALTATO[sid] ? SZOLGALTATO[sid].split(" ")[0].toUpperCase() : kaz?.forras === "stream" ? (SZOLG_NEV[kaz.tipus] || "STREAM") : kaz?.forras === "tel" ? "PHONE" : "") : (kaz ? (kaz.forras === "nas" ? "NAS" : kaz.forras === "tel" ? "PHONE" : "STREAM") : "");
     // állapotsor: hangerő · hangszóró · sorszám · lista · keverés · ismétlés · forrás
     let sorsz = "–/–";
     if (megy && a.queue_size) sorsz = `${String(a.queue_position || 1).padStart(3, "0")}/${String(a.queue_size).padStart(3, "0")}`;
@@ -4837,7 +4839,14 @@ class CantabileCard extends HTMLElement {
     }));
     // cím, előadó · album · minőség
     let cim = "", eloado = "", album = "";
-    if (megy) {
+    const ures = (x) => !x || /^(unknown|unavailable|not provided|none|null)$/i.test(String(x).trim());
+    if (bem) {
+      // a telefon (AVRCP) vagy a lejátszó küldhet címet; ha nem küld, a bemenet neve áll a kazettán
+      cim = ures(a.media_title) ? bem : a.media_title;
+      eloado = ures(a.media_artist) ? "" : a.media_artist;
+      album = ures(a.media_album_name) ? "" : a.media_album_name;
+      if (!eloado && cim.includes(" – ")) [eloado, cim] = cim.split(" – ", 2);
+    } else if (megy) {
       // a WiiM a nyers fájlnevet adja címként (átmeneti feltöltésnél időbélyeg-előtaggal): azt is megtisztítjuk
       const fajlszeru = /^\d{10,}_|\.(mp3|flac|m4a|aac|ogg|opus|wav|wma)$/i.test(a.media_title || "");
       cim = !URLSZERU(a.media_title) && a.media_title && !fajlszeru ? a.media_title : FAJLNEV(a.media_title || id);
@@ -4846,7 +4855,8 @@ class CantabileCard extends HTMLElement {
       if (!a.media_artist && cim.includes(" – ")) [eloado, cim] = cim.split(" – ", 2);
     } else if (kaz) { cim = kaz.cim; eloado = kaz.alcim || ""; album = ""; }
     const f = this._formatum;
-    const minoseg = f?.kodek || SZOLGALTATO[sid] || (forras === "NAS" ? "NAS" : "");
+    const BEM_FORMA = { "BT IN": ["Bluetooth", "A2DP"], "LINE IN": ["Line in", "analog"], "OPT IN": ["Optical", "S/PDIF"], PHONO: ["Phono", "analog"] };
+    const minoseg = bem ? (BEM_FORMA[bem]?.[0] || bem) : f?.kodek || SZOLGALTATO[sid] || (forras === "NAS" ? "NAS" : "");
     sr.getElementById("ablak").classList.toggle("ures", !cim);
     const kcimHtml = `<span class="gord">${ESC(cim || "— EMPTY —")}</span>`;
     const ksorHtml = cim
@@ -4860,7 +4870,8 @@ class CantabileCard extends HTMLElement {
     sr.getElementById("kcim").classList.toggle("dalos", !!this._kazDal);
     // formátum-sor: MP3 | 44.1kHz | 16bit | 320kbps + SQ/HQ jel + szív (Sonos-kedvenc)
     let form = "";
-    if (megy && f) {
+    if (bem) form = (BEM_FORMA[bem] || [bem, "input"]).join(" | ");
+    else if (megy && f) {
       form = [f.kodek, f.khz ? `${String(f.khz).replace(".", ",")}kHz` : "", f.bit ? `${f.bit}bit` : "", f.kbps ? `${f.kbps}kbps` : ""].filter(Boolean).join(" | ");
       const jel = /^(FLAC|ALAC|WAV|PCM.*|APE|WV|DSD.*)$/i.test(f.kodek || "") ? "SQ" : (f.kbps || 0) >= 256 ? "HQ" : "";
       if (jel) form += ` <span class="jel">${jel}</span>`;
@@ -4873,8 +4884,8 @@ class CantabileCard extends HTMLElement {
 
   // a magnó látszik → feliratkozás a választott lejátszó jelére; különben leiratkozás (a szerveren leáll az ffmpeg)
   _jelFeliratkozas() {
-    const kell = this._lathato !== false && this._hangszoro()?.entity !== HELYI && this.isConnected && !!this._hass?.connection && !this._jelHiba;
     const ent = this._hangszoro()?.entity;
+    const kell = this._lathato !== false && ent !== HELYI && this.isConnected && !!this._hass?.connection && !this._jelHiba && !this._bemenetrol(ent);
     if (kell && this._jelEnt === ent) return;
     if (this._jelLeir) {
       this._jelLeir.then((f) => f && f()).catch(() => {});
@@ -4887,12 +4898,20 @@ class CantabileCard extends HTMLElement {
       .catch(() => { this._jelHiba = true; this._jelAllapot = null; this._jelEnt = null; return null; });   // nincs integráció → utánzat
   }
 
+  // a VU fajtája: valódi jel (elemzés) vagy utánzat; a hangszóró saját bemenetéről (BT IN, LINE IN) a hang nem halad át a
+  // szerveren, ott mindig utánzat – a felirat meg is mondja, miért
+  _vuFelirat() {
+    const h = this._hangszoro();
+    if (h && this._bemenetrol(h.entity)) return `${BEMENET_NEV(this._hass?.states[h.entity]?.attributes?.source)} · SIMULATED`;
+    return this._jelAllapot === "elemzes" ? (this._config.magno?.vu_kijelzo === "fluor" ? "PEAK · dBFS" : "VU · NORMALIZED") : "VU · SIMULATED";
+  }
+
   _jelUzenet(m) {
     if (m.allapot) {
       this._jelAllapot = m.allapot;
       if (this._mod !== "magno") this._jelRajz();
       const f = this.shadowRoot.getElementById("vufajta");
-      if (f && this._magnoAllapot?.szol) f.textContent = m.allapot === "elemzes" ? (this._config.magno?.vu_kijelzo === "fluor" ? "PEAK · dBFS" : "VU · NORMALIZED") : "VU · SIMULATED";
+      if (f && this._magnoAllapot?.szol) f.textContent = this._vuFelirat();
     }
     if ("formatum" in m) { this._formatum = m.formatum || null; this._frissit(); }
     if (m.l == null) return;
