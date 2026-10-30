@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Radio: browse with the tuning wheel, save with a long press.** While a NET station plays, the Gyro tuning wheel steps through the Radio Browser list it came from (country, world, genre or search; after a page reload the same query is fetched again): the display shows the station, its format and place (“5/40”), and it starts when you stop turning. A long press on a preset button saves the playing NET station there, overwriting the old one in place (it keeps the button's frequency) with an **Undo** in the message; a long press on an empty slot adds it. Admins only, saved to the same dashboards as ⚙. The result message now also shows after Home Assistant rebuilds the card on save (⚙ too).
 - **Switching speakers with a Music Assistant queue now finds a way to keep playing on any output:**
   - target is a Music Assistant player, or the same device has one (Sonos 1 ↔ its MA player, Technics ↔ WiiM MA, Nest Hub…): Music Assistant moves the queue there, and the selector moves to that MA player if it's on the card;
   - no MA counterpart (a Cantabile TV, BT on this device…) but the track comes from the music folder: Cantabile takes over – the album from the music folder, from the same track and position – and Music Assistant stops;

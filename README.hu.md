@@ -21,6 +21,8 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
 - FM-skála mozgó mutatóval, adógombok, hangerő-forgatógomb, hangoló lendkerék.
 - **NET**: több ezer internetes adó a [Radio Browser](https://www.radio-browser.info) adatbázisából (hazai, világ,
   műfaj, név szerint). Bármelyik adó gombra tehető.
+- NET-adó közben a hangoló lendkerék a lista következő / előző adójára lép, a pörgetés végén az szól. Ha tetszik,
+  egy adógombot hosszan nyomva oda menti – egy régebbit is felülírhat (Visszavon gombbal).
 - SIGNAL-műszer, ami a valódi stream bitrátáját követi.
 
 **Tape deck**

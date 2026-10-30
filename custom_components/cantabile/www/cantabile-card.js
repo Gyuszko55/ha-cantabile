@@ -168,6 +168,16 @@ const EN = {
   "+ gombra": "+ preset",
   "A Radio Browser most nem érhető el: {h}": "Radio Browser is not reachable right now: {h}",
   "„{n}” felvéve – a Mentéssel gombként is megmarad.": "“{n}” added – Save keeps it as a preset.",
+  "Hosszan nyomva a gomb a most szóló NET-adót menti el. Indíts egyet a NET gombbal, aztán a gíró kerékkel lépkedhetsz a lista adói között.": "A long press saves the NET station that is playing to the button. Start one with NET, then the Gyro wheel steps through the list's stations.",
+  "A gombra mentéshez rendszergazdai felhasználó kell.": "Saving to a preset button needs an admin user.",
+  "„{n}” már a(z) {g}. gombon van.": "“{n}” is already on button {g}.",
+  "Mind a 12 gomb foglalt – nyomj hosszan egy foglalt gombot, és felülírja.": "All 12 buttons are taken – long-press one to overwrite it.",
+  "„{n}” a(z) {g}. gombra mentve (helyette: {r}).": "“{n}” saved to button {g} (replacing {r}).",
+  "„{n}” gombra mentve.": "“{n}” saved to a preset button.",
+  "Visszavon": "Undo",
+  "Visszaállítva: „{r}”.": "Restored: “{r}”.",
+  "A Radio Browser most nem érhető el.": "Radio Browser can't be reached right now.",
+  "Üres hely – koppints, és a NET-katalógusból tegyél ide adót; hosszan nyomva a most szóló NET-adót menti ide": "Empty slot – tap to add a station from the NET catalogue; a long press saves the NET station that is playing here",
   "„{n}” felvéve – add meg a frekvenciáját (MHz), majd Mentés.": "“{n}” added – enter its frequency (MHz), then Save.",
   "Keresés…": "Searching…",
   "A keresés nem érhető el: {h}": "Search is not available: {h}",
@@ -454,6 +464,8 @@ const KULSO = -2;
 // Radio Browser: a tükörszerverek listáját a szolgáltatótól kéri (a szerverek cserélődnek), tartaléknak az ismertek
 const RB_ALAP = ["de1", "de2"].map((x) => `https://${x}.api.radio-browser.info`);
 let RB_LISTA = null;
+// mentés után a HA újraépíti a kártyát: az eredményüzenet (és a gombja) az új példányon jelenik meg
+let ATADANDO = null;
 const RB_SZERVEREK = () => (RB_LISTA ||= (async () => {
   const ctl = new AbortController(), ido = setTimeout(() => ctl.abort(), 5000);
   try {
@@ -805,7 +817,7 @@ class CantabileCard extends HTMLElement {
     const ADOHELY = 12;
     const gombok = c.adok.map((a, i) => `
       <button class="bill ado" data-i="${i}"><span class="led"></span><b>${ESC(a.rovid || a.nev)}</b><small>${a.virt ? "WEB" : MHZ(a.frekvencia)}</small></button>`).join("")
-      + Array.from({ length: Math.max(0, ADOHELY - c.adok.length) }, () => `<button class="bill adoures" title="${T("Üres hely – koppints, és a NET-katalógusból tegyél ide adót")}"><span class="plusz">+</span></button>`).join("");
+      + Array.from({ length: Math.max(0, ADOHELY - c.adok.length) }, () => `<button class="bill adoures" title="${T("Üres hely – koppints, és a NET-katalógusból tegyél ide adót; hosszan nyomva a most szóló NET-adót menti ide")}"><span class="plusz">+</span></button>`).join("");
     // kimenetválasztó a Technics RS-M205 „tape select” tolókapcsolóinak mintájára: függőleges kapcsoló a hangszórókhoz
     // (annyi állás, ahány hangszóró), mellette külön kétállású BT kapcsoló; a kiválasztott név félkövér
     const kim = this._kimenetek, hszIdx = kim.map((h, i) => i).filter((i) => kim[i].entity !== HELYI), btIdx = kim.findIndex((h) => h.entity === HELYI);
@@ -1088,6 +1100,9 @@ class CantabileCard extends HTMLElement {
         .bill .led { position: absolute; top: 6px; left: 50%; width: 14px; height: 4px; margin-left: -7px; border-radius: 2px; background: #6b3a35; box-shadow: inset 0 1px 1px rgba(0,0,0,.5); }
         .bill.akt, .bill:active { transform: translateY(4px); box-shadow: 0 1px 0 #80858c, 0 2px 3px rgba(0,0,0,.25); background: linear-gradient(180deg, #e7e9ec, #cfd3d8); }
         .bill.akt .led { background: #ff3b2f; box-shadow: 0 0 6px #ff3b2f; }
+        .bill.ado, .bill.adoures { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+        .bill.ment .led { background: #ffb020; box-shadow: 0 0 6px #ffb020; animation: uzpislog .35s steps(2) infinite; }
+        .bill.adoures.ment .plusz { color: #ffb020; animation: uzpislog .35s steps(2) infinite; }
         .msor { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1.6fr 1fr; gap: 8px; padding: 5px 10px 9px; border-radius: 3px; box-sizing: border-box;
           background: linear-gradient(180deg, #b8bcc1, #d9dcdf); box-shadow: inset 0 2px 4px rgba(0,0,0,.35), 0 1px 0 #fff; }
         .mg { display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 0; border: 0; padding: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -1960,7 +1975,7 @@ class CantabileCard extends HTMLElement {
         <div class="beall" id="beall" hidden></div>
       </ha-card>`;
     const sr = this.shadowRoot;
-    sr.querySelectorAll(".ado").forEach((b) => b.addEventListener("click", () => this._hangol(Number(b.dataset.i))));
+    sr.querySelectorAll(".ado, .adoures").forEach((b) => this._adoGombKezel(b));
     sr.querySelectorAll(".hsz").forEach((b) => b.addEventListener("click", () => this._kimenetValt(Number(b.dataset.i))));
     sr.querySelectorAll(".hszv").forEach((b) => b.addEventListener("click", () => this._kimenetValt(Number(b.dataset.i))));
     const hszLep = (d) => {
@@ -1986,7 +2001,6 @@ class CantabileCard extends HTMLElement {
     sr.getElementById("power").addEventListener("click", () => this._bekapcs());
     sr.getElementById("kcim").addEventListener("click", (e) => { if (this._kazDal) { e.stopPropagation(); this._dalNyit("m"); } });
     sr.getElementById("cim").addEventListener("click", (e) => { if (this._radioDal) { e.stopPropagation(); this._dalNyit("r"); } });
-    sr.querySelectorAll(".adoures").forEach((b) => b.addEventListener("click", () => this._netNyit()));
     this._giroKezel(sr.getElementById("giro"));
     sr.querySelectorAll(".sleep").forEach((b) => b.addEventListener("click", () => this._alvasLep()));
     sr.querySelectorAll(".fgomb").forEach((b) => b.addEventListener("click", () => this._funkGomb(b.dataset.f)));
@@ -2860,15 +2874,84 @@ class CantabileCard extends HTMLElement {
         this._hangoloIdo = setTimeout(() => { this._hangolo = null; this.shadowRoot.getElementById("elo").classList.remove("kezi"); this._frissit(); }, 2500);
       }
     };
-    giro.addEventListener("pointerdown", (e) => { e.stopPropagation(); id = e.pointerId; giro.setPointerCapture(id); x0 = e.clientX; indul(); });
-    giro.addEventListener("pointermove", (e) => { if (x0 == null || e.pointerId !== id) return; const dx = e.clientX - x0; x0 = e.clientX; lep(dx * 0.025); });
-    const fel = (e) => { if (x0 == null || e.pointerId !== id) return; x0 = null; vege(); };
+    // NET-adó szól (a Radio Browserből): a kerék a lista adóin lép (egy fog ≈ 40 px húzás vagy egy görgőkattanás)
+    const netMod = () => !!this._netGiro || (this._radioAll?.szol && this._radioAll.i === KULSO && !this._hangolo);
+    let net = false, gyujt = 0;
+    const netLep = (dx, fog) => {
+      poz += dx; kerek.style.backgroundPositionX = `${poz.toFixed(1)}px`;
+      gyujt += dx;
+      while (Math.abs(gyujt) >= fog) { const d = Math.sign(gyujt); gyujt -= d * fog; this._netGiroLep(d); }
+    };
+    giro.addEventListener("pointerdown", (e) => {
+      e.stopPropagation(); id = e.pointerId; giro.setPointerCapture(id); x0 = e.clientX;
+      net = netMod(); gyujt = 0;
+      if (net) clearTimeout(this._netGiroIdo); else indul();
+    });
+    giro.addEventListener("pointermove", (e) => {
+      if (x0 == null || e.pointerId !== id) return;
+      const dx = e.clientX - x0; x0 = e.clientX;
+      if (net) netLep(dx, 40); else lep(dx * 0.025);
+    });
+    const fel = (e) => { if (x0 == null || e.pointerId !== id) return; x0 = null; if (net) this._netGiroVege(); else vege(); };
     giro.addEventListener("pointerup", fel); giro.addEventListener("pointercancel", fel);
     giro.addEventListener("wheel", (e) => {
-      e.preventDefault(); e.stopPropagation(); indul();
+      e.preventDefault(); e.stopPropagation();
+      if (netMod()) {
+        if (!this._netGiro) gyujt = 0;
+        netLep(Math.max(-100, Math.min(100, e.deltaY || e.deltaX)) * 0.4, 40);
+        this._netGiroVege(1200);
+        return;
+      }
+      indul();
       lep((e.deltaY || e.deltaX) > 0 ? 0.1 : -0.1);
       clearTimeout(this._gorgoIdo); this._gorgoIdo = setTimeout(vege, 700);
     }, { passive: false });
+  }
+
+  // adógomb: koppintás = hangol (üres helyen: NET-katalógus); hosszú nyomás = a most szóló NET-adót menti ide (felülírhatja)
+  _adoGombKezel(b) {
+    let ido = null, hosszu = false;
+    const ures = b.classList.contains("adoures");
+    const le = () => { clearTimeout(ido); ido = null; };
+    b.addEventListener("pointerdown", (e) => {
+      if (e.button) return;
+      hosszu = false; le();
+      ido = setTimeout(() => { ido = null; hosszu = true; navigator.vibrate?.(25); this._gombraMent(ures ? null : Number(b.dataset.i), b); }, 750);
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach((ev) => b.addEventListener(ev, le));
+    b.addEventListener("contextmenu", (e) => e.preventDefault());
+    b.addEventListener("click", (e) => {
+      if (hosszu) { hosszu = false; e.preventDefault(); return; }
+      if (ures) this._netNyit(); else this._hangol(Number(b.dataset.i));
+    });
+  }
+
+  async _gombraMent(i, gomb) {
+    const ra = this._radioAll, k = ra?.szol && ra.i === KULSO ? this._kulso() : null;
+    if (!k?.url) return this._uzen(T("Hosszan nyomva a gomb a most szóló NET-adót menti el. Indíts egyet a NET gombbal, aztán a gíró kerékkel lépkedhetsz a lista adói között."));
+    if (!this._hass?.user?.is_admin) return this._uzen(T("A gombra mentéshez rendszergazdai felhasználó kell."));
+    const c = this._config, nev = String(k.nev || "").trim() || CIM(k.url);
+    const van = c.adok.findIndex((a) => CIM(a.url) === CIM(k.url));
+    if (van >= 0) return this._uzen(T("„{n}” már a(z) {g}. gombon van.", { n: nev, g: van + 1 }));
+    const regiAdok = c.adok.map(({ virt, ...a }) => (virt ? { ...a, frekvencia: "" } : a)), adok = regiAdok.map((a) => ({ ...a }));
+    const regi = i != null ? c.adok[i] : null;
+    // a felülírt gomb a helyén marad (a frekvenciáját örökli); üres helyre a névben szereplő frekvencia, vagy WEB
+    const uj = { nev, url: k.url, frekvencia: regi ? (regi.virt ? "" : regi.frekvencia) : this._savFrek(nev) };
+    if (regi) adok[i] = uj;
+    else if (adok.length >= 12) return this._uzen(T("Mind a 12 gomb foglalt – nyomj hosszan egy foglalt gombot, és felülírja."));
+    else adok.push(uj);
+    gomb?.classList.add("ment");
+    const ok = await this._adokMent(adok, () => regi ? T("„{n}” a(z) {g}. gombra mentve (helyette: {r}).", { n: nev, g: i + 1, r: regi.nev }) : T("„{n}” gombra mentve.", { n: nev }),
+      regi ? { szoveg: T("Visszavon"), fn: (k) => k._adokMent(regiAdok, () => T("Visszaállítva: „{r}”.", { r: regi.nev })) } : null);
+    if (!ok) gomb?.classList.remove("ment");
+  }
+
+  // az adólista mentése a ⚙ mentésével (ugyanazokra a vezérlőpultokra), a beállítások ablaka nélkül
+  _adokMent(adok, kesz, gomb = null) {
+    const c = this._config;
+    this._szerk = JSON.parse(JSON.stringify({ marka: c.marka || "Cantabile", deezer: c.deezer !== false, felulet: c.felulet === "black" ? "black" : "silver",
+      hangszorok: c.hangszorok.map(({ automod, ...h }) => h), adok, magno: c.magno || {} }));
+    return this._beallMent({ kesz, gomb });
   }
 
   _hangoloRajz() {
@@ -3030,8 +3113,10 @@ class CantabileCard extends HTMLElement {
   }
 
   // ellenőrzés, majd a vezérlőpult konfigurációjában ennek a kártyának a helyére írja (lovelace/config/save; rendszergazda kell)
-  async _beallMent() {
+  // `csendes`: gyors mentés (pl. hosszú nyomás egy adógombon) – az eredmény üzenetben, nem a beállítások ablakában
+  async _beallMent(csendes = null) {
     const sz = this._szerk, hibak = [];
+    const hibaUzen = (m) => { if (!csendes) return this._beallRajz(m); this._beallZar(); this._uzen(m); return false; };
     const adok = sz.adok.map((a) => ({ ...a, nev: String(a.nev || "").trim(), rovid: String(a.rovid || "").trim(), url: String(a.url || "").trim(), frekvencia: String(a.frekvencia ?? "").trim() === "" ? NaN : Number(String(a.frekvencia).replace(",", ".")) }));
     adok.forEach((a, i) => {
       if (!a.nev) hibak.push(T("{n}. adó: hiányzik a név", { n: i + 1 }));
@@ -3039,13 +3124,14 @@ class CantabileCard extends HTMLElement {
       if (!/^https?:\/\//.test(a.url)) hibak.push(T("{n}: a stream-cím http:// vagy https:// kezdetű legyen", { n: a.nev || T("{n}. adó", { n: i + 1 }) }));
     });
     const hsz = sz.hangszorok.map((h) => { const o = { nev: String(h.nev || "").trim(), entity: h.entity, mod: h.mod === "sonos" ? "sonos" : "url" }; if (String(h.rovid || "").trim()) o.rovid = String(h.rovid).trim(); return o; });
-    hsz.forEach((h, i) => {
+    // gyors mentésnél a hangszórók változatlanok: azokat nem ellenőrzi (egy régi, túl hosszú név ne akassza meg)
+    if (!csendes) hsz.forEach((h, i) => {
       if (!h.nev || !h.entity) hibak.push(T("{n}. hangszóró: név és lejátszó kell", { n: i + 1 }));
       else if ((h.rovid || "").length > NEV_MAX) hibak.push(T("{n}: a kártyán megjelenő név legfeljebb 8 karakter lehet", { n: h.nev }));
       else if (!h.rovid && h.nev.length > NEV_MAX) hibak.push(T("{n}: a név 8 karakternél hosszabb – adj meg rövidebb nevet a kártyára", { n: h.nev }));
     });
     if (!hsz.length) hibak.push(T("Legalább egy hangszóró kell."));
-    if (hibak.length) return this._beallRajz(hibak.join(" · "));
+    if (hibak.length) return hibaUzen(hibak.join(" · "));
     const magno = {};
     for (const [k, v] of Object.entries(sz.magno || {})) {
       const t = String(v ?? "").trim();
@@ -3094,10 +3180,14 @@ class CantabileCard extends HTMLElement {
       }
       this._beallZar();
       const nevek = mentve.map((u) => lista.find((d) => d.url_path === u)?.title || u || T("Áttekintés")).join(", ");
-      this._uzen(T("Beállítások elmentve: {n}.", { n: nevek }) + (hibas.length ? " " + T("Nem sikerült: {h}.", { h: hibas.map((u) => lista.find((d) => d.url_path === u)?.title || u || T("Áttekintés")).join(", ") }) : ""));
+      const nem = hibas.length ? " " + T("Nem sikerült: {h}.", { h: hibas.map((u) => lista.find((d) => d.url_path === u)?.title || u || T("Áttekintés")).join(", ") }) : "";
+      const uz = (csendes ? csendes.kesz() : T("Beállítások elmentve: {n}.", { n: nevek })) + nem, gomb = csendes?.gomb || null;
+      ATADANDO = { szoveg: uz, gomb, regi: this, ido: Date.now() };
+      this._uzen(uz, gomb);
+      return true;
     } catch (err) {
       const m = String(err?.message || err?.code || err);
-      this._beallRajz(/unauthorized|admin/i.test(m) ? T("A mentéshez rendszergazdai felhasználó kell.") : T("A mentés nem sikerült: {h}", { h: m }));
+      return hibaUzen(/unauthorized|admin/i.test(m) ? T("A mentéshez rendszergazdai felhasználó kell.") : T("A mentés nem sikerült: {h}", { h: m }));
     }
   }
 
@@ -3402,7 +3492,7 @@ class CantabileCard extends HTMLElement {
       reteg.querySelector(".uzablak").addEventListener("click", () => this._uzenZar());
       reteg.querySelector(".uzgombok").addEventListener("click", (e) => {
         const b = e.target.closest(".uzgomb"); if (!b) return;
-        e.stopPropagation(); const f = this._uzenGombok?.[Number(b.dataset.i)]?.fn; this._uzenZar(); f?.();
+        e.stopPropagation(); const f = this._uzenGombok?.[Number(b.dataset.i)]?.fn; this._uzenZar(); f?.(this);
       });
       kartya.appendChild(reteg);
     }
@@ -3751,24 +3841,15 @@ class CantabileCard extends HTMLElement {
     lista.innerHTML = `<div class="puzenet">${T("Betöltés…")}</div>`;
     try {
       let adok;
-      if (nev.length >= 2) adok = await this._rb(`/json/stations/search?name=${encodeURIComponent(nev)}&${q}`);
-      else if (n.ful === "mufaj" && !n.tag) {
+      if (n.ful === "mufaj" && !n.tag && nev.length < 2) {
         const tagek = (await this._rb("/json/tags?order=stationcount&reverse=true&limit=60&hidebroken=true")).filter((t) => t.name && /^[\p{L}0-9 &'-]{2,24}$/u.test(t.name));
         if (most !== kulcs(this._net)) return;
         lista.innerHTML = `<div class="eloadok">${tagek.map((t, i) => `<button data-t="${i}">${ESC(t.name)} <small>${t.stationcount}</small></button>`).join("")}</div>`;
         lista.querySelectorAll("[data-t]").forEach((b) => b.addEventListener("click", () => { n.tag = tagek[Number(b.dataset.t)].name; this._netRajz(); }));
         return;
-      } else if (n.ful === "mufaj") adok = await this._rb(`/json/stations/search?tag=${encodeURIComponent(n.tag)}&tagExact=true&${q}`);
-      else if (n.ful === "hu") adok = await this._rb(`/json/stations/search?countrycode=${this._orszag()}&${q}`);
-      else adok = await this._rb(`/json/stations/search?${q}`);
+      }
+      adok = await this._netLeker(n);
       if (most !== kulcs(this._net)) return;
-      // a HLS (.m3u8) adókat a Sonos nem játssza; az azonos nevű és című ismétlődések kiesnek
-      const latott = new Set();
-      adok = adok.filter((t) => {
-        const u = t.url_resolved || t.url, k = `${(t.name || "").trim().toLowerCase()}|${CIM(u)}`;
-        if (!u || t.hls || /\.m3u8(\?|$)/i.test(u) || latott.has(k)) return false;
-        latott.add(k); return true;
-      }).slice(0, 40);
       if (!adok.length) { lista.innerHTML = `<div class="puzenet">${nev ? T("Nincs találat erre: „{q}”.", { q: ESC(nev) }) : T("Nincs találat.")}</div>`; return; }
       const k = this._radioAll?.i === KULSO ? this._kulso() : null;
       lista.innerHTML = `<div class="netlista">${adok.map((t, i) => {
@@ -3779,11 +3860,86 @@ class CantabileCard extends HTMLElement {
           <button class="ngomb" data-g="${i}" title="${T("Gombra (⚙ beállításokban)")}">${T("+ gombra")}</button></div>`;
       }).join("")}</div>`;
       lista.querySelectorAll(".nlogo img").forEach((im) => im.addEventListener("error", () => im.remove()));
-      lista.querySelectorAll("[data-i]").forEach((b) => b.addEventListener("click", () => this._netIndit(adok[Number(b.dataset.i)])));
+      const sor = { q: { ful: n.ful, tag: n.tag, keres: nev }, adok };
+      lista.querySelectorAll("[data-i]").forEach((b) => b.addEventListener("click", () => { this._netSorAllit(sor); this._netIndit(adok[Number(b.dataset.i)]); }));
       lista.querySelectorAll("[data-g]").forEach((b) => b.addEventListener("click", () => this._netGombra(adok[Number(b.dataset.g)])));
     } catch (err) {
       if (most === kulcs(this._net)) lista.innerHTML = `<div class="puzenet">${T("A Radio Browser most nem érhető el: {h}", { h: ESC(err?.message || err) })}</div>`;
     }
+  }
+
+  // a Radio Browser egy listája (keresés, ország, világ, műfaj) a NET-panel és a gíró kerék közös szűrésével
+  async _netLeker(n) {
+    const q = "hidebroken=true&order=clickcount&reverse=true&limit=60", nev = (n.keres || "").trim();
+    let adok;
+    if (nev.length >= 2) adok = await this._rb(`/json/stations/search?name=${encodeURIComponent(nev)}&${q}`);
+    else if (n.ful === "mufaj" && n.tag) adok = await this._rb(`/json/stations/search?tag=${encodeURIComponent(n.tag)}&tagExact=true&${q}`);
+    else if (n.ful === "vilag") adok = await this._rb(`/json/stations/search?${q}`);
+    else adok = await this._rb(`/json/stations/search?countrycode=${this._orszag()}&${q}`);
+    // a HLS (.m3u8) adókat a Sonos nem játssza; az azonos nevű és című ismétlődések kiesnek
+    const latott = new Set();
+    return adok.filter((t) => {
+      const u = t.url_resolved || t.url, k = `${(t.name || "").trim().toLowerCase()}|${CIM(u)}`;
+      if (!u || t.hls || /\.m3u8(\?|$)/i.test(u) || latott.has(k)) return false;
+      latott.add(k); return true;
+    }).slice(0, 40);
+  }
+
+  // a lista, amelyből a szóló NET-adó jött: ezen lép a gíró kerék (oldalfrissítés után a lekérdezésből újra betölti)
+  _netSorAllit(sor) { this._netSor = sor; TAR.ir("tablet-radio-netsor", JSON.stringify(sor.q)); }
+
+  async _netSorKell() {
+    if (this._netSor?.adok?.length) return this._netSor;
+    const q = TAR.json("tablet-radio-netsor") || { ful: "hu" }, adok = await this._netLeker(q);
+    if (adok.length) this._netSor = { q, adok };
+    return this._netSor;
+  }
+
+  // gíró kerék NET-adón: a lista következő / előző adója; a kijelző mutatja, megállás után (vagy elengedéskor) szól
+  _netGiroLep(d) {
+    const sr = this.shadowRoot;
+    if (!this._netGiro) {
+      const k = this._kulso();
+      this._netGiro = { lep: 0, i: null };
+      sr.getElementById("elo").classList.add("kezi");
+      this._netSorKell().then((sor) => {
+        const g = this._netGiro; if (!g) return;
+        if (!sor) { this._netGiro = null; sr.getElementById("elo").classList.remove("kezi"); this._frissit(); return this._uzen(T("A Radio Browser most nem érhető el.")); }
+        const c = k ? [CIM(k.url), k.alias] : [];
+        g.i0 = sor.adok.findIndex((t) => c.includes(CIM(t.url_resolved || t.url)));
+        g.i = g.i0 < 0 && g.lep > 0 ? g.lep - 1 : g.i0 + g.lep;
+        g.i = ((g.i % sor.adok.length) + sor.adok.length) % sor.adok.length;
+        this._netGiroRajz();
+        if (g.vege) this._netGiroVege();
+      }, () => { this._netGiro = null; sr.getElementById("elo").classList.remove("kezi"); this._frissit(); this._uzen(T("A Radio Browser most nem érhető el.")); });
+    }
+    const g = this._netGiro;
+    g.vege = false; clearTimeout(this._netGiroIdo);
+    if (g.i == null) { g.lep += d; return; }
+    const n = this._netSor.adok.length;
+    g.i = (((g.i + d) % n) + n) % n;
+    this._netGiroRajz();
+  }
+
+  _netGiroRajz() {
+    const g = this._netGiro, sr = this.shadowRoot;
+    if (!g || g.i == null || !sr) return;
+    const l = this._netSor.adok, t = l[g.i], [a, b] = this._sav || SAVOK.std;
+    sr.getElementById("mutato").style.left = `${this._poz(a + ((g.i + 0.5) / l.length) * (b - a))}%`;
+    sr.getElementById("ado").innerHTML = `<b>${ESC((t.name || "").trim())}</b> · NET${t.countrycode ? ` · ${ESC(t.countrycode)}` : ""} · ${g.i + 1}/${l.length}`;
+    sr.getElementById("cim").textContent = [[t.codec, t.bitrate ? `${t.bitrate} kbps` : ""].filter(Boolean).join(" "), (t.tags || "").split(",").filter(Boolean).slice(0, 3).join(", ")].filter(Boolean).join(" · ");
+  }
+
+  // elengedés / görgetés vége: ha másik adón áll, rövid szünet után indítja; ha visszaért a szólóra, csak visszaáll
+  _netGiroVege(kesik = 900) {
+    const g = this._netGiro; if (!g) return;
+    if (g.i == null) { g.vege = true; return; }
+    clearTimeout(this._netGiroIdo);
+    this._netGiroIdo = setTimeout(() => {
+      const t = g.i !== g.i0 ? this._netSor.adok[g.i] : null;
+      this._netGiro = null; this.shadowRoot.getElementById("elo").classList.remove("kezi");
+      if (t) this._netIndit(t); else this._frissit();
+    }, kesik);
   }
 
   // NET-adó indítása a kiválasztott hangszórón; a kártya megjegyzi, hogy felismerje (oldalfrissítés után is)
@@ -5480,6 +5636,11 @@ class CantabileCard extends HTMLElement {
     this._alvasRajz();
     this._jelRajz();
     if (this._hangolo) this._hangoloRajz();
+    if (this._netGiro) this._netGiroRajz();
+    if (ATADANDO && ATADANDO.regi !== this && this.isConnected) {
+      const u = ATADANDO; ATADANDO = null;
+      if (Date.now() - u.ido < 10000) setTimeout(() => this._uzen(u.szoveg, u.gomb), 300);
+    }
 
     // magnó
     const kaz = this._kazetta();

@@ -21,6 +21,8 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
 - FM-style glass dial with a moving pointer, preset buttons, a volume knob and a tuning wheel.
 - **NET**: thousands of internet stations from the [Radio Browser](https://www.radio-browser.info) directory
   (your country, worldwide, by genre, by name). Any station can be put on a preset button.
+- While a NET station plays, the tuning wheel steps to the next / previous station of its list; it starts when you
+  stop turning. Like it? A long press on a preset button saves it there – also over an older station (with Undo).
 - SIGNAL meter that follows the real stream bitrate.
 
 **Cassette deck**
