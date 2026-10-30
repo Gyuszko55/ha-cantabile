@@ -17,6 +17,9 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
 
 ## Mit tud
 
+**Zenetár** – füstüveg ablak: KERESÉS mindenhol · ELŐADÓK (zenemappa + Music Assistant + Deezer; az előadó lapján
+keverés, előadó-rádió, hasonló előadók) · MŰFAJOK · FORRÁSOK (minden forrás külön) · QUEUE.
+
 **Rádió**
 - FM-skála mozgó mutatóval, adógombok, hangerő-forgatógomb, hangoló lendkerék.
 - **NET**: több ezer internetes adó a [Radio Browser](https://www.radio-browser.info) adatbázisából (hazai, világ,

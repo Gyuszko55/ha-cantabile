@@ -17,6 +17,9 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
 
 ## What you get
 
+**Library** – a smoked-glass window: SEARCH everywhere · ARTISTS (music folder + Music Assistant + Deezer, artist page with
+shuffle, artist radio and similar artists) · GENRES · SOURCES (each source on its own) · QUEUE.
+
 **Radio**
 - FM-style glass dial with a moving pointer, preset buttons, a volume knob and a tuning wheel.
 - **NET**: thousands of internet stations from the [Radio Browser](https://www.radio-browser.info) directory
