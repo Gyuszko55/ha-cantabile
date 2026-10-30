@@ -185,6 +185,34 @@ const EN = {
   "Sor végére": "Add to end of queue",
   "ELŐADÓK": "ARTISTS",
   "MŰFAJOK": "GENRES",
+  "LISTÁK": "PLAYLISTS",
+  "A lista hangszórón szól, nem ezen a készüléken – válassz hangszórót.": "Playlists play on a speaker, not on this device – pick a speaker.",
+  "Listák": "Playlists",
+  "SAJÁT LISTÁK": "MY PLAYLISTS",
+  "＋ ÚJ LISTA": "＋ NEW PLAYLIST",
+  "＋ A MOST SZÓLÓ SZÁM": "＋ THE TRACK PLAYING",
+  "＋ A TELJES SOR": "＋ THE WHOLE QUEUE",
+  "Új lista neve": "New playlist name",
+  "LÉTREHOZÁS": "CREATE",
+  "HOZZÁADÁS LISTÁHOZ · {n} szám": "ADD TO PLAYLIST · {n} tracks",
+  "Mégse": "Cancel",
+  "Most nem szól semmi, amit listába lehetne tenni.": "Nothing is playing that could go on a playlist.",
+  "{n} szám hozzáadva: „{l}”.": "{n} tracks added to “{l}”.",
+  "Még nincs saját lista. Hozz létre egyet, vagy tedd listába a most szóló számot.": "No playlists yet. Create one, or add the track that's playing.",
+  "{n} szám": "{n} tracks",
+  "▶ LEJÁTSZÁS": "▶ PLAY",
+  "ÁTNEVEZÉS": "RENAME",
+  "TÖRLÉS": "DELETE",
+  "Biztos? Koppints újra": "Sure? Tap again",
+  "Üres lista.": "Empty playlist.",
+  "Ezen a hangszórón {n} szám szól, {k} kimarad ({m}).": "On this speaker {n} tracks play, {k} are skipped ({m}).",
+  "Sonoson a zenemappa és a Deezer szól": "Sonos plays the music folder and Deezer",
+  "Music Assistant-lejátszón az MA számai szólnak": "a Music Assistant player plays the MA tracks",
+  "ezen a hangszórón csak a zenemappa szól": "this speaker plays only the music folder",
+  "Ennek a listának egyik száma sem szól ezen a hangszórón.": "None of this playlist's tracks play on this speaker.",
+  "A lista nem indult: {h}": "The playlist didn't start: {h}",
+  "A Deezer Flow és a mixek a Music Assistant felületén ♥-vel kerülnek ide (Böngészés → Deezer).": "Deezer Flow and mixes show up here once you ♥ them in Music Assistant (Browse → Deezer).",
+  "SONOS KEDVENCEK": "SONOS FAVOURITES",
   "Végtelen keverés · vendégkívánságok": "Endless mix · guest requests",
   "Végtelen keverés a zenemappából: ugyanaz a szám sokáig nem jön újra, ugyanaz az előadó nem jön kétszer egymás után. Akkor is szól, ha a kártyát bezárod. A vendégek a telefonjukkal kérhetnek számot (QR-kód).": "Endless mix from the music folder: the same track won't come back for a long time, the same artist never twice in a row. It keeps playing when you close the card. Guests can request songs from their phones (QR code).",
   "MIBŐL SZÓLJON?": "PLAY FROM",
@@ -239,6 +267,7 @@ const EN = {
   "ALBUMOK": "ALBUMS",
   "SZÁMOK": "TRACKS",
   "LISTÁK": "PLAYLISTS",
+  "A lista hangszórón szól, nem ezen a készüléken – válassz hangszórót.": "Playlists play on a speaker, not on this device – pick a speaker.",
   "Keverés közben a „következőnek” és a „sor végére” nem érhető el (a Sonos véletlen helyre tenné).": "While shuffling, “play next” and “add to end” are not available (Sonos would insert at a random place).",
   "A Deezer csak Sonos hangszórón szól – válts Sonos hangszóróra.": "Deezer only plays on Sonos speakers – switch to a Sonos speaker.",
   "Keresés a Deezeren…": "Search Deezer…",
@@ -1634,6 +1663,27 @@ class CantabileCard extends HTMLElement {
         .pval button { border-color: rgba(255,176,32,.3); background: rgba(255,176,32,.05); }
         .pval button.akt { background: rgba(255,176,32,.2); border-color: rgba(255,176,32,.8); color: #ffe2a8; }
         :host([keskeny]) .party { grid-template-columns: 1fr; }
+        .mcs.luj { background: rgba(255,176,32,.06); border: 1px dashed rgba(255,176,32,.55); box-shadow: none; }
+        .mcs.luj::after { display: none; }
+        .mcs.luj .mcsn b { color: #ffcf7a; text-shadow: none; }
+        .lfelso { gap: 6px; margin: 0 0 2px; }
+        .lfelso:empty { display: none; }
+        .lfelso .uzgomb { margin: 0; }
+        .lvalaszt { display: grid; gap: 10px; }
+        .ltetel { display: grid; gap: 2px; color: #c9bfa9; font: 500 calc(12px * var(--bk, 1))/1.35 "Cantabile Sans", Arial, sans-serif; }
+        .lujsor { display: flex; gap: 6px; align-items: center; }
+        .lujsor .pkeres { flex: 1; min-width: 0; }
+        .lujsor .uzgomb { margin: 0; white-space: nowrap; }
+        .lelemek { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px; margin-top: 10px; }
+        .lelem { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px; }
+        .lelem > button:first-child { display: flex; align-items: center; gap: 8px; text-align: left; border: 0; border-radius: 3px; padding: 6px 8px; cursor: pointer;
+          background: rgba(255,255,255,.05); color: #f3e8d4; min-width: 0; }
+        .lelem > button:first-child span { min-width: 0; display: grid; }
+        .lelem b { font: 600 calc(12.5px * var(--bk, 1))/1.25 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lelem small { color: #a88f6b; font: 500 calc(11px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lelem.nem { opacity: .45; }
+        .lelem .sm { border: 0; border-radius: 3px; background: rgba(255,255,255,.06); color: #cdb995; cursor: pointer; padding: 0 9px; }
+        .enev b .pkeres { font-size: calc(15px * var(--bk, 1)); }
         .mcsempek { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
         .mcs { position: relative; height: 74px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; overflow: hidden; cursor: pointer; padding: 0; text-align: left;
           background: radial-gradient(circle at 80% 20%, rgba(255,255,255,.25), transparent 60%), var(--c, #555); box-shadow: 0 4px 10px rgba(0,0,0,.4); -webkit-tap-highlight-color: transparent; }
@@ -2705,6 +2755,12 @@ class CantabileCard extends HTMLElement {
         return;
       }
     }
+    // saját lista: az új hangszórón indul (ott az szól belőle, amit az tud)
+    if (pk?.lista && pk.entity === regi.entity && uj.entity !== HELYI && (SZOL(this._allapot(regi)) || SZUNETEL(this._allapot(regi)))) {
+      await this._hiv("media_player", "media_stop", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
+      this._hass.callWS({ type: "cantabile/lock/release", entity_id: regi.entity }).catch(() => {});
+      return this._listaJatszik(pk.lista, pk.cim, 0, uj);
+    }
     // Music Assistant sora: megkeressük, hogyan szólhat tovább az új kimeneten –
     //  1. MA-lejátszó, vagy a cél készüléknek van MA-párja (Sonos 1 ↔ Sonos MA, Technics ↔ WiiM MA): az MA viszi át;
     //  2. nincs MA-pár (TV, BT…), de a szám a zenemappából szól: a Cantabile veszi át ugyanattól a számtól és ponttól;
@@ -3495,6 +3551,7 @@ class CantabileCard extends HTMLElement {
 
   // kazetta betöltése: {cim, alcim, forras: stream|nas, id, tipus, szamok?}
   async _betolt(kaz, kezdo = 0) {
+    if (kaz.lista) return this._listaJatszik(kaz.lista, kaz.cim, kezdo);
     const hsz = this._hangszoro(), h = this._hass, e = { entity_id: hsz.entity };
     if (hsz.entity !== HELYI && h?.states[hsz.entity]?.state === "unavailable") return this._nemElerheto(hsz.entity);
     if (!kaz.atmeneti) this._atmenetiAll = null;     // új kazetta: a háttérben futó átmeneti feltöltés leáll
@@ -3635,7 +3692,7 @@ class CantabileCard extends HTMLElement {
   _polcNyit() {
     if (this._mod !== "magno") { this._mod = "magno"; this._frissit(); }
     const ful = TAR.olvas("tablet-magno-ful");
-    const lehet = ["eloado", "mind", "party", "nas", "tel", ...(this._config.magno?.nas || this._config.deezer !== false ? ["mufaj"] : []), ...(this._vanSonos() ? ["stream", ...(this._config.deezer !== false ? ["deezer"] : [])] : []), ...["spotify", "tidal"].filter((x) => this._szolgLatszik(x)), ...(this._maInfo?.available ? ["ma"] : [])];
+    const lehet = ["eloado", "mind", "party", "listak", "nas", "tel", ...(this._config.magno?.nas || this._config.deezer !== false ? ["mufaj"] : []), ...(this._vanSonos() ? ["stream", ...(this._config.deezer !== false ? ["deezer"] : [])] : []), ...["spotify", "tidal"].filter((x) => this._szolgLatszik(x)), ...(this._maInfo?.available ? ["ma"] : [])];
     this._polc = { ful: lehet.includes(ful) ? ful : this._vanSonos() ? "stream" : "nas", ut: [] };
     this._polcRajz();
     // a Music Assistant (ha van) fülét az első megnyitáskor tudjuk meg: utána megjelenik a fejlécben
@@ -4758,6 +4815,7 @@ class CantabileCard extends HTMLElement {
       ? `<button data-vissza>${T("‹ Vissza")}</button>${ESC(pl.ut.map((x) => x.cim).join(" › "))}`
       : pl.ful === "sor" ? ""
       : pl.ful === "party" ? T("Végtelen keverés · vendégkívánságok")
+      : pl.ful === "listak" ? (pl.ut.length ? `<button data-vissza>${T("‹ Vissza")}</button>${ESC(pl.ut[0].cim)}` : T("Listák"))
       : pl.ful === "mufaj" ? (pl.ut.length ? `<button data-vissza>${T("‹ Vissza")}</button>${ESC(pl.ut[0].cim)}` : T("Műfajok"))
       : pl.ful === "mind" ? `<input class="pkeres" id="pkeres" type="search" enterkeyhint="search" autocomplete="off" placeholder="${T("Keresés mindenhol…")}" value="${ESC(pl.keres || "")}">`
       : pl.ful === "wiim" ? T("WiiM-presetek")
@@ -4774,6 +4832,7 @@ class CantabileCard extends HTMLElement {
         <button class="pful ${pl.ful === "eloado" ? "akt" : ""}" data-ful="eloado">${T("ELŐADÓK")}</button>
         ${nasGyoker || this._config.deezer !== false ? `<button class="pful ${pl.ful === "mufaj" ? "akt" : ""}" data-ful="mufaj">${T("MŰFAJOK")}</button>` : ""}
         ${nasGyoker ? `<button class="pful ${pl.ful === "party" ? "akt" : ""}" data-ful="party">PARTY</button>` : ""}
+        <button class="pful ${pl.ful === "listak" ? "akt" : ""}" data-ful="listak">${T("LISTÁK")}</button>
         <button class="pful ${forrasban ? "akt" : ""}" data-ful="forras">${T("FORRÁSOK")}<i class="pnyil"></i></button>
         <button class="pful ${pl.ful === "sor" ? "akt" : ""}" data-ful="sor">QUEUE</button>
         <div class="put">${ut}</div>
@@ -4818,6 +4877,7 @@ class CantabileCard extends HTMLElement {
     if (pl.ful === "mind") return this._mindRajz(lista);
     if (pl.ful === "eloado") return this._eloadoRajz(lista);
     if (pl.ful === "party") return this._partyRajz(lista);
+    if (pl.ful === "listak") return this._listakRajz(lista);
     if (pl.ful === "ma") return this._maRajz(lista);
     if (pl.ful === "deezer") return this._deezerRajz(lista);
     if (szolg) return this._szolgRajz(lista, pl.ful);
@@ -5073,6 +5133,152 @@ class CantabileCard extends HTMLElement {
       this._polcZar();
       this._betolt({ cim: T("{e} rádió", { e: e.cim }), alcim: T("{n} szám · hasonlók is", { n: t.length }), forras: "stream", tipus: "deezer", id: t[0].link, szamok: t.map((x) => x.link), kep: e.kep || null });
     } catch (err) { this._uzen(T("A Deezer most nem érhető el: {h}", { h: err?.message || err })); }
+  }
+
+  // ---- LISTÁK (listak.py): saját listák vegyes forrásból, az MA (és rajta a Deezer) listái, Sonos-kedvencek ----
+  _listaKepes(hsz) {
+    if (this._maLejatszo(hsz?.entity)) return { t: ["ma"], m: T("Music Assistant-lejátszón az MA számai szólnak") };
+    if (hsz?.mod === "sonos") return { t: ["nas", "dz"], m: T("Sonoson a zenemappa és a Deezer szól") };
+    return { t: ["nas"], m: T("ezen a hangszórón csak a zenemappa szól") };
+  }
+
+  async _listaJatszik(lid, nev, kezdo = 0, hsz = this._hangszoro()) {
+    if (!hsz || hsz.entity === HELYI) return this._uzen(T("A lista hangszórón szól, nem ezen a készüléken – válassz hangszórót."));
+    const fr = this._foglaloIds(hsz.tagok || [hsz.entity]);
+    if (fr) return this._foglaltUzen(fr);
+    this._szkriptLeallit();
+    let r;
+    try {
+      r = await this._hass.callWS({ type: "cantabile/list/play", lista: lid, entity_id: hsz.entity, tagok: hsz.tagok || [hsz.entity], mod: hsz.mod === "sonos" ? "sonos" : "url",
+        kezdo, hires: this._config.magno?.hires || null, mappa: String(this._config.magno?.nas || "").replace(/\/$/, "") || null, device: ESZKOZ() });
+    } catch (err) {
+      const m = String(err?.message || err);
+      return this._uzen(m.startsWith("busy:") ? T("A(z) {h} foglalt: {n} használja.", { h: KN(hsz), n: m.slice(5) })
+        : m === "nothing_playable" ? T("Ennek a listának egyik száma sem szól ezen a hangszórón.") : T("A lista nem indult: {h}", { h: m }));
+    }
+    TAR.ir("tablet-magno-kazetta", JSON.stringify({ cim: nev, alcim: T("{n} szám", { n: r.szol }), forras: "lista", lista: lid, id: lid, entity: hsz.entity }));
+    if (this._mod !== "magno") { this._mod = "magno"; TAR.ir("tablet-radio-mod", this._mod); }
+    if (r.kimaradt) this._uzen(T("Ezen a hangszórón {n} szám szól, {k} kimarad ({m}).", { n: r.szol, k: r.kimaradt, m: this._listaKepes(hsz).m }));
+    this._polcZar();
+    this._frissit();
+  }
+
+  // hozzáadás egy listához: a meglévők közül, vagy új néven
+  async _listaValaszto(lista, elemek) {
+    const pl = this._polc;
+    let r;
+    try { r = await this._hass.callWS({ type: "cantabile/lists" }); } catch (err) { return this._uzen(T("Hiba: {h}", { h: err?.message || err })); }
+    lista.innerHTML = `<div class="lvalaszt">
+        <h5 class="kcsop"><i class="fp f-dz"></i>${ESC(T("HOZZÁADÁS LISTÁHOZ · {n} szám", { n: elemek.length }))}</h5>
+        <div class="ltetel">${elemek.slice(0, 3).map((x) => `<span>${ESC([x.eloado, x.cim].filter(Boolean).join(" – "))}</span>`).join("")}${elemek.length > 3 ? `<span>…</span>` : ""}</div>
+        <div class="malcim pval">${r.listak.map((x, i) => `<button data-li="${i}">${ESC(x.nev)} <small>${x.db}</small></button>`).join("")}</div>
+        <div class="lujsor"><input class="pkeres" id="lujnev" maxlength="60" placeholder="${T("Új lista neve")}"><button class="uzgomb" data-luj>${T("LÉTREHOZÁS")}</button><button class="uzgomb" data-lmegse>${T("Mégse")}</button></div>
+      </div>`;
+    const kesz = (nev, db) => { this._uzen(T("{n} szám hozzáadva: „{l}”.", { n: db, l: nev })); if (this._polc === pl) this._listakRajz(lista); };
+    lista.querySelectorAll("[data-li]").forEach((b) => b.addEventListener("click", async () => {
+      const x = r.listak[Number(b.dataset.li)];
+      try { const v = await this._hass.callWS({ type: "cantabile/list/add", lista: x.id, elemek }); kesz(x.nev, v.hozzaadva); } catch (err) { this._uzen(T("Hiba: {h}", { h: err?.message || err })); }
+    }));
+    const inp = lista.querySelector("#lujnev");
+    lista.querySelector("[data-luj]").addEventListener("click", async () => {
+      const nev = inp.value.trim(); if (!nev) return inp.focus();
+      try { await this._hass.callWS({ type: "cantabile/list/create", nev, elemek }); kesz(nev, elemek.length); } catch (err) { this._uzen(T("Hiba: {h}", { h: err?.message || err })); }
+    });
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") lista.querySelector("[data-luj]").click(); });
+    lista.querySelector("[data-lmegse]").addEventListener("click", () => this._listakRajz(lista));
+  }
+
+  async _listakRajz(lista) {
+    const pl = this._polc; if (!pl) return;
+    const hely = pl.ut[pl.ut.length - 1];
+    const friss = () => this._polc === pl && pl.ful === "listak" && pl.ut[pl.ut.length - 1] === hely && lista.isConnected;
+    if (hely) return this._listaLap(lista, hely, friss);
+    const hsz = this._hangszoro(), szol = hsz && hsz.entity !== HELYI && (SZOL(this._allapot(hsz)) || SZUNETEL(this._allapot(hsz)));
+    let r;
+    try { r = await this._hass.callWS({ type: "cantabile/lists" }); }
+    catch (err) { if (friss()) lista.innerHTML = `<div class="puzenet">${T("Hiba: {h}", { h: ESC(err?.message || err) })}</div>`; return; }
+    if (!friss()) return;
+    const pont = (f) => f.map((t) => `<i class="fp f-${t}"></i>`).join("");
+    lista.innerHTML = `<div class="tsor lfelso">${szol ? `<button class="uzgomb" data-ln="1">${T("＋ A MOST SZÓLÓ SZÁM")}</button><button class="uzgomb" data-ln="2">${T("＋ A TELJES SOR")}</button>` : ""}</div>
+      <h5 class="kcsop"><i class="fp f-nas"></i>${T("SAJÁT LISTÁK")}<span>${r.listak.length}</span></h5>
+      <div class="mcsempek">${r.listak.map((x, i) => `<button class="mcs" data-l="${i}" style="--c:${SZIN(x.nev)}">${x.kep ? `<img src="${ESC(x.kep)}" alt="" loading="lazy">` : ""}
+          <span class="mcsn"><b>${ESC(x.nev)}</b><small>${pont(x.forrasok)}${ESC(T("{n} szám", { n: x.db }))}${x.gazda_nev ? ` · ${ESC(x.gazda_nev)}` : ""}</small></span></button>`).join("")}
+        <button class="mcs luj" data-luj><span class="mcsn"><b>${T("＋ ÚJ LISTA")}</b></span></button></div>
+      ${r.listak.length ? "" : `<div class="puzenet">${T("Még nincs saját lista. Hozz létre egyet, vagy tedd listába a most szóló számot.")}</div>`}
+      <div class="eszak" data-sz="ma"></div><div class="eszak" data-sz="sonos"></div>`;
+    lista.querySelectorAll("[data-l]").forEach((b) => b.addEventListener("click", () => { const x = r.listak[Number(b.dataset.l)]; pl.ut = [{ id: x.id, cim: x.nev }]; this._polcRajz(); }));
+    lista.querySelector("[data-luj]").addEventListener("click", () => this._listaValaszto(lista, []));
+    lista.querySelectorAll("[data-ln]").forEach((b) => b.addEventListener("click", async () => {
+      let v;
+      try { v = await this._hass.callWS({ type: "cantabile/list/now", entity_id: hsz.entity, mind: b.dataset.ln === "2" }); } catch (err) { return this._uzen(T("Hiba: {h}", { h: err?.message || err })); }
+      if (!v.elemek.length) return this._uzen(T("Most nem szól semmi, amit listába lehetne tenni."));
+      this._listaValaszto(lista, v.elemek);
+    }));
+    // a Music Assistant listái (köztük a Deezer kedvencei) és a Sonos-kedvencek
+    const fej = (k, cim, db) => `<h5 class="kcsop"><i class="fp f-${k}"></i>${cim}<span>${db}</span></h5>`;
+    await this._maInfoLeker();
+    if (this._maInfo?.available) {
+      try {
+        const l = ((await this._maMind("playlist")).items || []).filter((x) => x.name);
+        if (friss() && l.length) {
+          const sz = lista.querySelector('[data-sz="ma"]');
+          sz.innerHTML = fej("ma", "MUSIC ASSISTANT · DEEZER", l.length) + `<div class="kazettak">${l.map((x, i) => this._kazettaCsempe({ cim: x.name, alcim: T("lejátszási lista"), kep: x.image }, i)).join("")}</div>`
+            + `<div class="puzenet">${T("A Deezer Flow és a mixek a Music Assistant felületén ♥-vel kerülnek ide (Böngészés → Deezer).")}</div>`;
+          sz.querySelectorAll(".kt").forEach((b) => b.addEventListener("click", () => this._maJatszik(l[Number(b.dataset.i)])));
+        }
+      } catch (_) { /* az MA most nem érhető el */ }
+    }
+    if (this._vanSonos()) {
+      try {
+        const k = (await this._streamKazettak()).filter((x) => x.alcim === T("lejátszási lista"));
+        if (friss() && k.length) {
+          const sz = lista.querySelector('[data-sz="sonos"]');
+          sz.innerHTML = fej("dz", T("SONOS KEDVENCEK"), k.length) + `<div class="kazettak">${k.map((x, i) => this._kazettaCsempe(x, i)).join("")}</div>`;
+          sz.querySelectorAll(".kt").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._betolt(k[Number(b.dataset.i)]); }));
+        }
+      } catch (_) { /* nincs Sonos-kedvenc */ }
+    }
+  }
+
+  async _listaLap(lista, hely, friss) {
+    let l;
+    try { l = await this._hass.callWS({ type: "cantabile/list/get", lista: hely.id }); }
+    catch (err) { if (friss()) lista.innerHTML = `<div class="puzenet">${T("Hiba: {h}", { h: ESC(err?.message || err) })}</div>`; return; }
+    if (!friss()) return;
+    const hsz = this._hangszoro(), kepes = this._listaKepes(hsz), jo = l.elemek.filter((x) => kepes.t.includes(x.t)).length;
+    const nev = { nas: "NAS", dz: "DEEZER", ma: "MA" }, db = (t) => l.elemek.filter((x) => x.t === t).length;
+    lista.innerHTML = `<div class="ehos" style="--c:${SZIN(l.nev)}">
+        <div class="ekep">${l.kep ? `<img src="${ESC(l.kep)}" alt="">` : `<span>${ESC(l.nev.slice(0, 2).toUpperCase())}</span>`}</div>
+        <div class="enev"><small>PLAYLIST${l.gazda_nev ? ` · ${ESC(l.gazda_nev)}` : ""}</small><b>${ESC(l.nev)}</b><span class="echip">${["nas", "dz", "ma"].filter(db).map((t) => `<i class="f-${t}">${nev[t]} ${db(t)}</i>`).join("")}</span></div>
+        <div class="egomb">${l.elemek.length ? `<button class="uzgomb" data-la="play">${T("▶ LEJÁTSZÁS")}</button>` : ""}${l.sajat ? `<button class="uzgomb" data-la="atnev">${T("ÁTNEVEZÉS")}</button><button class="uzgomb pvege" data-la="torol">${T("TÖRLÉS")}</button>` : ""}</div>
+      </div>
+      ${l.elemek.length && jo < l.elemek.length ? `<div class="puzenet">${ESC(T("Ezen a hangszórón {n} szám szól, {k} kimarad ({m}).", { n: jo, k: l.elemek.length - jo, m: kepes.m }))}</div>` : ""}
+      ${l.elemek.length ? `<div class="lelemek">${l.elemek.map((x, i) => `<div class="lelem${kepes.t.includes(x.t) ? "" : " nem"}"><button data-le="${i}"><i class="fp f-${x.t}"></i><span><b>${ESC(x.cim || x.id.split("/").pop())}</b><small>${ESC(x.eloado || nev[x.t])}</small></span></button>${l.sajat ? `<button class="sm" data-lx="${i}" title="${T("Törlés")}">×</button>` : ""}</div>`).join("")}</div>`
+        : `<div class="puzenet">${T("Üres lista.")}</div>`}`;
+    lista.querySelector('[data-la="play"]')?.addEventListener("click", () => this._listaJatszik(l.id, l.nev, 0));
+    lista.querySelectorAll("[data-le]").forEach((b) => b.addEventListener("click", () => this._listaJatszik(l.id, l.nev, Number(b.dataset.le))));
+    lista.querySelectorAll("[data-lx]").forEach((b) => b.addEventListener("click", async () => {
+      try { await this._hass.callWS({ type: "cantabile/list/remove", lista: l.id, index: Number(b.dataset.lx) }); } catch (err) { return this._uzen(T("Hiba: {h}", { h: err?.message || err })); }
+      this._listaLap(lista, hely, friss);
+    }));
+    lista.querySelector('[data-la="atnev"]')?.addEventListener("click", () => {
+      const b = lista.querySelector(".enev b");
+      b.innerHTML = `<input class="pkeres" id="latnev" maxlength="60" value="${ESC(l.nev)}">`;
+      const inp = b.querySelector("input"); inp.focus(); inp.select();
+      const ment = async () => {
+        const v = inp.value.trim();
+        if (v && v !== l.nev) { try { await this._hass.callWS({ type: "cantabile/list/rename", lista: l.id, nev: v }); hely.cim = v; } catch (err) { this._uzen(T("Hiba: {h}", { h: err?.message || err })); } }
+        this._polcRajz();
+      };
+      inp.addEventListener("keydown", (e) => { if (e.key === "Enter") ment(); if (e.key === "Escape") this._polcRajz(); });
+      inp.addEventListener("blur", ment);
+    });
+    lista.querySelector('[data-la="torol"]')?.addEventListener("click", async (ev) => {
+      const b = ev.currentTarget;
+      if (!b.classList.contains("biztos")) { b.classList.add("biztos"); b.textContent = T("Biztos? Koppints újra"); return; }
+      try { await this._hass.callWS({ type: "cantabile/list/delete", lista: l.id }); } catch (err) { return this._uzen(T("Hiba: {h}", { h: err?.message || err })); }
+      this._polc.ut = []; this._polcRajz();
+    });
   }
 
   // ---- PARTY (party.py): végtelen keverés a zenemappából a szerveren, vendégkívánságok QR-kóddal ----
