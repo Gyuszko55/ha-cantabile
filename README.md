@@ -69,7 +69,7 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
   > the speaker in the phone's Bluetooth settings (or the speaker's app, e.g. WiiM Home); BT IN only switches the
   > speaker to its Bluetooth input, and what plays into it is chosen on the phone.
 - **PAIR** (next to the inputs, WiiM): switches to BT IN and guides you through connecting the phone / tablet – the
-  speaker's Bluetooth name, an *Open* button for the Bluetooth settings on Android, the known devices and a live
+  speaker's Bluetooth name, pairing mode switched on by itself (the light flashes green), an *Open* button for the Bluetooth settings on Android, the known devices and a live
   “✓ Connected” status.
 - **EQ** (second tab of the panel, WiiM): a graphic equalizer with ten sliders, the WiiM's built-in sounds and your own
   **profiles** (STORE / DEL, shared by every card), plus **AUTO**: a profile per source (radio, NAS, Deezer, BT IN…) and

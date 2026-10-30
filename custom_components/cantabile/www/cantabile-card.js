@@ -340,13 +340,16 @@ const EN = {
   "még nincs": "none yet",
   "Átváltás Bluetooth-bemenetre…": "Switching to the Bluetooth input…",
   "✓ Csatlakozott: {n} – indítsd a zenét az eszközön, a(z) {h} szól.": "✓ Connected: {n} – start the music on the device, {h} plays it.",
-  "A(z) {h} most látható és párosítható – várja az eszközt.": "{h} is now visible and can be paired – waiting for the device.",
   "A telefonon / tableten nyisd meg a Bluetooth-beállításokat": "On the phone / tablet, open the Bluetooth settings",
   "Megnyitás": "Open",
   "Válaszd ki a listából:": "Pick from the list:",
   "(első alkalommal: párosítás).": "(the first time: pair).",
   "Indítsd a zenét az eszköz bármelyik appjában – a hang a hangszóróból szól. A kártyán a kazetta „BT IN”-t mutat.": "Start the music in any app on the device – the sound comes from the speaker. On the card the cassette shows “BT IN”.",
   "ISMERT ESZKÖZÖK": "KNOWN DEVICES",
+  "Előbb a csatlakozott eszközön kapcsold ki a Bluetooth-t.": "First turn off Bluetooth on the connected device.",
+  "Párosítási mód: a(z) {h} most látható (a fénye lassan villog zölden) – várja az eszközt.": "Pairing mode: {h} is visible now (its light slowly flashes green) – waiting for the device.",
+  "A(z) {h} Bluetooth-bemeneten várja az eszközt.": "{h} is on its Bluetooth input, waiting for the device.",
+  "(első alkalommal: párosítás). Ha nem látszik, frissítsd a listát, vagy kapcsold be újra a párosítási módot:": "(the first time: pair). If it isn't listed, refresh the list or turn pairing mode on again:",
   "A(z) {h} egyszerre csak egy eszközt fogad, és most ez csatlakozik: {n}. Ha nem erről akarsz zenét küldeni, előbb ezen az eszközön kapcsold ki a Bluetooth-t (vagy a Bluetooth-beállításaiban bontsd a kapcsolatot) – addig a többi eszköz nem is látja a hangszórót. A hangszóró maga nem tudja leválasztani.": "{h} takes only one device at a time, and {n} is connected now. If you want to play from another device, first turn off Bluetooth on this one (or disconnect it in its Bluetooth settings) – until then other devices can't even see the speaker. The speaker itself can't disconnect it.",
   "Párosítás nélkül, Wi-Fi-n: a zenei app hangszóró-ikonjával (Spotify Connect, TIDAL Connect, AirPlay) válaszd a(z) {n} hangszórót; vagy a kártya PHONE fülén játszd le az eszköz saját fájljait.": "Without pairing, over Wi-Fi: pick {n} with the music app's speaker icon (Spotify Connect, TIDAL Connect, AirPlay); or play the device's own files from the card's PHONE tab.",
   "A(z) {h} a(z) {b} bemenetről szólt – ez nem vihető át, szüneteltettem. Ha visszaváltasz rá, onnan folytatja.": "{h} was playing from its {b} input – that can't be moved, so it's paused. Switch back to it and it carries on."
@@ -1700,6 +1703,9 @@ class CantabileCard extends HTMLElement {
         .fbtlep b { font-weight: 700; color: #000; }
         .fbtnyit { display: inline-block; margin-left: 6px; padding: 2px 10px; border-radius: 3px; border: 1px solid #7c8189; background: linear-gradient(180deg, #fafbfc, #d5d8dc);
           color: #2b2e33; text-decoration: none; font-weight: 700; font-size: calc(11px * var(--bk, 1)); letter-spacing: .06em; }
+        .fbtpar { margin-left: 4px; padding: 2px 8px; border-radius: 3px; border: 1px solid #7c8189; background: linear-gradient(180deg, #fafbfc, #d5d8dc); cursor: pointer;
+          color: #2b2e33; font: 700 calc(10px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; letter-spacing: .08em; }
+        :host([fekete]) .fbtpar { background: linear-gradient(180deg, #34373c, #1c1e21); color: #e8eaed; border-color: #000; }
         .fbtism { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font: 600 calc(12px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; color: #4a4e55; }
         .fbtism small { text-align: left; margin-right: 4px; }
         .fbtism .ok { color: #1d7a3a; }
@@ -4719,14 +4725,16 @@ class CantabileCard extends HTMLElement {
   _btLapHtml(e, adat, src) {
     const bt = adat.bt, nev = bt.name || this._hszNev(e), ki = bt.devices.find((d) => d.connected), android = /Android/i.test(navigator.userAgent || "");
     const ismert = bt.devices.length ? bt.devices.map((d) => `<span class="${d.connected ? "ok" : ""}">${d.connected ? "✓ " : ""}${ESC(d.name)}</span>`).join("") : `<span>${T("még nincs")}</span>`;
+    const par = this._btParosit?.e === e && Date.now() - this._btParosit.ido < 180000;
     const allapot = src !== "Bluetooth" ? T("Átváltás Bluetooth-bemenetre…")
       : ki ? T("✓ Csatlakozott: {n} – indítsd a zenét az eszközön, a(z) {h} szól.", { n: ki.name, h: this._hszNev(e) })
-      : T("A(z) {h} most látható és párosítható – várja az eszközt.", { h: this._hszNev(e) });
+      : par ? T("Párosítási mód: a(z) {h} most látható (a fénye lassan villog zölden) – várja az eszközt.", { h: this._hszNev(e) })
+      : T("A(z) {h} Bluetooth-bemeneten várja az eszközt.", { h: this._hszNev(e) });
     return `<div class="fauto-lap fbt-lap"><div class="fafej"><button class="bill fvissza-bt"><span class="led"></span><b>‹ INPUT</b></button><span class="fbtall${ki ? " ok" : ""}">${ESC(allapot)}</span></div>
       ${ki && src === "Bluetooth" ? `<div class="fbtfoglalt">${T("A(z) {h} egyszerre csak egy eszközt fogad, és most ez csatlakozik: {n}. Ha nem erről akarsz zenét küldeni, előbb ezen az eszközön kapcsold ki a Bluetooth-t (vagy a Bluetooth-beállításaiban bontsd a kapcsolatot) – addig a többi eszköz nem is látja a hangszórót. A hangszóró maga nem tudja leválasztani.", { h: nev, n: ki.name })}</div>` : ""}
       <ol class="fbtlep">
         <li>${T("A telefonon / tableten nyisd meg a Bluetooth-beállításokat")}${android ? ` <a class="fbtnyit" href="intent:#Intent;action=android.settings.BLUETOOTH_SETTINGS;end">${T("Megnyitás")}</a>` : ""}.</li>
-        <li>${T("Válaszd ki a listából:")} <b>${ESC(nev)}</b> ${T("(első alkalommal: párosítás).")}</li>
+        <li>${T("Válaszd ki a listából:")} <b>${ESC(nev)}</b> ${T("(első alkalommal: párosítás). Ha nem látszik, frissítsd a listát, vagy kapcsold be újra a párosítási módot:")} <button class="fbtpar" type="button">PAIRING MODE</button></li>
         <li>${T("Indítsd a zenét az eszköz bármelyik appjában – a hang a hangszóróból szól. A kártyán a kazetta „BT IN”-t mutat.")}</li>
       </ol>
       <div class="fbtism"><small>${T("ISMERT ESZKÖZÖK")}</small>${ismert}</div>
@@ -4762,11 +4770,8 @@ class CantabileCard extends HTMLElement {
       if (c(".fful")) { this._fedelLap = c(".fful").dataset.l; this._eqNev = null; this._eqTorol = false; if (this._fedelLap === "eq") this._eqProfilok(); return this._fedelRajz(); }
       const b = c(".fbe");
       if (b && !b.classList.contains("akt")) return this._bemenetValt(e, b.dataset.n);
-      if (c(".fpair")) {
-        this._fedelLap = "bt";
-        if (this._hass.states[e]?.attributes?.source !== "Bluetooth") this._bemenetValt(e, "Bluetooth");
-        this._btFigyel(e); return this._fedelRajz();
-      }
+      if (c(".fpair")) { this._fedelLap = "bt"; this._btFigyel(e); this._fedelRajz(); return this._parositas(e); }
+      if (c(".fbtpar")) return this._parositas(e, true);
       if (c(".fvissza-bt")) { this._fedelLap = "alap"; this._btFigyel(null); return this._fedelRajz(); }
       if (c(".fbtnyit")) return;            // a hivatkozás nyissa meg a beállításokat
       if (c(".floud")) { const most = this._eqTar?.[e]?.__loud ?? this._vezTar?.[e]?.adat?.loudness; return this._eqKuldj(e, { loudness: !most }, { __loud: !most }); }
@@ -4795,6 +4800,22 @@ class CantabileCard extends HTMLElement {
       this._hass.callWS({ type: "cantabile/eq/auto/set", kind: s.dataset.kind, key: s.dataset.key, profile: s.value })
         .then(() => this._eqProfilok(true)).catch((err) => this._hivHiba(this._fedelE, err));
     });
+  }
+
+  // PAIR: BT-bemenetre vált, és ha épp nem csatlakozik hozzá más eszköz, párosítási módba teszi (a WiiM fénye lassan
+  // villog zölden) – így egy új telefon / tablet is megtalálja. `kezi`: a PAIRING MODE billentyű (újra, ha lejárt)
+  async _parositas(e, kezi = false) {
+    if (this._hass.states[e]?.attributes?.source !== "Bluetooth") {
+      await this._bemenetValt(e, "Bluetooth");
+      await new Promise((r) => setTimeout(r, 2500));      // a WiiM előbb a legutóbbi eszközt próbálja visszahívni
+      await this._vezerlok(e);
+    }
+    if (this._vezTar?.[e]?.adat?.bt?.devices?.some((d) => d.connected)) { if (kezi) this._uzen(T("Előbb a csatlakozott eszközön kapcsold ki a Bluetooth-t.")); return; }
+    try {
+      await this._hass.callWS({ type: "cantabile/bt/pair", entity_id: e });
+      this._btParosit = { e, ido: Date.now() };
+    } catch (err) { this._hivHiba(e, err); }
+    this._fedelRajz();
   }
 
   // amíg a PAIR-útmutató nyitva van, 3 mp-enként megnézi, csatlakozott-e már az eszköz

@@ -19,7 +19,7 @@ ablakban mutatja. Ami mögötte van:
 
 Websocket: `cantabile/controls` (mi állítható és hogyan áll), `cantabile/input/select`, `cantabile/tone/set`,
 `cantabile/eq/set`, `cantabile/eq/profiles`, `cantabile/eq/profile/save`, `cantabile/eq/profile/delete`,
-`cantabile/eq/auto/set`. A hangszórót állítók figyelik a hangszóró-foglalást; a bemenetváltás után a hangszóró a váltóé.
+`cantabile/eq/auto/set`, `cantabile/bt/pair` (párosítási mód a BT-bemeneten). A hangszórót állítók figyelik a hangszóró-foglalást; a bemenetváltás után a hangszóró a váltóé.
 """
 
 from __future__ import annotations
@@ -511,5 +511,22 @@ def regisztral(hass: HomeAssistant) -> None:
         profilok.ment()
         conn.send_result(msg["id"])
 
-    for c in (ws_controls, ws_input, ws_tone, ws_eq, ws_profilok, ws_mentes, ws_torles, ws_auto):
+    @websocket_api.websocket_command({vol.Required("type"): "cantabile/bt/pair", vol.Required("entity_id"): str})
+    @websocket_api.async_response
+    async def ws_parosit(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        """A WiiM Bluetooth-bemenete párosítási módba (`btavkenterpair`; a fénye lassan villog zölden), hogy egy új
+        telefon / tablet megtalálja. Csak akkor látszik, ha épp nem csatlakozik hozzá másik eszköz."""
+        host = gazdagep(hass, msg["entity_id"])
+        try:
+            _foglal(conn, msg["entity_id"], None)
+            if not host:
+                raise HomeAssistantError("Ezen a hangszórón nincs Bluetooth-párosítás.")
+            if str(await _wiim(hass, host, "btavkenterpair")).strip().upper() != "OK":
+                raise HomeAssistantError("A hangszóró nem lépett párosítási módba.")
+        except HomeAssistantError as err:
+            conn.send_error(msg["id"], "nem_sikerult", str(err))
+            return
+        conn.send_result(msg["id"])
+
+    for c in (ws_parosit, ws_controls, ws_input, ws_tone, ws_eq, ws_profilok, ws_mentes, ws_torles, ws_auto):
         websocket_api.async_register_command(hass, c)
