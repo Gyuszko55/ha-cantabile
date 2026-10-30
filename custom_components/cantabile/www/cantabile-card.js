@@ -168,7 +168,7 @@ const EN = {
   "+ gombra": "+ preset",
   "A Radio Browser most nem érhető el: {h}": "Radio Browser is not reachable right now: {h}",
   "„{n}” felvéve – a Mentéssel gombként is megmarad.": "“{n}” added – Save keeps it as a preset.",
-  "Hosszan nyomva a gomb a most szóló NET-adót menti el. Indíts egyet a NET gombbal, aztán a gíró kerékkel lépkedhetsz a lista adói között.": "A long press saves the NET station that is playing to the button. Start one with NET, then the Gyro wheel steps through the list's stations.",
+  "Hosszan nyomva a gomb a most szóló NET-adót menti el – a gíró kerékkel vagy a NET gombbal keress egyet.": "A long press saves the NET station that is playing to the button – find one with the Gyro wheel or NET.",
   "A gombra mentéshez rendszergazdai felhasználó kell.": "Saving to a preset button needs an admin user.",
   "„{n}” már a(z) {g}. gombon van.": "“{n}” is already on button {g}.",
   "Mind a 12 gomb foglalt – nyomj hosszan egy foglalt gombot, és felülírja.": "All 12 buttons are taken – long-press one to overwrite it.",
@@ -2814,15 +2814,13 @@ class CantabileCard extends HTMLElement {
     return p;
   }
 
-  // SIGNAL: a stream „térereje” – bitrátából (cantabile/signal, ffprobe), él-e az adás, pufferel-e; hangoláskor a legközelebbi adótól mért távolság
+  // SIGNAL: a stream „térereje” – bitrátából (cantabile/signal, ffprobe), él-e az adás, pufferel-e; léptetéskor SEEK
   _jelRajz() {
     const sr = this.shadowRoot, ra = this._radioAll;
     if (!sr || !ra) return;
     let v = 0, fel = "";
-    if (this._hangolo) {
-      const { d } = this._legkozelebbi(this._hangolo.f);
-      v = Math.max(0, 1 - d / 0.35) * 0.92; fel = v > 0.5 ? "STATION" : "SEEK";
-    } else if (ra.szol) {
+    if (this._netGiro) { v = 0.12; fel = "SEEK"; }
+    else if (ra.szol) {
       const kbps = Number(this._formatum?.kbps) || 0;
       if (ra.keres) { v = 0.12; fel = "TUNING…"; }
       else if (ra.s?.state === "buffering") { v = 0.25; fel = "BUFFERING"; }
@@ -2838,73 +2836,31 @@ class CantabileCard extends HTMLElement {
     sr.getElementById("jfel").textContent = fel;
   }
 
-  _legkozelebbi(f) {
-    let i = -1, d = 99;
-    this._config.adok.forEach((a, k) => { const x = Math.abs(a.frekvencia - f); if (x < d) { d = x; i = k; } });
-    return { i, d };
-  }
-
-  // Gyro-Touch lendkerék: oldalra húzva (vagy görgővel) a mutató szabadon jár; adó közelében „fog” a SIGNAL,
-  // elengedéskor ±0,25 MHz-en belül az adóra áll és indítja, máshol 2,5 mp múlva visszatér a szóló adóhoz
+  // Gyro-Touch lendkerék: a Radio Browser-lista adóin lép (egy fog ≈ 40 px húzás vagy egy görgőkattanás) – a szóló
+  // (NET- vagy gombos) adótól indulva; a kijelző mutatja, megállás / elengedés után az az adó szól
   _giroKezel(giro) {
     const kerek = giro.querySelector("#kerek");
-    let x0 = null, id = null, poz = 0;
-    const indul = () => {
-      if (!this._hangolo) {
-        const c = this._config, i = this._radioAll?.i;
-        this._hangolo = { f: c.adok[i >= 0 ? i : this._utolso ?? 0]?.frekvencia ?? this._savKozep() };
-      }
-      clearTimeout(this._hangoloIdo);
-      this.shadowRoot.getElementById("elo").classList.add("kezi");
-    };
-    const lep = (df) => {
-      this._hangolo.f = Math.min(this._sav[1], Math.max(this._sav[0], this._hangolo.f + df));
-      poz += df * 60; kerek.style.backgroundPositionX = `${poz.toFixed(1)}px`;
-      this._hangoloRajz(); this._jelRajz();
-    };
-    const vege = () => {
-      const { i, d } = this._legkozelebbi(this._hangolo.f);
-      if (d <= 0.25) {
-        this._hangolo.f = this._config.adok[i].frekvencia; this._hangoloRajz();
-        this._hangoloIdo = setTimeout(() => {
-          this._hangolo = null; this.shadowRoot.getElementById("elo").classList.remove("kezi");
-          if (!(this._radioAll?.szol && this._radioAll.i === i)) this._hangol(i); else this._frissit();
-        }, 350);
-      } else {
-        this._hangoloIdo = setTimeout(() => { this._hangolo = null; this.shadowRoot.getElementById("elo").classList.remove("kezi"); this._frissit(); }, 2500);
-      }
-    };
-    // NET-adó szól (a Radio Browserből): a kerék a lista adóin lép (egy fog ≈ 40 px húzás vagy egy görgőkattanás)
-    const netMod = () => !!this._netGiro || (this._radioAll?.szol && this._radioAll.i === KULSO && !this._hangolo);
-    let net = false, gyujt = 0;
-    const netLep = (dx, fog) => {
+    let x0 = null, id = null, poz = 0, gyujt = 0;
+    const lep = (dx, fog) => {
       poz += dx; kerek.style.backgroundPositionX = `${poz.toFixed(1)}px`;
       gyujt += dx;
       while (Math.abs(gyujt) >= fog) { const d = Math.sign(gyujt); gyujt -= d * fog; this._netGiroLep(d); }
     };
     giro.addEventListener("pointerdown", (e) => {
-      e.stopPropagation(); id = e.pointerId; giro.setPointerCapture(id); x0 = e.clientX;
-      net = netMod(); gyujt = 0;
-      if (net) clearTimeout(this._netGiroIdo); else indul();
+      e.stopPropagation(); id = e.pointerId; giro.setPointerCapture(id); x0 = e.clientX; gyujt = 0;
+      clearTimeout(this._netGiroIdo);
     });
     giro.addEventListener("pointermove", (e) => {
       if (x0 == null || e.pointerId !== id) return;
-      const dx = e.clientX - x0; x0 = e.clientX;
-      if (net) netLep(dx, 40); else lep(dx * 0.025);
+      const dx = e.clientX - x0; x0 = e.clientX; lep(dx, 40);
     });
-    const fel = (e) => { if (x0 == null || e.pointerId !== id) return; x0 = null; if (net) this._netGiroVege(); else vege(); };
+    const fel = (e) => { if (x0 == null || e.pointerId !== id) return; x0 = null; this._netGiroVege(); };
     giro.addEventListener("pointerup", fel); giro.addEventListener("pointercancel", fel);
     giro.addEventListener("wheel", (e) => {
       e.preventDefault(); e.stopPropagation();
-      if (netMod()) {
-        if (!this._netGiro) gyujt = 0;
-        netLep(Math.max(-100, Math.min(100, e.deltaY || e.deltaX)) * 0.4, 40);
-        this._netGiroVege(1200);
-        return;
-      }
-      indul();
-      lep((e.deltaY || e.deltaX) > 0 ? 0.1 : -0.1);
-      clearTimeout(this._gorgoIdo); this._gorgoIdo = setTimeout(vege, 700);
+      if (!this._netGiro) gyujt = 0;
+      lep(Math.max(-100, Math.min(100, e.deltaY || e.deltaX)) * 0.4, 40);
+      this._netGiroVege(1200);
     }, { passive: false });
   }
 
@@ -2928,7 +2884,7 @@ class CantabileCard extends HTMLElement {
 
   async _gombraMent(i, gomb) {
     const ra = this._radioAll, k = ra?.szol && ra.i === KULSO ? this._kulso() : null;
-    if (!k?.url) return this._uzen(T("Hosszan nyomva a gomb a most szóló NET-adót menti el. Indíts egyet a NET gombbal, aztán a gíró kerékkel lépkedhetsz a lista adói között."));
+    if (!k?.url) return this._uzen(T("Hosszan nyomva a gomb a most szóló NET-adót menti el – a gíró kerékkel vagy a NET gombbal keress egyet."));
     if (!this._hass?.user?.is_admin) return this._uzen(T("A gombra mentéshez rendszergazdai felhasználó kell."));
     const c = this._config, nev = String(k.nev || "").trim() || CIM(k.url);
     const van = c.adok.findIndex((a) => CIM(a.url) === CIM(k.url));
@@ -2952,13 +2908,6 @@ class CantabileCard extends HTMLElement {
     this._szerk = JSON.parse(JSON.stringify({ marka: c.marka || "Cantabile", deezer: c.deezer !== false, felulet: c.felulet === "black" ? "black" : "silver",
       hangszorok: c.hangszorok.map(({ automod, ...h }) => h), adok, magno: c.magno || {} }));
     return this._beallMent({ kesz, gomb });
-  }
-
-  _hangoloRajz() {
-    const sr = this.shadowRoot, f = this._hangolo.f, { i, d } = this._legkozelebbi(f), c = this._config;
-    sr.getElementById("mutato").style.left = `${this._poz(f)}%`;
-    sr.getElementById("ado").innerHTML = d <= 0.25 ? `<b>${ESC(c.adok[i].nev)}</b> · ${MHZ(c.adok[i].frekvencia)} MHz` : `${MHZ(Math.round(f * 10) / 10)} MHz · NO STATION`;
-    sr.getElementById("cim").textContent = "";
   }
 
   _bekapcs() {
@@ -3886,12 +3835,24 @@ class CantabileCard extends HTMLElement {
   }
 
   // a lista, amelyből a szóló NET-adó jött: ezen lép a gíró kerék (oldalfrissítés után a lekérdezésből újra betölti)
-  _netSorAllit(sor) { this._netSor = sor; TAR.ir("tablet-radio-netsor", JSON.stringify(sor.q)); }
+  // A lista helyben is megmarad (egy napig friss): a kerék azonnal indul, és akkor is működik, ha a Radio Browser épp nem érhető el
+  _netSorAllit(sor) {
+    this._netSor = sor;
+    const adok = sor.adok.map(({ name, url, url_resolved, favicon, countrycode, codec, bitrate, tags, stationuuid }) => ({ name, url, url_resolved, favicon, countrycode, codec, bitrate, tags, stationuuid }));
+    TAR.ir("tablet-radio-netsor", JSON.stringify({ ...sor.q, adok, ido: Date.now() }));
+  }
 
   async _netSorKell() {
     if (this._netSor?.adok?.length) return this._netSor;
-    const q = TAR.json("tablet-radio-netsor") || { ful: "hu" }, adok = await this._netLeker(q);
-    if (adok.length) this._netSor = { q, adok };
+    const { adok: tarolt, ido, ...q } = TAR.json("tablet-radio-netsor") || { ful: "hu" };
+    if (tarolt?.length && Date.now() - (ido || 0) < 86400000) return (this._netSor = { q, adok: tarolt });
+    try {
+      const adok = await this._netLeker(q);
+      if (adok.length) this._netSorAllit({ q, adok });
+    } catch (e) {
+      if (!tarolt?.length) throw e;
+      this._netSor = { q, adok: tarolt };
+    }
     return this._netSor;
   }
 
@@ -3899,13 +3860,13 @@ class CantabileCard extends HTMLElement {
   _netGiroLep(d) {
     const sr = this.shadowRoot;
     if (!this._netGiro) {
-      const k = this._kulso();
+      const ra = this._radioAll, k = ra?.szol ? (ra.i === KULSO ? this._kulso() : this._config.adok[ra.i]) : null;
       this._netGiro = { lep: 0, i: null };
       sr.getElementById("elo").classList.add("kezi");
       this._netSorKell().then((sor) => {
         const g = this._netGiro; if (!g) return;
         if (!sor) { this._netGiro = null; sr.getElementById("elo").classList.remove("kezi"); this._frissit(); return this._uzen(T("A Radio Browser most nem érhető el.")); }
-        const c = k ? [CIM(k.url), k.alias] : [];
+        const c = k ? [CIM(k.url), k.alias].filter(Boolean) : [];
         g.i0 = sor.adok.findIndex((t) => c.includes(CIM(t.url_resolved || t.url)));
         g.i = g.i0 < 0 && g.lep > 0 ? g.lep - 1 : g.i0 + g.lep;
         g.i = ((g.i % sor.adok.length) + sor.adok.length) % sor.adok.length;
@@ -3915,7 +3876,7 @@ class CantabileCard extends HTMLElement {
     }
     const g = this._netGiro;
     g.vege = false; clearTimeout(this._netGiroIdo);
-    if (g.i == null) { g.lep += d; return; }
+    if (g.i == null) { g.lep += d; return this._netGiroRajz(); }
     const n = this._netSor.adok.length;
     g.i = (((g.i + d) % n) + n) % n;
     this._netGiroRajz();
@@ -3923,7 +3884,9 @@ class CantabileCard extends HTMLElement {
 
   _netGiroRajz() {
     const g = this._netGiro, sr = this.shadowRoot;
-    if (!g || g.i == null || !sr) return;
+    if (!g || !sr) return;
+    // a lista még töltődik
+    if (g.i == null) { sr.getElementById("ado").innerHTML = "<b>NET</b> · Radio Browser…"; sr.getElementById("cim").textContent = ""; return; }
     const l = this._netSor.adok, t = l[g.i], [a, b] = this._sav || SAVOK.std;
     sr.getElementById("mutato").style.left = `${this._poz(a + ((g.i + 0.5) / l.length) * (b - a))}%`;
     sr.getElementById("ado").innerHTML = `<b>${ESC((t.name || "").trim())}</b> · NET${t.countrycode ? ` · ${ESC(t.countrycode)}` : ""} · ${g.i + 1}/${l.length}`;
@@ -5635,7 +5598,6 @@ class CantabileCard extends HTMLElement {
     if (this._jelutE) requestAnimationFrame(() => this._jelutRajz());
     this._alvasRajz();
     this._jelRajz();
-    if (this._hangolo) this._hangoloRajz();
     if (this._netGiro) this._netGiroRajz();
     if (ATADANDO && ATADANDO.regi !== this && this.isConnected) {
       const u = ATADANDO; ATADANDO = null;
