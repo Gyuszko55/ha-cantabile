@@ -4798,7 +4798,12 @@ class CantabileCard extends HTMLElement {
   // ---- Music Assistant (ma.py): választható forrás, ha a HA-ban be van állítva ----
 
   _maLejatszo(e) { return !!e && !!this._hass?.states[e]?.attributes?.mass_player_type; }
-  _maSorSzol(e) { return !!e && this._hass?.states[e]?.attributes?.app_id === "music_assistant"; }
+  // az MA saját sora szól: az MA-lejátszó akkor is „Music Assistant Queue”-t jelez, ha kívülről (pl. a Sonos appból) szól
+  // valami – ezért az MA-azonosítójú szám (library://…, spotify://…) dönt
+  _maSorSzol(e) {
+    const a = e && this._hass?.states[e]?.attributes;
+    return !!a && a.app_id === "music_assistant" && /^[\w.-]+:\/\//.test(a.media_content_id || "") && !/^https?:/i.test(a.media_content_id || "");
+  }
 
   async _maInfoLeker() {
     if (this._maInfo && Date.now() - this._maInfo.ido < 300000) return;

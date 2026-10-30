@@ -61,7 +61,8 @@ def ma_lejatszo(hass: HomeAssistant, entity_id: str) -> bool:
 def ma_sor_szol(hass: HomeAssistant, entity_id: str) -> bool:
     """Az MA-lejátszón az MA saját sora szól (nem kívülről küldött cím)."""
     st = hass.states.get(entity_id)
-    return bool(st and st.attributes.get("app_id") == MA)
+    cid = str(st.attributes.get("media_content_id") or "") if st else ""
+    return bool(st and st.attributes.get("app_id") == MA and re.match(r"^[\w.-]+://", cid) and not cid.lower().startswith(("http://", "https://")))
 
 
 def _kep(hass: HomeAssistant, url: Any) -> str | None:
