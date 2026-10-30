@@ -4898,10 +4898,11 @@ class CantabileCard extends HTMLElement {
       const x = m.get(k) || { nev: String(nev).trim(), kulcs: k };
       m.set(k, Object.assign(x, adat, { kep: x.kep || adat.kep || null }));
     };
-    const [nr, mr] = await Promise.all([nas ? this._bongesz(nas).catch(() => null) : null, this._maInfo?.available ? this._maKonyvtar("artist").catch(() => null) : null]);
+    const [nr, mr] = await Promise.all([nas ? this._bongesz(nas).catch(() => null) : null, this._maInfo?.available ? this._maMind("artist").catch(() => null) : null]);
     const kihagy = [this._telMappa(), this._config.magno?.hires];
     for (const x of nr?.children || []) if (x.can_expand && !kihagy.includes(x.title)) tesz(x.title, { nas: x.media_content_id });
-    for (const x of mr?.items || []) if (x.name) tesz(x.name, { ma: x.uri, kep: x.image || null });
+    // a címkézetlen fájlokból az MA „01”, „02_Sweet”-féle előadókat is felvesz – ezek kimaradnak (a „50 Cent” nem)
+    for (const x of mr?.items || []) if (x.name && !/^\d{1,3}(\s*[-_.)]|\s*$)/.test(x.name)) tesz(x.name, { ma: x.uri, kep: x.image || null });
     const l = [...m.values()].sort((a, b) => a.nev.localeCompare(b.nev, NYELV(), { numeric: true }));
     this._eloTar = { ido: Date.now(), l };
     return l;
@@ -5523,6 +5524,25 @@ class CantabileCard extends HTMLElement {
   }
 
   // a könyvtár egy-egy típusa 5 percig megjegyezve (az első lekérés lassú lehet); a polc megnyitásakor előre letöltjük
+  // az MA teljes könyvtára egy típusból, lapozva (az ELŐADÓK névsorához), 5 percig tárolva
+  _maMind(tip) {
+    this._maMindTar = this._maMindTar || {};
+    const t = this._maMindTar[tip];
+    if (t && Date.now() - t.ido < 300000) return t.p;
+    const p = (async () => {
+      const items = [];
+      for (let lap = 0; lap < 15; lap++) {
+        const r = await this._hass.callWS({ type: "cantabile/ma/library", media_type: tip, limit: 200, offset: items.length });
+        items.push(...(r.items || []));
+        if (!r.more) break;
+      }
+      return { items };
+    })();
+    this._maMindTar[tip] = { ido: Date.now(), p };
+    p.catch(() => { if (this._maMindTar[tip]?.p === p) delete this._maMindTar[tip]; });
+    return p;
+  }
+
   _maKonyvtar(tip) {
     this._maTar = this._maTar || {};
     const t = this._maTar[tip];
