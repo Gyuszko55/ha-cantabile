@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- MA tab: albums and tracks without a name (Music Assistant adds them from untagged files) are no longer shown as empty tiles.
+
 ## 2.0.0 – 2026-10-30
 
 Cantabile 2: Music Assistant joins as an optional source, alongside its own sources and engine.

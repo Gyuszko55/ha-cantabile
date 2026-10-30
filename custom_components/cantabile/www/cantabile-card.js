@@ -4842,6 +4842,9 @@ class CantabileCard extends HTMLElement {
       } else if (keres) cs = await this._hass.callWS({ type: "cantabile/ma/search", query: kerdes.trim(), limit: 12 });
       else elemek = (await this._hass.callWS({ type: "cantabile/ma/library", media_type: tip, limit: 150 })).items || [];
       if (!friss()) return;
+      // a címkézetlen fájlokból az MA név nélküli albumot / számot is felvesz – ezek üres csempék lennének
+      elemek = elemek.filter((x) => x.name);
+      if (cs) for (const k of Object.keys(cs)) cs[k] = (cs[k] || []).filter((x) => x.name);
       let html = "", osszes = [];
       const kazHtml = (l) => { const k = osszes.length; osszes.push(...l); return `<div class="kazettak">${l.map((x, i) => csempe(x, k + i)).join("")}</div>`; };
       const sorHtml = (l) => { const k = osszes.length; osszes.push(...l); return `<div class="ktalal">${l.map((x, i) => sor(x, k + i)).join("")}</div>`; };
