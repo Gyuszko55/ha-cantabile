@@ -122,10 +122,15 @@ class Gyujto:
         self._albumok: dict[str, list[str]] = {}                  # gyökér → a legutóbb látott albumok (relatív)
         self._ido: dict[str, float] = {}
         self._halad: dict[str, tuple[int, int]] = {}
+        self._zar = asyncio.Lock()
+
+    async def _betolt(self) -> None:
+        async with self._zar:                 # a GENRE fül és az EQ-profil egyszerre is kérheti: csak egyszer töltjük
+            if self._tar is None:
+                self._tar = (await self._store.async_load()) or {}
 
     async def lekerdez(self, gyoker: str, kihagy: list[str], frissit: bool) -> dict[str, Any]:
-        if self._tar is None:
-            self._tar = (await self._store.async_load()) or {}
+        await self._betolt()
         fut = self._futas.get(gyoker)
         if (fut is None or fut.done()) and (frissit or time.monotonic() - self._ido.get(gyoker, -ERVENYES) >= ERVENYES):
             self._ido[gyoker] = time.monotonic()
@@ -133,7 +138,7 @@ class Gyujto:
             await asyncio.sleep(0)
         csoport: dict[str, dict[str, Any]] = {}
         for rel in self._albumok.get(gyoker, []):
-            bej = self._tar.get(os.path.join(gyoker, rel))
+            bej = self._tar.get(os.path.normpath(os.path.join(gyoker, rel)))
             if bej is None:
                 continue
             for g in bej["g"] or [""]:
@@ -146,22 +151,21 @@ class Gyujto:
 
     async def mappa_mufajai(self, mappa: str) -> list[str]:
         """Egy albummappa műfajai a tárolt gyűjtésből (üres, ha még nem olvastuk ki)."""
-        if self._tar is None:
-            self._tar = (await self._store.async_load()) or {}
+        await self._betolt()
         return list((self._tar.get(mappa) or {}).get("g") or [])
 
     async def _gyujt(self, gyoker: str, kihagy: list[str], frissit: bool) -> None:
         assert self._tar is not None
         albumok = await self.hass.async_add_executor_job(_albumok, gyoker, kihagy)
         self._albumok[gyoker] = [a[0] for a in albumok]
-        kell = [a for a in albumok if frissit or (self._tar.get(os.path.join(gyoker, a[0])) or {}).get("m") != a[1]]
+        kell = [a for a in albumok if frissit or (self._tar.get(os.path.normpath(os.path.join(gyoker, a[0]))) or {}).get("m") != a[1]]
         self._halad[gyoker] = (len(albumok) - len(kell), len(albumok))
         zar = asyncio.Semaphore(EGYSZERRE)
 
         async def egy(rel: str, mtime: float, fajl: str) -> None:
             async with zar:
                 g = mufajok(await _cimke(fajl))
-            self._tar[os.path.join(gyoker, rel)] = {"m": mtime, "g": g}
+            self._tar[os.path.normpath(os.path.join(gyoker, rel))] = {"m": mtime, "g": g}
             k, n = self._halad[gyoker]
             self._halad[gyoker] = (k + 1, n)
             if (k + 1) % 100 == 0:

@@ -48,6 +48,8 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
   tárcsákkal – ⚙ → *Előlap*, vagy YAML-ban `finish: black`.
 - Minden hangszórónak van legfeljebb 8 karakteres **kártyán megjelenő neve** (pl. *Nappali*): ez kerül a forgó
   választóra, a fejlécbe és a kazettára, a hangvezérlés pedig továbbra is a teljes nevet használja.
+- **ⓘ Jelút**: a ⚙ előtti gomb élőben megmutatja, honnan jön a hang, mi történik vele és hol szól
+  (forrás → feldolgozás → kimenet, az EQ-val / hangszínnel, és hogy a VU-mérő valódi jelet mutat-e).
 - **Üzenetek a lejátszón**: a tippek és hibák magán a kártyán, egy füstüveg ablakban jelennek meg, majd elhalványulnak
   (koppintásra bezárul); ha a kártya nem látszik, a Home Assistant saját értesítője jön.
 

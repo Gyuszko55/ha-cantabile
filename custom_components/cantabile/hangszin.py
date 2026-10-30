@@ -19,7 +19,8 @@ ablakban mutatja. Ami mögötte van:
 
 Websocket: `cantabile/controls` (mi állítható és hogyan áll), `cantabile/input/select`, `cantabile/tone/set`,
 `cantabile/eq/set`, `cantabile/eq/profiles`, `cantabile/eq/profile/save`, `cantabile/eq/profile/delete`,
-`cantabile/eq/auto/set`, `cantabile/bt/pair` (párosítási mód a BT-bemeneten). A hangszórót állítók figyelik a hangszóró-foglalást; a bemenetváltás után a hangszóró a váltóé.
+`cantabile/eq/auto/set`, `cantabile/bt/pair` (párosítási mód a BT-bemeneten). A közös profil törlése / felülírása és
+az AUTO-szabályok csak rendszergazdának; új profilt mentani és párosítani bárki tud. A hangszórót állítók figyelik a hangszóró-foglalást; a bemenetváltás után a hangszóró a váltóé.
 """
 
 from __future__ import annotations
@@ -59,7 +60,12 @@ WIIM_HALO = "Network"
 WIIM_PLM = ((4, "Bluetooth"), (2, "Line In"), (16, "Optical In"), (1024, "TV"), (65536, "Phono In"))
 # a Sonos source_list-jében a valódi bemenetek (a többi kedvenc)
 # a szóló zene forrása az automatikus profilhoz (a kártya ugyanezekkel a kulcsokkal mutatja)
-FORRASOK = ("radio", "nas", "deezer", "tidal", "qobuz", "spotify", "bt", "line", "egyeb")
+FORRASOK = ("radio", "nas", "deezer", "tidal", "qobuz", "spotify", "bt", "line", "optical", "tv", "phono", "egyeb")
+# a HA WiiM-integrációjának bemenetnevei → a WiiM saját módnevei (setPlayerCmd:switchmode), ha a lejátszó nem tud váltani
+WIIM_MOD = {"Network": "wifi", "Bluetooth": "bluetooth", "Line In": "line-in", "Optical In": "optical", "TV": "HDMI", "Phono In": "phono"}
+SAV_RE = re.compile(r"^band\d+k?hz$", re.I)
+PROFIL_RE = re.compile(r"^[\w .&+'()/-]{1,32}$")
+IDOKORLAT = 3
 PROFIL_TAR = "cantabile_eq_profilok"
 BEMENET_RE = re.compile(r"^(line[- ]?in|tv|hdmi|bluetooth|aux|optical( in)?|phono( in)?|coaxial|usb|cd|tuner|network|wi-?fi)$", re.I)
 
@@ -70,10 +76,12 @@ def _ent(hass: HomeAssistant, entity_id: str) -> er.RegistryEntry | None:
 
 async def _wiim(hass: HomeAssistant, host: str, parancs: str) -> Any:
     sess = async_get_clientsession(hass, verify_ssl=False)
+    cim = f"[{host}]" if ":" in host and not host.startswith("[") else host
     try:
-        async with asyncio.timeout(5):
-            async with sess.get(f"https://{host}/httpapi.asp?command={quote(parancs, safe=':')}") as v:
-                szoveg = await v.text()
+        async with asyncio.timeout(IDOKORLAT):
+            async with sess.get(f"https://{cim}/httpapi.asp?command={quote(parancs, safe=':')}") as v:
+                v.raise_for_status()
+                szoveg = await v.text(errors="replace")
     except (aiohttp.ClientError, TimeoutError) as err:
         raise HomeAssistantError(f"WiiM ({host}): {err}") from err
     try:
@@ -93,6 +101,13 @@ def _sonos_szint(hass: HomeAssistant, ent: er.RegistryEntry) -> dict[str, str]:
     return ki
 
 
+def _savok(eqv: Any) -> list[dict[str, Any]]:
+    """Az EQGetBand válaszának ép sávjai (név + szám)."""
+    lista = eqv.get("EQBand") if isinstance(eqv, dict) else None
+    return [s for s in lista or [] if isinstance(s, dict) and isinstance(s.get("param_name"), str)
+            and isinstance(s.get("value"), (int, float))]
+
+
 def _wiim_fok(savok: list[dict[str, Any]], alak: dict[str, float]) -> int:
     ertek = {str(s.get("param_name", "")).lower(): s.get("value") for s in savok}
     teljes = [ertek[n] for n, s in alak.items() if s == 1 and isinstance(ertek.get(n), (int, float))]
@@ -106,9 +121,11 @@ async def allapot(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
     ent = _ent(hass, entity_id)
     a = st.attributes if st else {}
     platform = ent.platform if ent else None
-    host = gazdagep(hass, entity_id) if platform in ("wiim", "linkplay") else None
+    elerheto = st is not None and st.state != "unavailable"
+    host = gazdagep(hass, entity_id) if elerheto and platform in ("wiim", "linkplay") else None
     lista = [s for s in a.get("source_list") or [] if isinstance(s, str)]
-    if platform == "sonos":
+    if platform == "sonos" or (len(lista) > 8 and any(BEMENET_RE.match(s) for s in lista)):
+        # Sonos: a lista többi eleme kedvenc; TV-k, médialejátszók: a bemenetek mellett appok is (Netflix, YouTube…)
         lista = [s for s in lista if BEMENET_RE.match(s)]
     bemenetek: list[str] = []
     allas: dict[str, Any] = {}
@@ -117,7 +134,18 @@ async def allapot(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
             allas = await _wiim(hass, host, "getStatusEx")
             allas = allas if isinstance(allas, dict) else {}
         except HomeAssistantError:
-            _LOGGER.debug("Cantabile: a WiiM állapota nem olvasható (%s)", entity_id, exc_info=True)
+            _LOGGER.debug("Cantabile: a WiiM nem válaszol (%s)", entity_id, exc_info=True)
+            host = None                   # ne várjunk a többi lekérdezésre is
+    tort: Any = None
+    eqv: Any = None
+    if host:
+        async def _csendes(parancs: str) -> Any:
+            try:
+                return await _wiim(hass, host, parancs)
+            except HomeAssistantError:
+                _LOGGER.debug("Cantabile: WiiM %s nem olvasható (%s)", parancs, entity_id, exc_info=True)
+                return None
+        tort, eqv = await asyncio.gather(_csendes("getbthistory"), _csendes("EQGetBand"))
     if lista:
         bemenetek = lista
     elif allas:
@@ -127,16 +155,11 @@ async def allapot(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
         except ValueError:
             _LOGGER.debug("Cantabile: a WiiM bemenetei nem olvashatók (%s)", entity_id, exc_info=True)
     bt: dict[str, Any] | None = None
-    if host and "Bluetooth" in bemenetek:
+    if host and "Bluetooth" in bemenetek and isinstance(tort, dict):
         # a párosításhoz: a WiiM Bluetooth-neve és az ismert (párosított) eszközök, hogy melyik csatlakozik most
-        try:
-            tort = await _wiim(hass, host, "getbthistory")
-            bt = {"name": allas.get("DeviceName") or allas.get("ssid") or "",
-                  "devices": [{"name": str(d.get("name") or "?"), "connected": str(d.get("ct")) == "1"}
-                              for d in (tort.get("list") or [] if isinstance(tort, dict) else [])
-                              if str(d.get("role", "")).lower() == "audio source"]}
-        except HomeAssistantError:
-            _LOGGER.debug("Cantabile: a WiiM Bluetooth-állapota nem olvasható (%s)", entity_id, exc_info=True)
+        bt = {"name": str(allas.get("DeviceName") or allas.get("ssid") or ""),
+              "devices": [{"name": str(d.get("name") or "?"), "connected": str(d.get("ct")) == "1"}
+                          for d in tort.get("list") or [] if isinstance(d, dict) and str(d.get("role", "")).lower() == "audio source"]}
     if platform == "sonos" and bemenetek:
         bemenetek = ["Network", *bemenetek]          # a Sonos „vissza a hálózatra” állása: a bemenetről zene indításával
     hang: dict[str, Any] | None = None
@@ -151,18 +174,11 @@ async def allapot(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
     hangossag: bool | None = None
     if platform == "sonos" and ent and (le := _sonos_loudness(hass, ent)) and (ls := hass.states.get(le)) and ls.state in ("on", "off"):
         hangossag = ls.state == "on"
-    elif host:
-        try:
-            eqv = await _wiim(hass, host, "EQGetBand")
-            if isinstance(eqv, dict) and eqv.get("EQBand"):
-                be = str(eqv.get("EQStat", "")).lower() == "on"
-                hang = {"fajta": "wiim", "bass": _wiim_fok(eqv["EQBand"], WIIM_MELY) if be else 0,
-                        "treble": _wiim_fok(eqv["EQBand"], WIIM_MAGAS) if be else 0}
-                eq = {"on": be, "name": str(eqv.get("Name") or ""), "source": eqv.get("source_name"),
-                      "bands": [{"n": s.get("param_name"), "v": s.get("value")} for s in eqv["EQBand"]],
-                      "presets": await _wiim_lista(hass, host)}
-        except HomeAssistantError:
-            _LOGGER.debug("Cantabile: a WiiM EQ-ja nem olvasható (%s)", entity_id, exc_info=True)
+    elif host and (savok := _savok(eqv)):
+        be = str(eqv.get("EQStat", "")).lower() == "on"
+        hang = {"fajta": "wiim", "bass": _wiim_fok(savok, WIIM_MELY) if be else 0, "treble": _wiim_fok(savok, WIIM_MAGAS) if be else 0}
+        eq = {"on": be, "name": str(eqv.get("Name") or ""), "source": eqv.get("source_name"),
+              "bands": [{"n": s["param_name"], "v": s["value"]} for s in savok], "presets": await _wiim_lista(hass, host)}
     return {"inputs": bemenetek if len(bemenetek) > 1 else [], "source": a.get("source"), "tone": hang, "min": -HATAR, "max": HATAR,
             "eq": eq, "loudness": hangossag, "bt": bt}
 
@@ -171,10 +187,15 @@ _LISTAK: dict[str, list[str]] = {}
 
 
 async def _wiim_lista(hass: HomeAssistant, host: str) -> list[str]:
-    """A WiiM beépített hangzásai (egyszer kérdezzük le eszközönként)."""
+    """A WiiM beépített hangzásai (egyszer kérdezzük le eszközönként; hibánál üres, és legközelebb újra próbálja)."""
     if host not in _LISTAK:
-        lista = await _wiim(hass, host, "EQGetList")
-        _LISTAK[host] = [str(x) for x in lista] if isinstance(lista, list) else []
+        try:
+            lista = await _wiim(hass, host, "EQGetList")
+        except HomeAssistantError:
+            return []
+        if not isinstance(lista, list) or not lista:
+            return []
+        _LISTAK[host] = [str(x) for x in lista]
     return _LISTAK[host]
 
 
@@ -199,11 +220,16 @@ async def equalizer(hass: HomeAssistant, entity_id: str, msg: dict[str, Any], co
     if not host:
         raise HomeAssistantError("Ezen a hangszórón nincs equalizer.")
     if msg.get("preset"):
+        if msg["preset"] not in await _wiim_lista(hass, host):
+            raise HomeAssistantError(f"Ismeretlen hangzás: {msg['preset']}")
         await _wiim(hass, host, f"EQLoad:{msg['preset']}")
     elif msg.get("profile"):
         await profilok.alkalmaz(host, f"own:{msg['profile']}")
     elif msg.get("bands"):
-        uj = [{"param_name": n, "value": max(0, min(100, round(float(v), 1)))} for n, v in msg["bands"].items()]
+        uj = [{"param_name": n, "value": max(0, min(100, round(float(v), 1)))} for n, v in msg["bands"].items()
+              if SAV_RE.match(n) and float(v) == float(v)]
+        if not uj:
+            raise HomeAssistantError("Nincs érvényes EQ-sáv.")
         await _wiim(hass, host, "EQSetBand:" + json.dumps({"EQBand": uj}, separators=(",", ":")))
     if "on" in msg:
         await _wiim(hass, host, "EQOn" if msg["on"] else "EQOff")
@@ -218,12 +244,20 @@ class Profilok:
         self.adat: dict[str, Any] | None = None
         self._utolso: dict[str, tuple[Any, ...]] = {}      # entity → (forrás, album) – csak ennek változásakor vált
         self._alkalmazott: dict[str, str] = {}             # entity → az utoljára magától feltett profil
+        self._zar = asyncio.Lock()
 
     async def betolt(self) -> dict[str, Any]:
-        if self.adat is None:
-            self.adat = (await self._store.async_load()) or {}
-            self.adat.setdefault("own", {})
-            self.adat.setdefault("auto", {"source": {}, "genre": {}})
+        async with self._zar:                              # párhuzamos első hívásnál se töltse kétszer (felülírná a mentést)
+            if self.adat is None:
+                adat = (await self._store.async_load()) or {}
+                adat = adat if isinstance(adat, dict) else {}
+                if not isinstance(adat.get("own"), dict):
+                    adat["own"] = {}
+                auto = adat.get("auto") if isinstance(adat.get("auto"), dict) else {}
+                auto["source"] = auto.get("source") if isinstance(auto.get("source"), dict) else {}
+                auto["genre"] = {k: v for k, v in (auto.get("genre") or {}).items() if isinstance(v, dict)} if isinstance(auto.get("genre"), dict) else {}
+                adat["auto"] = auto
+                self.adat = adat
         return self.adat
 
     def ment(self) -> None:
@@ -239,7 +273,7 @@ class Profilok:
             savok = (await self.betolt())["own"].get(ref[4:])
             if not savok:
                 raise HomeAssistantError(f"Nincs ilyen profil: {ref[4:]}")
-            uj = [{"param_name": n, "value": v} for n, v in savok.items()]
+            uj = [{"param_name": n, "value": v} for n, v in savok.items() if SAV_RE.match(n) and isinstance(v, (int, float))]
             await _wiim(self.hass, host, "EQSetBand:" + json.dumps({"EQBand": uj}, separators=(",", ":")))
             await _wiim(self.hass, host, "EQOn")
 
@@ -274,7 +308,8 @@ class Profilok:
                     break
         if ref is None:
             ref = auto["source"].get(forras) or None
-        if not ref or self._alkalmazott.get(e) == f"{ref}|{forras}|{mappa}":
+        # közben már másik album / forrás szól (gyors váltás): annak a feladata dönt
+        if not ref or self._alkalmazott.get(e) == f"{ref}|{forras}|{mappa}" or self._utolso.get(e) != (forras, mappa):
             return
         host = gazdagep(self.hass, e)
         if not host:
@@ -284,6 +319,9 @@ class Profilok:
             self._alkalmazott[e] = f"{ref}|{forras}|{mappa}"
             _LOGGER.debug("Cantabile: EQ-profil %s → %s (%s, %s)", ref, e, forras, mappa)
         except HomeAssistantError:
+            # a következő állapotváltozáskor újra próbálja (pl. épp újracsatlakozó WiiM)
+            if self._utolso.get(e) == (forras, mappa):
+                self._utolso.pop(e, None)
             _LOGGER.debug("Cantabile: az EQ-profil nem tehető fel (%s)", e, exc_info=True)
 
 
@@ -293,8 +331,14 @@ def _forras(hass: HomeAssistant, st: Any) -> tuple[str, str | None]:
     src = str(a.get("source") or "").lower()
     if src == "bluetooth":
         return "bt", None
-    if src.startswith("line"):
+    if src.startswith("line") or src == "aux":
         return "line", None
+    if src.startswith(("optical", "coax")):
+        return "optical", None
+    if src in ("tv", "hdmi", "arc"):
+        return "tv", None
+    if src.startswith("phono"):
+        return "phono", None
     cid = str(a.get("media_content_id") or "")
     u = urlsplit(cid)
     if u.path.startswith("/media/") and "authSig" in (u.query or ""):
@@ -318,9 +362,16 @@ async def bemenet(hass: HomeAssistant, entity_id: str, forras: str, context: Any
         # a Sonos bemenetről csak lejátszással jön vissza: a kártya ilyenkor maga indít zenét – itt csak megállítjuk
         await hass.services.async_call("media_player", "media_stop", {"entity_id": entity_id}, blocking=True, context=context)
         return
-    await hass.services.async_call("media_player", "select_source", {"entity_id": entity_id, "source": forras},
-                                   blocking=True, context=context)
-    if hangero is None:
+    tud = int(st.attributes.get("supported_features") or 0) & 2048 if st else 0      # SELECT_SOURCE
+    host = gazdagep(hass, entity_id) if ent and ent.platform in ("wiim", "linkplay") else None
+    if not tud and host and forras in WIIM_MOD:
+        # a lejátszó nem tud bemenetet váltani, de a WiiM igen (a bemeneteit is tőle kérdeztük)
+        if str(await _wiim(hass, host, f"setPlayerCmd:switchmode:{WIIM_MOD[forras]}")).strip().upper() != "OK":
+            raise HomeAssistantError(f"A hangszóró nem váltott át: {forras}")
+    else:
+        await hass.services.async_call("media_player", "select_source", {"entity_id": entity_id, "source": forras},
+                                       blocking=True, context=context)
+    if not isinstance(hangero, (int, float)):
         return
     for _ in range(12):        # a WiiM a bemenet saját hangerejére ugrik: ha átváltott, visszaállítjuk az előzőt
         await asyncio.sleep(0.5)
@@ -329,7 +380,7 @@ async def bemenet(hass: HomeAssistant, entity_id: str, forras: str, context: Any
             break
     await asyncio.sleep(0.5)
     s = hass.states.get(entity_id)
-    if s and s.attributes.get("volume_level") is not None and abs(s.attributes["volume_level"] - hangero) > 0.005:
+    if s and isinstance(s.attributes.get("volume_level"), (int, float)) and abs(s.attributes["volume_level"] - hangero) > 0.005:
         await hass.services.async_call("media_player", "volume_set", {"entity_id": entity_id, "volume_level": hangero},
                                        blocking=True, context=context)
 
@@ -396,8 +447,9 @@ def regisztral(hass: HomeAssistant) -> None:
     @websocket_api.async_response
     async def ws_input(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
         try:
-            _foglal(conn, msg["entity_id"], msg["device"])
+            _foglal(conn, msg["entity_id"], None)         # más használja: hiba; a hangszóró csak sikeres váltás után a miénk
             await bemenet(hass, msg["entity_id"], msg["source"], conn.context(msg))
+            _foglal(conn, msg["entity_id"], msg["device"])
         except HomeAssistantError as err:
             conn.send_error(msg["id"], "nem_sikerult", str(err))
             return
@@ -450,23 +502,36 @@ def regisztral(hass: HomeAssistant) -> None:
 
     @websocket_api.websocket_command({
         vol.Required("type"): "cantabile/eq/profile/save",
-        vol.Required("name"): vol.All(str, vol.Length(min=1, max=24)),
+        vol.Required("name"): vol.All(str, vol.Length(min=1, max=32)),
         vol.Required("entity_id"): str,
     })
     @websocket_api.async_response
     async def ws_mentes(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
-        """A hangszóró mostani sávállása saját profilként (a WiiM-ből olvasva – ami szól, az kerül el)."""
+        """A hangszóró mostani sávállása saját profilként (a WiiM-ből olvasva – ami szól, az kerül el: kikapcsolt EQ-nál
+        a semleges állás)."""
+        nev = msg["name"].strip()
         host = gazdagep(hass, msg["entity_id"])
-        eqv = await _wiim(hass, host, "EQGetBand") if host else None
-        if not isinstance(eqv, dict) or not eqv.get("EQBand"):
-            conn.send_error(msg["id"], "nem_sikerult", "A WiiM nem adta meg az EQ-sávjait.")
+        try:
+            if not PROFIL_RE.match(nev):
+                raise HomeAssistantError("A profil neve 1–32 betű, szám, szóköz vagy . & + ' ( ) / - lehet.")
+            eqv = await _wiim(hass, host, "EQGetBand") if host else None
+            savok = _savok(eqv)
+            if not savok:
+                raise HomeAssistantError("A WiiM nem adta meg az EQ-sávjait.")
+        except HomeAssistantError as err:
+            conn.send_error(msg["id"], "nem_sikerult", str(err))
             return
+        be = str(eqv.get("EQStat", "")).lower() == "on"
         a = await profilok.betolt()
-        a["own"][msg["name"].strip()] = {s["param_name"]: s["value"] for s in eqv["EQBand"]}
+        if nev in a["own"] and not conn.user.is_admin:
+            conn.send_error(msg["id"], "nem_sikerult", "Meglévő közös profilt csak rendszergazda írhat felül – adj neki új nevet.")
+            return
+        a["own"][nev] = {s["param_name"]: (s["value"] if be else 50) for s in savok}
         profilok.ment()
         conn.send_result(msg["id"])
 
     @websocket_api.websocket_command({vol.Required("type"): "cantabile/eq/profile/delete", vol.Required("name"): str})
+    @websocket_api.require_admin
     @websocket_api.async_response
     async def ws_torles(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
         a = await profilok.betolt()
@@ -474,7 +539,7 @@ def regisztral(hass: HomeAssistant) -> None:
         ref = f"own:{msg['name']}"
         for k in [k for k, v in a["auto"]["source"].items() if v == ref]:
             del a["auto"]["source"][k]
-        for k in [k for k, v in a["auto"]["genre"].items() if v.get("profile") == ref]:
+        for k in [k for k, v in a["auto"]["genre"].items() if isinstance(v, dict) and v.get("profile") == ref]:
             del a["auto"]["genre"][k]
         profilok.ment()
         conn.send_result(msg["id"])
@@ -485,12 +550,14 @@ def regisztral(hass: HomeAssistant) -> None:
         vol.Required("key"): str,
         vol.Optional("profile", default=""): str,
     })
+    @websocket_api.require_admin
     @websocket_api.async_response
     async def ws_auto(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
         """Forrás- vagy műfaj-profil („wiim:<név>”, „own:<név>”, „off”; üres: törlés). Műfajnál a kulcs a műfaj neve."""
         a = await profilok.betolt()
         prof = msg["profile"]
-        if prof and not (prof == "off" or prof.startswith(("wiim:", "own:"))):
+        if prof and not (prof == "off" or (prof.startswith("wiim:") and PROFIL_RE.match(prof[5:]))
+                         or (prof.startswith("own:") and prof[4:] in a["own"])):
             conn.send_error(msg["id"], "rossz_profil", prof)
             return
         if msg["kind"] == "source":
