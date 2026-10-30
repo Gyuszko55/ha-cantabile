@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **EQ tab** on the INPUT · TONE panel (WiiM / LinkPlay), like an old graphic equalizer: a profile display with ◀ ▶, EQ ON, STORE, DEL, AUTO and ten lit sliders (31 Hz – 16 kHz; drag, scroll, double-tap = 0). BASS / TREBLE and the sliders move together: the knobs show the average of their bands, and turning a knob moves its sliders. The EQ is per input, as the WiiM keeps it.
+- **Music profiles**: the WiiM's built-in sounds (Flat, Rock, Jazz, Classical, Vocal Booster, Loudness …) and your own profiles – STORE saves the current sliders under a name (kept in Home Assistant, shared by every card), DEL removes it.
+- **Automatic profile (AUTO)** by source (radio, music folder, Deezer, TIDAL, Qobuz, Spotify, BT IN, LINE IN, other) and, for the music folder, by the album's genre (the GENRE tab's tags); the genre wins over the source, and a profile can also be “EQ OFF”. It changes only when the source or the album changes, so a manual setting stays until then.
+- **LOUDNESS** key on Sonos (the speaker's own loudness switch).
+- New websocket commands `cantabile/eq/set`, `cantabile/eq/profiles`, `cantabile/eq/profile/save`, `cantabile/eq/profile/delete`, `cantabile/eq/auto/set`; `cantabile/controls` also returns `eq` and `loudness`.
+
 ## 1.12.20 – 2026-10-30
 
 - **INPUT · TONE**: a flip-down lower panel on both front panels (tab at the bottom), like the hinged flap of an old hi-fi, with the speaker's own inputs and BASS / TREBLE knobs (−10…+10). It closes with CLOSE or by itself after 20 s without a touch, and appears only when the speaker has something to set.

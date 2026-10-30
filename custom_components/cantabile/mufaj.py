@@ -144,6 +144,12 @@ class Gyujto:
         fut = self._futas.get(gyoker)
         return {"genres": lista, "done": kesz, "total": ossz, "running": bool(fut and not fut.done())}
 
+    async def mappa_mufajai(self, mappa: str) -> list[str]:
+        """Egy albummappa műfajai a tárolt gyűjtésből (üres, ha még nem olvastuk ki)."""
+        if self._tar is None:
+            self._tar = (await self._store.async_load()) or {}
+        return list((self._tar.get(mappa) or {}).get("g") or [])
+
     async def _gyujt(self, gyoker: str, kihagy: list[str], frissit: bool) -> None:
         assert self._tar is not None
         albumok = await self.hass.async_add_executor_job(_albumok, gyoker, kihagy)

@@ -322,6 +322,19 @@ const EN = {
   "Ezen a hangszórón nincs állítható bemenet vagy hangszín.": "This speaker has no input or tone setting.",
   "Olvasom a hangszóró beállításait…": "Reading the speaker's settings…",
   "A(z) {h} foglalt.": "{h} is in use.",
+  "Hangosság-kiegyenlítés (a hangszóró saját LOUDNESS-e)": "Loudness compensation (the speaker's own LOUDNESS)",
+  "Profil neve": "Profile name",
+  "Előző profil": "Previous profile",
+  "Következő profil": "Next profile",
+  "Equalizer be / ki": "Equalizer on / off",
+  "A mostani beállítás mentése saját profilként": "Save the current setting as your own profile",
+  "A saját profil törlése (még egy koppintás)": "Delete your own profile (tap again)",
+  "Automatikus profil forrás és műfaj szerint": "Automatic profile by source and genre",
+  "Olvasom a profilokat…": "Reading the profiles…",
+  "EGYÉB": "OTHER",
+  "A zenemappa műfajai a GENRE fülön gyűlnek össze; ha nincs zenemappa, csak a forrás szerinti profil működik.": "The music folder's genres are collected on the GENRE tab; without a music folder only the profile by source works.",
+  "Automatikus profil: a műfaj (zenemappa) erősebb a forrásnál. Csak forrás- vagy albumváltáskor vált, a kézi állítás addig megmarad.": "Automatic profile: the genre (music folder) wins over the source. It changes only when the source or the album changes; a manual setting stays until then.",
+  "Elmentve: {n}": "Saved: {n}",
   "A(z) {h} a(z) {b} bemenetről szólt – ez nem vihető át, szüneteltettem. Ha visszaváltasz rá, onnan folytatja.": "{h} was playing from its {b} input – that can't be moved, so it's paused. Switch back to it and it carries on."
 };
 // felirat a Home Assistant nyelvén: a forrásszöveg magyar, angolul az EN szótárból ({x} = behelyettesítés)
@@ -349,6 +362,9 @@ const ELENGEDO = new Set(["media_player.media_stop", "cantabile.stop_tracks"]);
 // a hangszóró saját bemenetei (hangszin.py) rövid, előlapi névvel
 const BEMENET_NEV = (n) => ({ network: "NET", bluetooth: "BT IN", "line in": "LINE IN", "line-in": "LINE IN", "optical in": "OPT IN", optical: "OPT IN", tv: "TV", hdmi: "HDMI",
   "phono in": "PHONO", phono: "PHONO", aux: "AUX", coaxial: "COAX", usb: "USB", cd: "CD", tuner: "TUNER" })[String(n || "").toLowerCase()] || String(n || "").toUpperCase();
+// a WiiM EQ-sávjai, amelyeket a BASS / TREBLE mozgat (súllyal; ugyanaz, mint a hangszin.py-ban)
+const EQ_MELY = { band31hz: 1, band63hz: 1, band125hz: 1, band250hz: 0.5 };
+const EQ_MAGAS = { band2khz: 0.5, band4khz: 1, band8khz: 1, band16khz: 1 };
 // a foglalás mellett kiírt készülékfajta
 const ESZKOZ = () => {
   const u = navigator.userAgent || "";
@@ -1630,6 +1646,60 @@ class CantabileCard extends HTMLElement {
         .fido { position: absolute; left: 14px; right: 14px; bottom: 4px; height: 2px; border-radius: 1px; background: rgba(0,0,0,.18); transform-origin: 0 50%; }
         .fedel.nyitva .fido { animation: fedfogy var(--fido, 20s) linear forwards; }
         @keyframes fedfogy { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+        /* EQ fül: régi grafikus equalizer – fülek a fedél tetején, profil-kijelző (VFD), billentyűk, 10 világító tolókar */
+        .ffulek { position: absolute; left: 16px; top: -1px; display: flex; gap: 2px; }
+        .fful { border: 0; border-radius: 0 0 4px 4px; padding: 4px 12px 5px; cursor: pointer; font: 700 calc(8px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .2em;
+          color: #5b6068; background: rgba(0,0,0,.08); box-shadow: inset 0 2px 3px rgba(0,0,0,.25); -webkit-tap-highlight-color: transparent; }
+        .fful.akt { color: #1d1f22; background: rgba(255,255,255,.55); box-shadow: inset 0 -1px 0 rgba(0,0,0,.15); }
+        .fedel.fulos { padding-top: 26px; }
+        .feq { display: flex; align-items: stretch; gap: 18px; flex: 1 1 auto; min-width: 0; justify-content: center; }
+        .feqbal { display: flex; flex-direction: column; gap: 10px; justify-content: center; min-width: 0; }
+        .fvfd { width: 230px; max-width: 100%; box-sizing: border-box; padding: 6px 8px 7px; border-radius: 3px; background: #07100f; box-shadow: inset 0 2px 6px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.5); }
+        .fvfd small { text-align: left; color: #2f7f74; font-size: calc(7px * var(--bk, 1)); letter-spacing: .2em; }
+        .fvsor { display: flex; align-items: center; gap: 6px; margin-top: 4px; min-height: 22px; }
+        .feqn { flex: 1; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          font: 400 calc(13px * var(--bk, 1))/1 Michroma, "Cantabile Sans", Arial, sans-serif; letter-spacing: .08em; color: #7ff6e2; text-shadow: 0 0 6px rgba(80,240,210,.65); }
+        .feqn.ki { color: #2d6f66; text-shadow: none; }
+        .feqlep { flex: none; width: 22px; height: 22px; padding: 4px; border: 0; border-radius: 3px; cursor: pointer; background: rgba(127,246,226,.08); -webkit-tap-highlight-color: transparent; }
+        .feqlep svg { width: 100%; height: 100%; fill: #7ff6e2; display: block; }
+        .feqnev { flex: 1; min-width: 0; box-sizing: border-box; border: 1px solid #2f7f74; border-radius: 3px; background: #0b1a18; color: #7ff6e2; padding: 3px 6px;
+          font: 500 calc(12px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; outline: none; }
+        .fvsor .bill { flex: none; height: 24px; min-width: 40px; padding: 9px 6px 2px; }
+        .feqgombok { height: 40px; }
+        .feqgombok .bill { min-width: 0; flex: 1; padding: 12px 5px 3px; }
+        .feqgombok .bill b { font-size: calc(9.5px * var(--bk, 1)); }
+        .ftolok { display: flex; gap: 4px; align-items: stretch; padding: 4px 8px 0; border-radius: 3px; background: rgba(0,0,0,.06); box-shadow: inset 0 1px 3px rgba(0,0,0,.2); }
+        .ftolo { width: 26px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .ftolo small { font-size: calc(7.5px * var(--bk, 1)); letter-spacing: .02em; }
+        .fsin { position: relative; width: 26px; height: 112px; cursor: ns-resize; touch-action: none; }
+        .fsin::before { content: ""; position: absolute; left: 50%; top: 4px; bottom: 4px; width: 4px; margin-left: -2px; border-radius: 2px; background: #1d1f22; box-shadow: inset 0 1px 2px #000, 0 1px 0 rgba(255,255,255,.6); }
+        .fnull { position: absolute; left: 3px; right: 3px; top: 50%; height: 1px; background: rgba(0,0,0,.35); }
+        .ffog { position: absolute; left: 1px; right: 1px; height: 12px; margin-bottom: -6px; border-radius: 2px; background: linear-gradient(180deg, #fafbfc, #c9cdd2); box-shadow: 0 2px 3px rgba(0,0,0,.45), 0 0 0 1px #6d7076; }
+        .ffog::after { content: ""; position: absolute; left: 3px; right: 3px; top: 5px; height: 2px; border-radius: 1px; background: #ff7a2f; box-shadow: 0 0 5px #ff7a2f; }
+        .ftolo.ki .ffog::after { background: #6b3a35; box-shadow: none; }
+        .fauto-lap { flex: 1 1 100%; display: flex; flex-direction: column; gap: 8px; min-width: 0; max-height: 250px; }
+        .fedel.autolap .fzar { position: absolute; right: 16px; top: 30px; }
+        .fedel.autolap .fafej { padding-right: 64px; }
+        .fafej { display: flex; align-items: center; gap: 10px; font: 500 calc(11px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; color: #4a4e55; }
+        .fafej .bill { flex: none; height: 30px; min-width: 56px; padding: 10px 6px 3px; }
+        .fakol { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; overflow-y: auto; overscroll-behavior: contain; min-height: 0; padding-right: 4px; }
+        .fakol small { text-align: left; margin-bottom: 4px; }
+        .fasor { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid rgba(0,0,0,.08);
+          font: 600 calc(11px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; color: #2b2e33; }
+        .fasor span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fauto { flex: none; width: 130px; border: 1px solid #7c8189; border-radius: 3px; background: #f3f4f6; color: #2b2e33; padding: 2px 4px; font: 500 calc(11px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; }
+        :host([fekete]) .fful { color: #9a9ea5; background: rgba(255,255,255,.04); }
+        :host([fekete]) .fful.akt { color: #e8eaed; background: rgba(255,255,255,.14); }
+        :host([fekete]) .ftolok { background: rgba(0,0,0,.25); }
+        :host([fekete]) .ffog { background: linear-gradient(180deg, #4a4d52, #1c1e21); box-shadow: 0 2px 3px rgba(0,0,0,.6), 0 0 0 1px #000; }
+        :host([fekete]) .fnull { background: rgba(255,255,255,.2); }
+        :host([fekete]) .fafej, :host([fekete]) .fasor { color: #c9ccd1; }
+        :host([fekete]) .fasor { border-color: rgba(255,255,255,.08); }
+        :host([fekete]) .fauto { background: #1c1e21; color: #e8eaed; border-color: #000; }
+        :host([keskeny]) .feq { flex-direction: column; align-items: center; gap: 10px; }
+        :host([keskeny]) .ftolo { width: 22px; } :host([keskeny]) .fsin { width: 22px; height: 96px; }
+        :host([keskeny]) .fakol { grid-template-columns: 1fr; }
+        :host([keskeny]) .fafej span { font-size: calc(10px * var(--bk, 1)); }
         :host([fekete]) .fedfog { background: linear-gradient(180deg, #0c0d0f, #1d1e21); color: #9a9ea5; box-shadow: inset 0 2px 3px rgba(0,0,0,.8); }
         :host([fekete]) .fedel { color: #d5d8dc;
           background: repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, rgba(0,0,0,.08) 1px 2px, transparent 2px 3px), linear-gradient(180deg, #2a2c30, #17181b);
@@ -4488,6 +4558,7 @@ class CantabileCard extends HTMLElement {
     const t = this._vezTar[e] = { ...(this._vezTar[e] || {}), tolt: true, ido: Date.now() };
     try { t.adat = await this._hass.callWS({ type: "cantabile/controls", entity_id: e }); } catch (_) { t.adat = t.adat || null; }
     t.tolt = false; t.ido = Date.now();
+    if (!this._eqKuld?.[e]) { if (this._hangTar) delete this._hangTar[e]; if (this._eqTar) delete this._eqTar[e]; }
     this._fedelFigyel(this._hangszoro());
     if (this._fedelE === e) this._fedelRajz();
   }
@@ -4514,7 +4585,7 @@ class CantabileCard extends HTMLElement {
 
   _fedelZar() {
     const p = this.shadowRoot?.getElementById("fedel");
-    this._fedelE = null; clearTimeout(this._fedelIdo);
+    this._fedelE = null; this._eqNev = null; this._eqTorol = false; clearTimeout(this._fedelIdo);
     if (!p || p.hidden) return;
     p.classList.remove("nyitva");
     setTimeout(() => { if (!this._fedelE) { p.hidden = true; p.innerHTML = ""; } }, 450);
@@ -4522,45 +4593,218 @@ class CantabileCard extends HTMLElement {
 
   // tétlenség után magától becsukódik; minden érintés újraindítja az órát
   _fedelEbreszt() {
-    const MP = 20, p = this.shadowRoot.getElementById("fedel"), cs = p?.querySelector(".fido");
+    const MP = this._fedelLap === "auto" || this._eqNev != null ? 60 : 20, p = this.shadowRoot.getElementById("fedel"), cs = p?.querySelector(".fido");
     clearTimeout(this._fedelIdo);
     this._fedelIdo = setTimeout(() => this._fedelZar(), MP * 1000);
     if (cs) { p.style.setProperty("--fido", `${MP}s`); cs.style.animation = "none"; void cs.offsetWidth; cs.style.animation = ""; }
+  }
+
+  // a WiiM sávjai a még el nem küldött helyi állításokkal együtt; a BASS / TREBLE ezekből jön (együtt mozognak)
+  _eqSavok(e) {
+    const eq = this._vezTar?.[e]?.adat?.eq, helyi = this._eqTar?.[e] || {};
+    return eq ? eq.bands.map((b) => ({ n: b.n, v: helyi[b.n] ?? b.v })) : [];
+  }
+  _eqBe(e) { const eq = this._vezTar?.[e]?.adat?.eq; return !!eq && (this._eqTar?.[e]?.__be ?? eq.on); }
+  _eqFok(e, f) {
+    const alak = f === "bass" ? EQ_MELY : EQ_MAGAS, sav = this._eqSavok(e).filter((b) => alak[String(b.n).toLowerCase()] === 1);
+    if (!this._eqBe(e) || !sav.length) return 0;
+    return Math.max(-10, Math.min(10, Math.round((sav.reduce((x, b) => x + Number(b.v), 0) / sav.length - 50) / 2.5)));
+  }
+
+  // a profilok listája a ◀ ▶ léptetéshez: a WiiM beépített hangzásai, utána a saját profilok (★)
+  _eqLista(e) {
+    const eq = this._vezTar?.[e]?.adat?.eq, own = Object.keys(this._eqProf?.own || {}).sort((a, b) => a.localeCompare(b));
+    return [...(eq?.presets || []).map((n) => ({ ref: `wiim:${n}`, nev: n })), ...own.map((n) => ({ ref: `own:${n}`, nev: `★ ${n}` }))];
+  }
+  _eqMost(e) {
+    const eq = this._vezTar?.[e]?.adat?.eq;
+    if (!eq) return null;
+    if (this._eqTar?.[e] && Object.keys(this._eqTar[e]).some((k) => k !== "__be" && k !== "__ref")) return this._eqTar[e].__ref || null;
+    if (this._eqTar?.[e]?.__ref) return this._eqTar[e].__ref;
+    if (eq.name && eq.presets.includes(eq.name)) return `wiim:${eq.name}`;
+    const savok = Object.fromEntries(eq.bands.map((b) => [String(b.n).toLowerCase(), Number(b.v)]));
+    for (const [n, sv] of Object.entries(this._eqProf?.own || {}))
+      if (Object.entries(sv).every(([k, v]) => Math.abs(Number(v) - (savok[k.toLowerCase()] ?? 50)) < 0.6)) return `own:${n}`;
+    return null;
   }
 
   _fedelRajz() {
     const p = this.shadowRoot.getElementById("fedel"), e = this._fedelE;
     if (!p || !e) return;
     const t = this._vezTar?.[e], adat = t?.adat, src = this._hass?.states[e]?.attributes?.source;
-    const kulcs = JSON.stringify([e, adat, src, this._hangTar?.[e]]);
+    const lap = adat?.eq ? this._fedelLap || "alap" : "alap";
+    const kulcs = JSON.stringify([e, adat, src, lap, this._hangTar?.[e], this._eqTar?.[e], this._eqProf, this._eqNev, this._eqTorol, this._eqMufajok?.length]);
     if (p.dataset.k === kulcs && p.innerHTML) return;
     p.dataset.k = kulcs;
     const zar = `<button class="fzar" title="CLOSE"><i></i><small>CLOSE</small></button><div class="fido"></div>`;
     if (!adat) { p.innerHTML = `<div class="fmeg">${t?.tolt !== false ? T("Olvasom a hangszóró beállításait…") : T("Ezen a hangszórón nincs állítható bemenet vagy hangszín.")}</div>${zar}`; return this._fedelEbreszt(); }
-    const bem = adat.inputs.length ? `<div class="fbem"><div class="fbill">${adat.inputs.map((n) => `<button class="bill fbe${n === src || (n === "Network" && !adat.inputs.includes(src)) ? " akt" : ""}" data-n="${ESC(n)}" title="${ESC(T("Bemenet: {b}", { b: n }))}"><span class="led"></span><b>${ESC(BEMENET_NEV(n))}</b></button>`).join("")}</div><small>INPUT</small></div>` : "";
-    const ertek = (f) => this._hangTar?.[e]?.[f] ?? adat.tone?.[f] ?? 0;
-    const tarcsa = (f, cim, felirat) => {
-      let jel = "";
-      for (let k = -10; k <= 10; k += 2) jel += `<i class="tj${k % 10 === 0 ? " n" : ""}" style="transform:rotate(${k * 13.5}deg)"></i>`;
-      return `<div class="fhang" data-f="${f}" title="${cim}">${jel}<b class="tsz" style="left:6px">−</b><b class="tsz" style="right:6px">+</b>
-        <div class="kgomb"><div class="ksapka" style="transform:rotate(${ertek(f) * 13.5}deg)"></div></div><div class="tcim">${felirat} <span>${ertek(f) > 0 ? "+" : ""}${ertek(f)}</span></div></div>`;
-    };
-    const hang = adat.tone ? tarcsa("bass", T("Mély: koppintva, húzva vagy görgetve; dupla koppintás: 0"), "BASS") + tarcsa("treble", T("Magas: koppintva, húzva vagy görgetve; dupla koppintás: 0"), "TREBLE") : "";
-    p.innerHTML = (bem || hang ? bem + hang : `<div class="fmeg">${T("Ezen a hangszórón nincs állítható bemenet vagy hangszín.")}</div>`) + zar;
-    p.querySelectorAll(".fhang").forEach((h) => this._kisTarcsa(h, e));
+    const fulek = adat.eq ? `<div class="ffulek">${[["alap", "INPUT · TONE"], ["eq", "EQ"]].map(([l, n]) => `<button class="fful${lap === l || (l === "eq" && lap === "auto") ? " akt" : ""}" data-l="${l}">${n}</button>`).join("")}</div>` : "";
+    p.classList.toggle("fulos", !!adat.eq);
+    p.classList.toggle("autolap", lap === "auto");
+    if (lap === "eq") p.innerHTML = fulek + this._eqLapHtml(e, adat) + zar;
+    else if (lap === "auto") p.innerHTML = fulek + this._autoLapHtml(e) + zar;
+    else {
+      const bem = adat.inputs.length ? `<div class="fbem"><div class="fbill">${adat.inputs.map((n) => `<button class="bill fbe${n === src || (n === "Network" && !adat.inputs.includes(src)) ? " akt" : ""}" data-n="${ESC(n)}" title="${ESC(T("Bemenet: {b}", { b: n }))}"><span class="led"></span><b>${ESC(BEMENET_NEV(n))}</b></button>`).join("")}</div><small>INPUT</small></div>` : "";
+      const ertek = (f) => (adat.eq ? this._eqFok(e, f) : this._hangTar?.[e]?.[f] ?? adat.tone?.[f] ?? 0);
+      const tarcsa = (f, cim, felirat) => {
+        let jel = "";
+        for (let k = -10; k <= 10; k += 2) jel += `<i class="tj${k % 10 === 0 ? " n" : ""}" style="transform:rotate(${k * 13.5}deg)"></i>`;
+        return `<div class="fhang" data-f="${f}" title="${cim}">${jel}<b class="tsz" style="left:6px">−</b><b class="tsz" style="right:6px">+</b>
+          <div class="kgomb"><div class="ksapka" style="transform:rotate(${ertek(f) * 13.5}deg)"></div></div><div class="tcim">${felirat} <span>${ertek(f) > 0 ? "+" : ""}${ertek(f)}</span></div></div>`;
+      };
+      const hang = adat.tone ? tarcsa("bass", T("Mély: koppintva, húzva vagy görgetve; dupla koppintás: 0"), "BASS") + tarcsa("treble", T("Magas: koppintva, húzva vagy görgetve; dupla koppintás: 0"), "TREBLE") : "";
+      const loud = adat.loudness != null ? `<div class="fbem"><div class="fbill"><button class="bill floud${(this._eqTar?.[e]?.__loud ?? adat.loudness) ? " akt" : ""}" title="${T("Hangosság-kiegyenlítés (a hangszóró saját LOUDNESS-e)")}"><span class="led"></span><b>LOUDNESS</b></button></div><small>TONE</small></div>` : "";
+      p.innerHTML = fulek + (bem || hang || loud ? bem + hang + loud : `<div class="fmeg">${T("Ezen a hangszórón nincs állítható bemenet vagy hangszín.")}</div>`) + zar;
+      p.querySelectorAll(".fhang").forEach((h) => this._kisTarcsa(h, e));
+    }
+    p.querySelectorAll(".ftolo").forEach((h) => this._eqTolo(h, e));
     this._fedelEbreszt();
+  }
+
+  // EQ fül: profil-kijelző ◀ ▶ léptetéssel, EQ ON · STORE · DEL · AUTO billentyűk és a 10 tolókar (régi grafikus EQ mintára)
+  _eqLapHtml(e, adat) {
+    const eq = adat.eq, be = this._eqBe(e), most = this._eqMost(e), lista = this._eqLista(e);
+    const nev = this._eqNev != null ? "" : most ? (lista.find((x) => x.ref === most)?.nev || most.replace(/^\w+:/, "")) : "CUSTOM";
+    const sajat = most?.startsWith("own:");
+    const kij = this._eqNev != null
+      ? `<input class="feqnev" maxlength="24" placeholder="${T("Profil neve")}" value="${ESC(this._eqNev)}" enterkeyhint="done"><button class="bill feqok"><span class="led"></span><b>OK</b></button>`
+      : `<button class="feqlep" data-lep="-1" title="${T("Előző profil")}"><svg viewBox="0 0 10 10"><path d="M7 1 2 5l5 4z"/></svg></button><b class="feqn${be ? "" : " ki"}">${ESC(String(nev).toUpperCase())}</b><button class="feqlep" data-lep="1" title="${T("Következő profil")}"><svg viewBox="0 0 10 10"><path d="M3 1l5 4-5 4z"/></svg></button>`;
+    const gomb = (o, n, akt, cim) => `<button class="bill ${o}${akt ? " akt" : ""}" title="${cim}"><span class="led"></span><b>${n}</b></button>`;
+    const FREK = { band31hz: "31", band63hz: "63", band125hz: "125", band250hz: "250", band500hz: "500", band1khz: "1k", band2khz: "2k", band4khz: "4k", band8khz: "8k", band16khz: "16k" };
+    const tolok = this._eqSavok(e).map((b) => `<div class="ftolo${be ? "" : " ki"}" data-n="${ESC(b.n)}" title="${FREK[String(b.n).toLowerCase()] || b.n} Hz"><div class="fsin"><i class="fnull"></i><i class="ffog" style="bottom:${Math.max(0, Math.min(100, Number(b.v)))}%"></i></div><small>${FREK[String(b.n).toLowerCase()] || ""}</small></div>`).join("");
+    return `<div class="feq"><div class="feqbal"><div class="fvfd"><small>PROFILE · ${ESC(BEMENET_NEV(eq.source === "wifi" ? "Network" : eq.source === "bluetooth" ? "Bluetooth" : eq.source === "line-in" ? "Line In" : eq.source || ""))}</small><div class="fvsor">${kij}</div></div>
+      <div class="fbill feqgombok">${gomb("feqbe", "EQ ON", be, T("Equalizer be / ki"))}${gomb("feqtar", "STORE", this._eqNev != null, T("A mostani beállítás mentése saját profilként"))}${sajat ? gomb("feqdel", this._eqTorol ? "DEL?" : "DEL", this._eqTorol, T("A saját profil törlése (még egy koppintás)")) : ""}${gomb("feqauto", "AUTO", false, T("Automatikus profil forrás és műfaj szerint"))}</div></div>
+      <div class="ftolok">${tolok}</div></div>`;
+  }
+
+  // AUTO lap: forrásonként és műfajonként egy profil; a műfaj erősebb (zenemappából szóló albumnál)
+  _autoLapHtml(e) {
+    const pr = this._eqProf;
+    if (!pr) return `<div class="fmeg">${T("Olvasom a profilokat…")}</div>`;
+    const lista = this._eqLista(e);
+    const valaszto = (kind, key, ert) => `<select class="fauto" data-kind="${kind}" data-key="${ESC(key)}"><option value="">—</option><option value="off"${ert === "off" ? " selected" : ""}>EQ OFF</option>${lista.map((x) => `<option value="${ESC(x.ref)}"${x.ref === ert ? " selected" : ""}>${ESC(x.nev)}</option>`).join("")}</select>`;
+    const FORRAS_NEV = { radio: "RADIO", nas: "NAS", deezer: "DEEZER", tidal: "TIDAL", qobuz: "QOBUZ", spotify: "SPOTIFY", bt: "BT IN", line: "LINE IN", egyeb: T("EGYÉB") };
+    const forrasok = pr.sources.map((k) => `<label class="fasor"><span>${FORRAS_NEV[k] || k.toUpperCase()}</span>${valaszto("source", k, pr.auto.source[k] || "")}</label>`).join("");
+    const kiosztott = Object.values(pr.auto.genre || {}), nevek = new Map();
+    kiosztott.forEach((g) => nevek.set(g.name.toLowerCase(), g.name));
+    (this._eqMufajok || []).forEach((g) => { if (g.name && !nevek.has(g.name.toLowerCase())) nevek.set(g.name.toLowerCase(), g.name); });
+    const ertekG = (n) => kiosztott.find((g) => g.name.toLowerCase() === n.toLowerCase())?.profile || "";
+    const mufajok = [...nevek.values()].map((n) => `<label class="fasor"><span>${ESC(n)}</span>${valaszto("genre", n, ertekG(n))}</label>`).join("")
+      || `<div class="fmeg">${T("A zenemappa műfajai a GENRE fülön gyűlnek össze; ha nincs zenemappa, csak a forrás szerinti profil működik.")}</div>`;
+    return `<div class="fauto-lap"><div class="fafej"><button class="bill fvissza"><span class="led"></span><b>‹ EQ</b></button><span>${T("Automatikus profil: a műfaj (zenemappa) erősebb a forrásnál. Csak forrás- vagy albumváltáskor vált, a kézi állítás addig megmarad.")}</span></div>
+      <div class="fakol"><div><small>SOURCE</small>${forrasok}</div><div><small>GENRE</small>${mufajok}</div></div></div>`;
   }
 
   // a fedél kezelése egyszer, eseménydelegálással (a tartalma újrarajzolódik)
   _fedelKezel(p) {
     if (!p) return;
-    ["pointerdown", "wheel", "keydown"].forEach((ev) => p.addEventListener(ev, () => this._fedelEbreszt(), { passive: true }));
+    ["pointerdown", "wheel", "keydown", "input", "change"].forEach((ev) => p.addEventListener(ev, () => this._fedelEbreszt(), { passive: true }));
     p.addEventListener("click", (ev) => {
       ev.stopPropagation();
-      if (ev.target.closest(".fzar")) return this._fedelZar();
-      const b = ev.target.closest(".fbe");
-      if (b && !b.classList.contains("akt")) this._bemenetValt(this._fedelE, b.dataset.n);
+      const e = this._fedelE, c = (s) => ev.target.closest(s);
+      if (c(".fzar")) return this._fedelZar();
+      if (c(".fful")) { this._fedelLap = c(".fful").dataset.l; this._eqNev = null; this._eqTorol = false; if (this._fedelLap === "eq") this._eqProfilok(); return this._fedelRajz(); }
+      const b = c(".fbe");
+      if (b && !b.classList.contains("akt")) return this._bemenetValt(e, b.dataset.n);
+      if (c(".floud")) { const most = this._eqTar?.[e]?.__loud ?? this._vezTar?.[e]?.adat?.loudness; return this._eqKuldj(e, { loudness: !most }, { __loud: !most }); }
+      if (c(".feqbe")) return this._eqKuldj(e, { on: !this._eqBe(e) }, { __be: !this._eqBe(e) });
+      if (c(".feqlep")) {
+        const L = this._eqLista(e); if (!L.length) return;
+        const i = L.findIndex((x) => x.ref === this._eqMost(e)), j = (((i < 0 ? (Number(c(".feqlep").dataset.lep) > 0 ? -1 : 0) : i) + Number(c(".feqlep").dataset.lep)) % L.length + L.length) % L.length;
+        return this._eqProfilTesz(e, L[j].ref);
+      }
+      if (c(".feqtar")) { this._eqNev = this._eqNev != null ? null : ""; this._fedelRajz(); return p.querySelector(".feqnev")?.focus(); }
+      if (c(".feqok")) return this._eqMent(e);
+      if (c(".feqdel")) {
+        if (!this._eqTorol) { this._eqTorol = true; this._fedelRajz(); clearTimeout(this._eqTorolIdo); this._eqTorolIdo = setTimeout(() => { this._eqTorol = false; this._fedelRajz(); }, 4000); return; }
+        this._eqTorol = false;
+        const ref = this._eqMost(e);
+        if (ref?.startsWith("own:")) this._hass.callWS({ type: "cantabile/eq/profile/delete", name: ref.slice(4) }).then(() => this._eqProfilok(true)).catch((err) => this._hivHiba(e, err));
+        return;
+      }
+      if (c(".feqauto")) { this._fedelLap = "auto"; this._eqProfilok(true); this._eqMufajLista(); return this._fedelRajz(); }
+      if (c(".fvissza")) { this._fedelLap = "eq"; return this._fedelRajz(); }
     });
+    p.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && ev.target.closest(".feqnev")) { ev.preventDefault(); this._eqMent(this._fedelE); } });
+    p.addEventListener("input", (ev) => { if (ev.target.closest(".feqnev")) this._eqNev = ev.target.value; });
+    p.addEventListener("change", (ev) => {
+      const s = ev.target.closest(".fauto"); if (!s) return;
+      this._hass.callWS({ type: "cantabile/eq/auto/set", kind: s.dataset.kind, key: s.dataset.key, profile: s.value })
+        .then(() => this._eqProfilok(true)).catch((err) => this._hivHiba(this._fedelE, err));
+    });
+  }
+
+  async _eqProfilok(friss = false) {
+    if (this._eqProf && !friss) return;
+    try { this._eqProf = await this._hass.callWS({ type: "cantabile/eq/profiles" }); } catch (_) { this._eqProf = this._eqProf || { own: {}, auto: { source: {}, genre: {} }, sources: [] }; }
+    this._fedelRajz();
+  }
+
+  async _eqMufajLista() {
+    const nas = String(this._config.magno?.nas || "").replace(/\/$/, "");
+    if (!nas || this._eqMufajok) return;
+    try {
+      const r = await this._hass.callWS({ type: "cantabile/genres", mappa: nas, kihagy: [this._telMappa(), this._config.magno?.hires].filter(Boolean) });
+      this._eqMufajok = (r.genres || []).filter((g) => g.name);
+    } catch (_) { this._eqMufajok = []; }
+    this._fedelRajz();
+  }
+
+  // beküldés (foglalás-figyeléssel); a helyi állapot azonnal látszik, utána a hangszóró friss adata
+  async _eqKuldj(e, adat, helyi = null) {
+    const fr = this._foglaloIds([e]);
+    if (fr) return this._foglaltUzen(fr);
+    this._eqTar = this._eqTar || {}; this._eqKuld = this._eqKuld || {};
+    if (helyi) { this._eqTar[e] = { ...(this._eqTar[e] || {}), ...helyi }; this._fedelRajz(); }
+    this._eqKuld[e] = (this._eqKuld[e] || 0) + 1;
+    try { await this._hass.callWS({ type: "cantabile/eq/set", entity_id: e, ...adat }); }
+    catch (err) {
+      const m = String(err?.message || "");
+      if (m.startsWith("busy:")) this._uzen(T("A(z) {h} foglalt: {n} használja.", { h: this._hszNev(e), n: m.slice(5) })); else this._hivHiba(e, err);
+    } finally { this._eqKuld[e]--; }
+    if (!this._eqKuld[e]) { clearTimeout(this._eqFrissIdo); this._eqFrissIdo = setTimeout(() => this._vezerlok(e), 500); }
+  }
+
+  _eqProfilTesz(e, ref) {
+    this._eqTar = this._eqTar || {};
+    this._eqTar[e] = {};
+    return this._eqKuldj(e, ref.startsWith("own:") ? { profile: ref.slice(4) } : { preset: ref.slice(5) }, { __ref: ref, __be: true });
+  }
+
+  async _eqMent(e) {
+    const nev = String(this._eqNev || "").trim();
+    if (!nev) return;
+    this._eqNev = null;
+    try {
+      await this._hass.callWS({ type: "cantabile/eq/profile/save", name: nev, entity_id: e });
+      await this._eqProfilok(true);
+      this._uzen(T("Elmentve: {n}", { n: nev }));
+    } catch (err) { this._hivHiba(e, err); }
+    this._fedelRajz();
+  }
+
+  // egy EQ-tolókar: függőleges húzás, görgő ±2,5, dupla koppintás 0 (50); a változott sávok 350 ms után együtt mennek
+  _eqTolo(h, e) {
+    const n = h.dataset.n, sin = h.querySelector(".fsin"), fog = h.querySelector(".ffog");
+    const most = () => Number(this._eqSavok(e).find((b) => b.n === n)?.v ?? 50);
+    const allit = (v) => {
+      v = Math.max(0, Math.min(100, Math.round(v * 2) / 2));
+      this._eqTar = this._eqTar || {};
+      this._eqTar[e] = { ...(this._eqTar[e] || {}), [n]: v, __be: true, __ref: null };
+      fog.style.bottom = `${v}%`;
+      this._eqKuldendo = { ...(this._eqKuldendo || {}), [n]: v };
+      clearTimeout(this._eqToloIdo);
+      this._eqToloIdo = setTimeout(() => { const s = this._eqKuldendo; this._eqKuldendo = null; if (s) this._eqKuldj(e, { bands: s }); }, 350);
+      if (id == null) this._fedelRajz();          // görgetés: a kijelző (CUSTOM) és a BASS / TREBLE rögtön; húzásnál az elengedéskor
+    };
+    const hely = (ev) => { const r = sin.getBoundingClientRect(); return (1 - (ev.clientY - r.top) / r.height) * 100; };
+    let id = null;
+    sin.addEventListener("pointerdown", (ev) => { ev.stopPropagation(); id = ev.pointerId; sin.setPointerCapture(id); this._fedelHuz = true; allit(hely(ev)); });
+    sin.addEventListener("pointermove", (ev) => { if (ev.pointerId === id) allit(hely(ev)); });
+    const vege = (ev) => { if (ev.pointerId !== id) return; id = null; this._fedelHuz = false; this._fedelRajz(); };
+    sin.addEventListener("pointerup", vege); sin.addEventListener("pointercancel", vege);
+    sin.addEventListener("dblclick", (ev) => { ev.stopPropagation(); allit(50); });
+    h.addEventListener("wheel", (ev) => { ev.preventDefault(); ev.stopPropagation(); allit(most() + ((ev.deltaY || -ev.deltaX) < 0 ? 2.5 : -2.5)); }, { passive: false });
   }
 
   async _bemenetValt(e, n) {
@@ -4583,19 +4827,33 @@ class CantabileCard extends HTMLElement {
   _kisTarcsa(h, e) {
     const f = h.dataset.f, g = h.querySelector(".kgomb"), sapka = h.querySelector(".ksapka"), felirat = h.querySelector(".tcim span");
     this._hangTar = this._hangTar || {};
-    const most = () => this._hangTar[e]?.[f] ?? this._vezTar?.[e]?.adat?.tone?.[f] ?? 0;
+    const vanEq = () => !!this._vezTar?.[e]?.adat?.eq;
+    const most = () => (vanEq() ? this._eqFok(e, f) : this._hangTar[e]?.[f] ?? this._vezTar?.[e]?.adat?.tone?.[f] ?? 0);
     const allit = (v) => {
       v = Math.max(-10, Math.min(10, Math.round(v)));
-      if (v === most() && this._hangTar[e]?.[f] != null) return;
+      if (v === most() && (vanEq() || this._hangTar[e]?.[f] != null)) return;
       this._hangTar[e] = { ...(this._hangTar[e] || {}), [f]: v };
+      if (vanEq()) {
+        // a tolókarok is mozdulnak: ugyanaz a sávalak, mint a szerveren (hangszin.py)
+        const alak = f === "bass" ? EQ_MELY : EQ_MAGAS, masik = f === "bass" ? "treble" : "bass", mv = this._eqBe(e) ? this._eqFok(e, masik) : 0;
+        const masAlak = f === "bass" ? EQ_MAGAS : EQ_MELY, uj = { __be: true, __ref: null };
+        for (const b of this._eqSavok(e)) {
+          const k = String(b.n).toLowerCase();
+          if (alak[k]) uj[b.n] = 50 + v * 2.5 * alak[k];
+          else if (!this._eqBe(e) && masAlak[k]) uj[b.n] = 50 + mv * 2.5 * masAlak[k];
+        }
+        this._eqTar = this._eqTar || {}; this._eqTar[e] = { ...(this._eqTar[e] || {}), ...uj };
+      }
       sapka.style.transform = `rotate(${v * 13.5}deg)`; felirat.textContent = `${v > 0 ? "+" : ""}${v}`;
       clearTimeout(this._hangKuld?.[f]); this._hangKuld = this._hangKuld || {};
       this._hangKuld[f] = setTimeout(async () => {
-        try { await this._hass.callWS({ type: "cantabile/tone/set", entity_id: e, [f]: this._hangTar[e][f] }); }
+        this._eqKuld = this._eqKuld || {}; this._eqKuld[e] = (this._eqKuld[e] || 0) + 1;
+        try { await this._hass.callWS({ type: "cantabile/tone/set", entity_id: e, [f]: this._hangTar[e][f] }); this._eqKuld[e]--; if (!this._eqKuld[e]) setTimeout(() => this._vezerlok(e), 500); }
         catch (err) {
           const m = String(err?.message || "");
           if (m.startsWith("busy:")) this._uzen(T("A(z) {h} foglalt: {n} használja.", { h: this._hszNev(e), n: m.slice(5) })); else this._hivHiba(e, err);
-          delete this._hangTar[e][f]; this._fedelRajz();
+          this._eqKuld[e]--; delete this._hangTar[e][f]; if (this._eqTar) delete this._eqTar[e];
+          this._vezerlok(e); this._fedelRajz();
         }
       }, 350);
     };

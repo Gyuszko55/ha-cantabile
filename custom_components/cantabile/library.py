@@ -17,7 +17,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 
-from .const import szoveg
+from .const import DOMAIN, szoveg
 
 ELOTAG = "media-source://media_source/"
 HANGFAJL = (".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wav", ".wma")
@@ -95,7 +95,7 @@ def regisztral(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_nas_lista)
 
     from .mufaj import Gyujto
-    gyujto = Gyujto(hass)
+    gyujto = hass.data[DOMAIN]["mufaj"] = Gyujto(hass)     # az EQ-profil műfaj szerinti választása is ezt kérdezi (hangszin.py)
 
     @websocket_api.websocket_command({
         vol.Required("type"): "cantabile/genres", vol.Required("mappa"): str,
