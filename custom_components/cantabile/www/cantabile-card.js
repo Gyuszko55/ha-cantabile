@@ -4576,9 +4576,15 @@ class CantabileCard extends HTMLElement {
     }));
     lista.querySelectorAll("[data-e]").forEach((b) => b.addEventListener("click", () => {
       // előadó: a zenemappában ha ott van, különben a Deezer / Spotify előadó-oldala
-      const x = eL[Number(b.dataset.e)], f = ["nas", "deezer", "spotify"].find((y) => x.f[y]);
+      // az ELŐADÓK közös lapja (zenemappa + Music Assistant + Deezer); csak Spotify-találatnál a Spotify előadó-oldala
+      const x = eL[Number(b.dataset.e)];
       pl.vissza = { ful: "mind", keres: kerdes };                  // a „‹ Vissza” ide hoz vissza
-      pl.ful = f; pl.ut = x.f[f].ut; pl.dzKeres = ""; pl.keres = ""; this._polcRajz();
+      if (!x.f.nas && !x.f.deezer && x.f.spotify) { pl.ful = "spotify"; pl.ut = x.f.spotify.ut; pl.dzKeres = ""; pl.keres = ""; return this._polcRajz(); }
+      const sajat = this._eloTar?.l.find((y) => y.kulcs === KERES_NORM(x.cim).trim());
+      const nasUt = x.f.nas?.ut?.[0], dzUt = x.f.deezer?.ut?.[0];
+      pl.ful = "eloado"; pl.keres = "";
+      pl.ut = [{ id: `e:${KERES_NORM(x.cim).trim()}`, cim: x.cim, nas: nasUt?.id || sajat?.nas, ma: sajat?.ma, dz: dzUt?.id, kep: x.kep || sajat?.kep || null }];
+      this._polcRajz();
     }));
     lista.querySelectorAll("[data-r]").forEach((b) => b.addEventListener("click", () => {
       const x = adok[Number(b.dataset.r)]; this._polcZar();
