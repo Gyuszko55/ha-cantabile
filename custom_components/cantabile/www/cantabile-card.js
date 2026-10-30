@@ -321,7 +321,8 @@ const EN = {
   "Magas: koppintva, húzva vagy görgetve; dupla koppintás: 0": "Treble: tap, drag or scroll; double-tap: 0",
   "Ezen a hangszórón nincs állítható bemenet vagy hangszín.": "This speaker has no input or tone setting.",
   "Olvasom a hangszóró beállításait…": "Reading the speaker's settings…",
-  "A(z) {h} foglalt.": "{h} is in use."
+  "A(z) {h} foglalt.": "{h} is in use.",
+  "A(z) {h} a(z) {b} bemenetről szólt – ez nem vihető át, szüneteltettem. Ha visszaváltasz rá, onnan folytatja.": "{h} was playing from its {b} input – that can't be moved, so it's paused. Switch back to it and it carries on."
 };
 // felirat a Home Assistant nyelvén: a forrásszöveg magyar, angolul az EN szótárból ({x} = behelyettesítés)
 const MAGYAR = () => /^hu/i.test(document.documentElement.lang || navigator.language || "");
@@ -2312,6 +2313,26 @@ class CantabileCard extends HTMLElement {
 
   // kimenetváltás: ami szól, átkerül az új kimenetre (mint egy igazi hangszóróválasztón); atvisz=false: csak választ
   async _atviszHaKell(regi, uj) {
+    // a hangszóró saját bemenete (BT IN, LINE IN) nem vihető át: a régi szünetel (BT-n a telefon is megáll), az új hallgat;
+    // ha visszaváltunk rá, onnan folytatja – hacsak nem visszük rá épp más zenét
+    if (regi.entity !== HELYI && this._bemenetrol(regi.entity)) {
+      const rs = this._allapot(regi), forras = rs?.attributes?.source;
+      if (SZOL(rs)) {
+        await this._hiv("media_player", "media_pause", { entity_id: regi.entity }, { csendes: true });
+        this._bemSzunet = { ...(this._bemSzunet || {}), [regi.entity]: { forras, ido: Date.now() } };
+        this._uzen(T("A(z) {h} a(z) {b} bemenetről szólt – ez nem vihető át, szüneteltettem. Ha visszaváltasz rá, onnan folytatja.", { h: KN(regi), b: BEMENET_NEV(forras) }));
+      }
+      return this._csoportAllit(uj);
+    }
+    const folyt = this._bemSzunet?.[uj.entity];
+    if (folyt) {
+      delete this._bemSzunet[uj.entity];
+      const us = this._hass?.states[uj.entity], rs = this._allapot(regi);
+      if (!SZOL(rs) && us?.state === "paused" && us.attributes?.source === folyt.forras && Date.now() - folyt.ido < 3 * 3600000) {
+        await this._csoportAllit(uj);
+        return this._hiv("media_player", "media_play", { entity_id: uj.entity });
+      }
+    }
     if (this._spotifyConnectSzol(regi)) {
       // Spotify Connect: a Spotify maga adja át a lejátszást a másik eszköznek
       const eszk = this._spotifyEszkoz(uj);
@@ -4471,7 +4492,10 @@ class CantabileCard extends HTMLElement {
   // a hangszóró most a saját bemenetéről szól (BT, LINE IN…), nem a hálózatról
   _bemenetrol(e) {
     const t = this._vezTar?.[e]?.adat, src = this._hass?.states[e]?.attributes?.source;
-    return !!(t && src && src !== "Network" && t.inputs.includes(src) && t.inputs.includes("Network"));
+    if (!src || src === "Network") return false;
+    // még nem olvastuk ki a bemeneteit (pl. épp most töltött be a kártya): a BT- és vonalbemenet neve is elárulja
+    if (!t) return /^(bluetooth|line[- ]?in)$/i.test(src);
+    return t.inputs.includes(src) && t.inputs.includes("Network");
   }
 
   _fedelNyit() {
