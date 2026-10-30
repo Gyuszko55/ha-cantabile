@@ -290,6 +290,8 @@ After setting up the integration, open your conversation agent's options (e.g. *
        cards:
          - type: custom:cantabile-tv
    ```
+   Optional: `weather: weather.your_entity` on the `cantabile-tv` card shows the current weather (icon and temperature)
+   before the clock; without it `weather.home` or the first weather entity is used, `weather: false` hides it.
    The TV loads this page through Home Assistant's Cast receiver, so Home Assistant must be reachable from the TV over
    https (Home Assistant Cloud or your own external URL).
 3. On the card: **⚙ → Speakers → + New speaker** → choose the **“Cantabile TV · …”** player (not the TV's own Cast /

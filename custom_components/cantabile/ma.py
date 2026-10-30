@@ -211,8 +211,10 @@ def regisztral(hass: HomeAssistant) -> None:
         except HomeAssistantError as err:
             conn.send_error(msg["id"], "nem_sikerult", str(err))
             return
-        elemek = [x for x in (_elem(hass, i) for i in (v or {}).get("items") or []) if x]
-        conn.send_result(msg["id"], {"items": elemek, "offset": msg["offset"], "more": len(elemek) >= msg["limit"]})
+        nyers = (v or {}).get("items") or []
+        elemek = [x for x in (_elem(hass, i) for i in nyers) if x]
+        # a lapozás a nyers darabszámon megy (a szűrés után kevesebb maradhat, a következő lap mégis létezik)
+        conn.send_result(msg["id"], {"items": elemek, "offset": msg["offset"], "next": msg["offset"] + len(nyers), "more": len(nyers) >= msg["limit"]})
 
     @websocket_api.websocket_command({
         vol.Required("type"): "cantabile/ma/search",

@@ -44,7 +44,8 @@ ELEM = vol.Schema({
     vol.Required("id"): vol.All(str, vol.Length(min=3, max=800)),
     vol.Optional("cim", default=""): vol.All(str, vol.Length(max=200)),
     vol.Optional("eloado", default=""): vol.All(str, vol.Length(max=200)),
-    vol.Optional("kep"): vol.Any(None, vol.All(str, vol.Length(max=800))),
+    # a borító más felhasználók kártyáján is megjelenik: csak https-cím vagy a HA saját (aláírt) útvonala
+    vol.Optional("kep"): vol.Any(None, vol.All(str, vol.Length(max=800), vol.Match(r"^(https://|/api/)"))),
 }, extra=vol.REMOVE_EXTRA)
 
 

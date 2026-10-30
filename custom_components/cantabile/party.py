@@ -43,6 +43,8 @@ URL = "/api/cantabile/party"
 KIVANSAG_MAX = 3            # függő kívánság vendégenként
 KIVANSAG_OSSZES = 30        # függő kívánság összesen
 ELOZMENY_MAX = 300          # ennyi szám nem jön újra (kis válogatásnál a fele)
+TURELEM_MP = 20             # indulás után ennyi ideig nem figyeli, mi szól (a Sonos még a régit jelezheti)
+KERES_KOZ = 0.25            # vendégkeresés: legalább ennyi mp két keresés között ugyanarról a címről
 
 
 def kozpont(hass: HomeAssistant) -> Partik:
@@ -68,6 +70,7 @@ class Party:
     def __init__(self, kp: Partik, tagok: list[str], mod: str, nas: str, osszes: dict[str, list[str]], albumok: list[str] | None,
                  cim: str, hires: str | None, gazda: dict[str, str]) -> None:
         self.kp, self.hass = kp, kp.hass
+        self.rt = kp.rt                             # a futó integráció (leállításkor már nem kérdezhető le)
         self.tagok, self.e, self.mod, self.nas, self.cim, self.hires, self.gazda = tagok, tagok[0], mod, nas, cim, hires, gazda
         self.osszes = osszes
         kulcsok = albumok if albumok else [a for a in osszes if not (hires and (a == hires or a.startswith(f"{hires}/")))]
@@ -84,13 +87,20 @@ class Party:
         self.utolso: str | None = None
         self._le: list[Any] = []
         self._tolt = False
+        self._tolto: Any = None
+        self._sajat: set[str] = set()               # a party által a Sonos-sorba tett számok (az eredeti útjukkal)
+        self._utolso_kiv: dict[str, Any] | None = None
+        self._index: list[tuple[str, str]] | None = None
+        self._keres_ido: dict[str, float] = {}
         self.aktiv = True
 
     # ---- válogatás ----
     def kovetkezo_rel(self) -> str:
+        self._utolso_kiv = None
         if self.kivansag:
             k = self.kivansag.popleft()
             f = k["f"]
+            self._utolso_kiv = k
             if k.get("ki"):
                 self.kerte[f] = k["ki"]
         else:
@@ -115,12 +125,21 @@ class Party:
     def kovetkezo(self) -> str | None:
         return None
 
+    def visszatesz(self) -> None:
+        """Léptetéskor: ha a hézagmentes lejátszó már előre elkérte a következő számot, és az egy vendégkívánság volt,
+        az visszakerül a kívánságok elejére (különben elveszne)."""
+        k = self._utolso_kiv
+        if k and self.utolso and self.utolso != self.most and self.utolso == f"{self.nas}/{k['f']}":
+            self.kivansag.appendleft(k)
+        self._utolso_kiv = None
+
     def _rel(self, id_or_url: str) -> str | None:
         """A szóló szám (media-source azonosító vagy a Sonos aláírt linkje) zenemappán belüli útja."""
-        t = unquote(str(id_or_url or "")).split("?")[0]
+        t = str(id_or_url or "")
         if t.startswith(f"{self.nas}/"):
-            rel = t[len(self.nas) + 1:]
+            rel = t[len(self.nas) + 1:]                         # media-source azonosító: nincs kódolva, „?” is lehet a nevében
         else:
+            t = unquote(t.split("?")[0])
             jel = f"/media/{self.nas[len(ELOTAG):]}/"           # a Sonos aláírt linkje: http://…/media/local/NAS310/…
             if jel not in t:
                 return None
@@ -136,7 +155,7 @@ class Party:
     # ---- indítás / leállítás ----
     async def indit(self) -> None:
         if self.mod != "sonos":
-            self.kp.rt.play_iter(self.e, self)
+            self.rt.play_iter(self.e, self)
             return
         z = self.kp.zene
         z._hatter_le(self.tagok)
@@ -152,8 +171,11 @@ class Party:
 
     async def _sonos_hozzaad(self) -> None:
         for _ in range(3):           # egy hibás fájl ne akassza meg: a következővel próbálja
+            if not self.aktiv:
+                return
             rel = self.kovetkezo_rel()
             uj = sonos_valtozat(self.osszes, [rel], self.hires)[0]
+            self._sajat.add(rel)
             try:
                 await self.kp.zene.hiv("media_player", "play_media", {"entity_id": self.e, "media_content_id": f"{self.nas}/{uj}",
                                                                       "media_content_type": "music", "enqueue": "add"})
@@ -168,7 +190,8 @@ class Party:
             return
         a = uj.attributes
         cid = str(a.get("media_content_id") or "")
-        if uj.state in ("playing", "paused") and cid and self._rel(cid) is None:
+        # más szól: nem a zenemappából, vagy nem a party tette a sorba (pl. egy album ugyanabból a mappából)
+        if uj.state in ("playing", "paused") and cid and time.time() - self.indult > TURELEM_MP and self._rel(cid) not in self._sajat:
             _LOGGER.info("Cantabile PARTY: más szól a(z) %s hangszórón, a party véget ért", self.e)
             self.kp.vege(self.e)
             return
@@ -182,21 +205,23 @@ class Party:
                 finally:
                     self._tolt = False
 
-            self.hass.async_create_background_task(tolt(), f"cantabile party {self.e}")
+            self._tolto = self.hass.async_create_background_task(tolt(), f"cantabile party {self.e}")
 
     def leall(self) -> None:
         self.aktiv = False
         for le in self._le:
             le()
         self._le.clear()
-        if self.mod != "sonos" and self.kp.rt.sorrend(self.e) is self:
-            self.kp.rt.stop_tracks(self.e)
+        if self._tolto is not None and not self._tolto.done():
+            self._tolto.cancel()
+        if self.mod != "sonos" and self.rt.sorrend(self.e) is self:
+            self.rt.stop_tracks(self.e)
 
     def el(self) -> bool:
         if not self.aktiv:
             return False
         if self.mod != "sonos":
-            return self.kp.rt.sorrend(self.e) is self
+            return self.rt.sorrend(self.e) is self
         return True
 
     # ---- állapot ----
@@ -224,29 +249,40 @@ class Party:
         szavak = norm(q).split()
         if not szavak:
             return []
+        if self._index is None:     # egyszer a party alatt: a normalizált „album fájl” szöveg számonként
+            self._index = [(f"{norm(a)} {norm(f.rpartition('/')[2])}", f) for a, fajlok in self.osszes.items()
+                           if not (self.hires and (a == self.hires or a.startswith(f"{self.hires}/"))) for f in fajlok]
         ki = []
-        for a, fajlok in self.osszes.items():
-            if self.hires and (a == self.hires or a.startswith(f"{self.hires}/")):
-                continue
-            na = norm(a)
-            for f in fajlok:
-                if all(w in na or w in norm(f.rpartition("/")[2]) for w in szavak):
-                    ki.append(_szam(f))
-                    if len(ki) >= 40:
-                        return ki
+        for szoveg, f in self._index:
+            if all(w in szoveg for w in szavak):
+                ki.append(_szam(f))
+                if len(ki) >= 40:
+                    break
         return ki
 
-    def kivan(self, rel: str, ki: str, vendeg_id: str) -> int:
+    def keres_szabad(self, cim: str) -> bool:
+        """Egyszerű korlát: ugyanarról a címről legfeljebb 4 keresés másodpercenként."""
+        most = time.monotonic()
+        if most - self._keres_ido.get(cim, 0) < KERES_KOZ:
+            return False
+        if len(self._keres_ido) > 500:
+            self._keres_ido.clear()
+        self._keres_ido[cim] = most
+        return True
+
+    def kivan(self, rel: str, ki: str, vendeg_id: str, cim: str = "") -> int:
         album = rel.rpartition("/")[0]
         if rel not in self.osszes.get(album, []):
             raise ValueError("unknown")
         if not self.vendeg:
             raise ValueError("closed")
-        if len(self.kivansag) >= KIVANSAG_OSSZES or sum(1 for k in self.kivansag if k["v"] == vendeg_id) >= KIVANSAG_MAX:
+        # vendégenként (süti) 3, és ugyanarról a címről legfeljebb 6 – a süti cseréjével ne lehessen telerakni
+        if (len(self.kivansag) >= KIVANSAG_OSSZES or sum(1 for k in self.kivansag if k["v"] == vendeg_id) >= KIVANSAG_MAX
+                or (cim and sum(1 for k in self.kivansag if k.get("c") == cim) >= KIVANSAG_MAX * 2)):
             raise ValueError("limit")
         if any(k["f"] == rel for k in self.kivansag):
             raise ValueError("queued")
-        self.kivansag.append({"f": rel, "ki": ki[:24].strip() or None, "v": vendeg_id})
+        self.kivansag.append({"f": rel, "ki": ki[:24].strip() or None, "v": vendeg_id, "c": cim})
         return len(self.kivansag)
 
 
@@ -275,6 +311,8 @@ class Partik:
         return self.partik
 
     def tokennel(self, token: str) -> Party | None:
+        if not token or len(token) > 64 or not token.isascii():
+            return None
         for p in self.elo().values():
             if secrets.compare_digest(p.token, token):
                 return p
@@ -333,6 +371,7 @@ def regisztral(hass: HomeAssistant) -> None:
     async def ws_start(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
         e = msg["entity_id"]
         tagok = [e] + [t for t in msg.get("tagok") or [] if t != e]
+        p: Party | None = None
         try:
             _foglal(conn, tagok)
             nas = msg["mappa"].rstrip("/")
@@ -347,11 +386,13 @@ def regisztral(hass: HomeAssistant) -> None:
             await p.indit()
             foglalas.kozpont(hass).foglal(tagok, conn.user.id, conn.user.name or "?", msg["device"])
         except (HomeAssistantError, HibaUzenet) as err:
-            kp.vege(e)
+            if p is not None and kp.partik.get(e) is p:     # csak a most indított partyt, egy másik futóét nem
+                kp.vege(e)
             conn.send_error(msg["id"], "party_failed", str(err))
             return
         except Exception as err:  # noqa: BLE001
-            kp.vege(e)
+            if p is not None and kp.partik.get(e) is p:
+                kp.vege(e)
             _LOGGER.exception("Cantabile PARTY: nem indult (%s)", e)
             conn.send_error(msg["id"], "party_failed", str(err))
             return
@@ -397,6 +438,11 @@ def regisztral(hass: HomeAssistant) -> None:
     def ws_guests(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
         p = kp.elo().get(msg["entity_id"])
         if p:
+            try:
+                _foglal(conn, [p.e])
+            except HomeAssistantError as err:
+                conn.send_error(msg["id"], "busy", str(err))
+                return
             p.vendeg = msg["on"]
             if not p.vendeg:
                 p.token = secrets.token_urlsafe(18)       # a régi link (és QR) érvénytelen lesz
@@ -454,6 +500,8 @@ class VendegKeres(HomeAssistantView):
     async def get(self, req: web.Request, token: str) -> web.Response:
         p = _party(req, token)
         q = req.query.get("q", "")[:60]
+        if not p.keres_szabad(req.remote or "?"):
+            return self.json({"hiba": "slow"}, status_code=429)
         return self.json({"talalat": await req.app["hass"].async_add_executor_job(p.keres, q) if len(q.strip()) >= 2 else []})
 
 
@@ -466,7 +514,7 @@ class VendegKer(HomeAssistantView):
         p = _party(req, token)
         try:
             adat = await req.json()
-            hely = p.kivan(str(adat.get("f") or "")[:600], str(adat.get("ki") or ""), _vendeg_id(req))
+            hely = p.kivan(str(adat.get("f") or "")[:600], str(adat.get("ki") or ""), _vendeg_id(req), req.remote or "")
         except ValueError as err:
             return self.json({"hiba": str(err)}, status_code=400)
         except Exception:  # noqa: BLE001
@@ -546,12 +594,12 @@ async function allapot(){
 async function keres(){
  const q=$("q").value.trim();if(q.length<2){$("tal").innerHTML="";$("uz").textContent="";return}
  $("uz").textContent="Keresés…";
- try{const r=await fetch(alap+"/search?q="+encodeURIComponent(q),{cache:"no-store"});tal=(await r.json()).talalat||[];
+ try{const r=await fetch(alap+"/search?q="+encodeURIComponent(q),{cache:"no-store"});if(r.status===429){clearTimeout(ido);ido=setTimeout(keres,500);return}tal=(await r.json()).talalat||[];
  $("uz").textContent=tal.length?"":"Nincs ilyen a zenetárban.";
  $("tal").innerHTML=tal.map((t,i)=>`<div class="s"><div><b>${E(t.cim)}</b><span>${E([t.eloado,t.album].filter(Boolean).join(" · "))}</span></div><button data-i="${i}">Kérem</button></div>`).join("");
  }catch(e){$("uz").textContent="A keresés most nem megy."}
 }
-$("q").addEventListener("input",()=>{clearTimeout(ido);ido=setTimeout(keres,350)});
+$("q").addEventListener("input",()=>{clearTimeout(ido);ido=setTimeout(keres,400)});
 $("tal").addEventListener("click",async(ev)=>{
  const b=ev.target.closest("button");if(!b)return;const t=tal[Number(b.dataset.i)];b.disabled=true;
  try{const r=await fetch(alap+"/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({f:t.f,ki:$("nev").value})});

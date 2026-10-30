@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Cantabile TV: the current weather before the clock** – a line icon (sun, clouds, rain, snow, fog, storm…) and the temperature, top right of the TV page, refreshed with the clock. Set `weather: weather.xxx` on the `custom:cantabile-tv` card; without it `weather.home` or the first weather entity is used, `weather: false` hides it.
+- Fixes from a full review:
+  - PARTY: a failed start (busy speaker, missing music folder) no longer ends someone else's running party; on WiiM / Cast a party is no longer ended by a status check right after start or skip; skipping on a gapless player no longer drops a guest request; reloading the integration while a party runs works; on Sonos the party ends when anything it didn't queue starts playing (e.g. an album from the same music folder); the queue top-up stops with the party.
+  - Guest page: odd tokens give 404 instead of a server error; the search uses a prepared index and a light rate limit (the page retries by itself); besides 3 requests per guest, one address can hold at most 6; only the party's owner (or an admin) can switch guests on / off.
+  - Playlists: cover addresses must be https or Home Assistant's own; removing tracks quickly removes the right ones; Escape cancels renaming and Enter saves once; switching speakers starts a playlist (or a party) on the new speaker first and stops the old one only if that worked – otherwise the music stays where it was – and a playlist continues from the track that was playing.
+  - ARTISTS: the Music Assistant library is paged by the server's real count (no silently cut lists); a source that didn't answer isn't cached for 5 minutes; an MA album without an artist no longer hides the MA section.
+  - GENRES: “Hip-Hop”, “R'n'B” and drum & bass styles find their family; a genre page loads its Deezer data once.
+  - Radio wheel: a broken saved list or a list replaced meanwhile no longer leaves the wheel stuck or plays the wrong station; a pending wheel step is cancelled when the card goes away.
+  - The result message after a save goes only to the card that was rebuilt with the same speakers and stations.
+
 ## 2.1.0 – 2026-10-30
 
 Cantabile 2.1: the library. EJECT now opens one window organised by what you want to hear – artists, genres, an endless party with guest requests, playlists – across the music folder, Music Assistant (and the services linked in it) and Deezer.

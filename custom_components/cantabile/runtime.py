@@ -159,6 +159,7 @@ class Cantabile:
     def play_iter(self, entity_id: str, sorrend: Any) -> None:
         """Sorozatlejátszás tetszőleges sorrendből (pl. a PARTY végtelen válogatása: `szamok` nélkül, mindig a következőt adja)."""
         self.stop_tracks(entity_id)
+        self._sorrend[entity_id] = sorrend      # rögtön: a UPnP-keresés alatt is látszódjon, mi fut (a PARTY ebből tudja, hogy él)
         self._sorozat[entity_id] = self.hass.async_create_background_task(
             self._sorozat_fut(entity_id, sorrend), f"cantabile tracks {entity_id}"
         )
@@ -177,19 +178,20 @@ class Cantabile:
     @callback
     def add_tracks(self, entity_id: str, tracks: list[str]) -> None:
         """A szóló sorozat végére fűz (a háttérben feltöltött saját zene)."""
-        if (s := self._sorrend.get(entity_id)) is not None:
+        if (s := self._sorrend.get(entity_id)) is not None and hasattr(s, "hozzaad"):
             s.hozzaad(tracks)
 
     @callback
     def set_order(self, entity_id: str, tracks: list[str]) -> None:
         """A szóló sorozat új sorrendje (a SOR fülön húzással): a szóló szám után ebben a sorrendben folytatja."""
-        if (s := self._sorrend.get(entity_id)) is not None:
+        if (s := self._sorrend.get(entity_id)) is not None and hasattr(s, "atrendez"):
             s.atrendez(tracks)
 
     def ugrik(self, entity_id: str, lepes: int) -> bool:
         """Következő / előző szám a sorozatlejátszásban (a szóló számhoz képest); False, ha nincs futó sorozat."""
         s = self._sorrend.get(entity_id)
         if s is not None and getattr(s, "party", False) and lepes > 0 and self.tracks_running(entity_id):
+            s.visszatesz()                   # az előre elkért vendégkívánság ne vesszen el
             self.play_iter(entity_id, s)     # PARTY: a következő válogatott szám
             return True
         if s is None or not s.szamok or not self.tracks_running(entity_id):

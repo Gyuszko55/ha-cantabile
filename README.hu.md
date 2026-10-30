@@ -289,6 +289,8 @@ Az integráció beállítása után nyisd meg a beszélgetőügynök beállítá
        cards:
          - type: custom:cantabile-tv
    ```
+   Elhagyható: a `cantabile-tv` kártyán `weather: weather.entitasod` – az óra előtt a pillanatnyi időjárás (ikon és hőfok);
+   nélküle a `weather.home`, vagy az első időjárás-entitás látszik, `weather: false` elrejti.
    A TV ezt az oldalt a Home Assistant Cast-vevőjén át tölti be, ezért a Home Assistantnak a TV felől https-en
    elérhetőnek kell lennie (Home Assistant Cloud vagy saját külső cím).
 3. A kártyán: **⚙ → Hangszórók → + Új hangszóró** → a **„Cantabile TV · …”** lejátszót válaszd (ne a TV saját Cast- /
