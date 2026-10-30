@@ -314,7 +314,14 @@ const EN = {
   "Nincs beszédfelismerő: állíts be egy hangsegédet beszédfelismeréssel (Beállítások → Hangsegédek).": "No speech recognition: set up an assistant with speech-to-text (Settings → Voice assistants).",
   "A beszédfelismerés nem sikerült: {e}": "Speech recognition failed: {e}",
   "A Cantabile integráció nincs telepítve.": "The Cantabile integration is not installed.",
-  "Rádióadásnál a pontos hely nem ismert, a szöveg kiemelés nélkül látszik.": "On radio the exact position is unknown, so no line is highlighted."
+  "Rádióadásnál a pontos hely nem ismert, a szöveg kiemelés nélkül látszik.": "On radio the exact position is unknown, so no line is highlighted.",
+  "Bemenet és hangszín": "Input and tone",
+  "Bemenet: {b}": "Input: {b}",
+  "Mély: koppintva, húzva vagy görgetve; dupla koppintás: 0": "Bass: tap, drag or scroll; double-tap: 0",
+  "Magas: koppintva, húzva vagy görgetve; dupla koppintás: 0": "Treble: tap, drag or scroll; double-tap: 0",
+  "Ezen a hangszórón nincs állítható bemenet vagy hangszín.": "This speaker has no input or tone setting.",
+  "Olvasom a hangszóró beállításait…": "Reading the speaker's settings…",
+  "A(z) {h} foglalt.": "{h} is in use."
 };
 // felirat a Home Assistant nyelvén: a forrásszöveg magyar, angolul az EN szótárból ({x} = behelyettesítés)
 const MAGYAR = () => /^hu/i.test(document.documentElement.lang || navigator.language || "");
@@ -338,6 +345,9 @@ const HELYI = "helyi:bt";
 // hangszóró-foglalás (foglalas.py): ezek a hívások a hangszórót a felhasználóé teszik, ezek elengedik
 const FOGLALO = new Set(["media_player.play_media", "media_player.media_play", "media_player.join", "media_player.select_source", "cantabile.play_tracks", "sonos.play_queue"]);
 const ELENGEDO = new Set(["media_player.media_stop", "cantabile.stop_tracks"]);
+// a hangszóró saját bemenetei (hangszin.py) rövid, előlapi névvel
+const BEMENET_NEV = (n) => ({ network: "NET", bluetooth: "BT IN", "line in": "LINE IN", "line-in": "LINE IN", "optical in": "OPT IN", optical: "OPT IN", tv: "TV", hdmi: "HDMI",
+  "phono in": "PHONO", phono: "PHONO", aux: "AUX", coaxial: "COAX", usb: "USB", cd: "CD", tuner: "TUNER" })[String(n || "").toLowerCase()] || String(n || "").toUpperCase();
 // a foglalás mellett kiírt készülékfajta
 const ESZKOZ = () => {
   const u = navigator.userAgent || "";
@@ -1050,10 +1060,10 @@ class CantabileCard extends HTMLElement {
           background: repeating-conic-gradient(#d8dbdf 0 2.5deg, #7d828a 2.5deg 5deg);
           box-shadow: 0 6px 12px rgba(0,0,0,.45), 0 0 0 2px #50545a; touch-action: none; cursor: grab; }
         .gomb:active { cursor: grabbing; }
-        .sapka { position: absolute; inset: 9px; border-radius: 50%; transition: transform .15s;
+        .sapka, .ksapka { position: absolute; inset: 9px; border-radius: 50%; transition: transform .15s;
           background: conic-gradient(from 20deg, #f4f5f6, #a9aeb4 12%, #eceef0 25%, #9da2a8 38%, #f1f2f3 50%, #a2a7ad 62%, #e9ebed 75%, #9ca1a7 88%, #f4f5f6);
           box-shadow: inset 0 2px 2px rgba(255,255,255,.9), inset 0 -3px 5px rgba(0,0,0,.35); }
-        .sapka::after { content: ""; position: absolute; left: 50%; top: 9px; width: 5px; height: 22px; margin-left: -2.5px; border-radius: 3px; background: #1d1f22; box-shadow: inset 0 1px 1px rgba(255,255,255,.3); }
+        .sapka::after, .ksapka::after { content: ""; position: absolute; left: 50%; top: 9px; width: 5px; height: 22px; margin-left: -2.5px; border-radius: 3px; background: #1d1f22; box-shadow: inset 0 1px 1px rgba(255,255,255,.3); }
         .hcim { position: absolute; left: 0; right: 0; bottom: -1px; text-align: center; font: 700 calc(10px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .25em; color: #3d4148; }
         .hcim span { letter-spacing: .05em; color: #5b6068; font-weight: 600; }
         .lent { display: flex; align-items: center; gap: 10px; flex: none; }
@@ -1579,6 +1589,58 @@ class CantabileCard extends HTMLElement {
         :host([magas]) ha-card { grid-template-rows: auto; align-content: center; }
         :host([magas]) .elo { height: auto; aspect-ratio: 2.3; max-height: 100%; }
         /* üzenetablak: külön réteg a kártya fölött – füstüveg, borostyán szegély, Michroma fejléc, Exo 2 szöveg, fogyó időcsík */
+        /* lenyíló előlap (INPUT · BASS · TREBLE): a régi hi-fi alsó, lenyitható fedele a ritkán kellő kezelőszervekkel.
+           Fogója az előlap alján; a fedél alul csuklósan nyílik a néző felé, és 20 mp tétlenség után magától visszacsukódik */
+        .fedfog { position: absolute; left: 50%; bottom: 0; z-index: 4; transform: translateX(-50%); height: 13px; padding: 0 16px; border: 0; border-radius: 0 0 7px 7px;
+          cursor: pointer; font: 700 calc(7px * var(--bk, 1))/13px "Cantabile Sans", Arial, sans-serif; letter-spacing: .26em; color: #4f545b; white-space: nowrap;
+          background: linear-gradient(180deg, #a9aeb5, #c3c7cc); box-shadow: inset 0 2px 3px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.5); -webkit-tap-highlight-color: transparent; }
+        .fedfog::before { content: ""; display: inline-block; vertical-align: 1px; margin-right: 6px; border: 3.5px solid transparent; border-top: 4.5px solid currentColor; border-bottom: 0; }
+        .fedfog[hidden] { display: none; }
+        .fedel { position: absolute; left: 12px; right: 12px; bottom: 6px; z-index: 8; box-sizing: border-box; border-radius: 4px 4px 6px 6px; padding: 14px 18px 12px;
+          display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px 22px; color: #2b2e33;
+          background:
+            repeating-linear-gradient(90deg, rgba(255,255,255,.10) 0 1px, rgba(0,0,0,.035) 1px 2px, transparent 2px 3px),
+            linear-gradient(180deg, #d9dce0, #bfc3c9 60%, #aeb3ba);
+          box-shadow: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(0,0,0,.25), 0 0 0 1px #6d7076, 0 -6px 18px rgba(0,0,0,.35), 0 14px 26px rgba(0,0,0,.45);
+          transform-origin: 50% 100%; transform: perspective(700px) rotateX(84deg); opacity: 0; pointer-events: none;
+          transition: transform .45s cubic-bezier(.2,1.1,.4,1), opacity .3s; }
+        .fedel.nyitva { transform: none; opacity: 1; pointer-events: auto; }
+        .fedel[hidden] { display: none; }
+        .fedel::before { content: ""; position: absolute; left: 10px; right: 10px; top: 4px; height: 3px; border-radius: 2px; background: linear-gradient(180deg, rgba(0,0,0,.28), rgba(255,255,255,.4)); }
+        .fedel small { display: block; text-align: center; font: 700 calc(8px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .24em; color: #4f545b; }
+        .fbem { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+        .fbill { display: flex; gap: 6px; height: 46px; }
+        .fbill .bill { flex: none; min-width: 58px; padding: 13px 8px 4px; }
+        .fbill .bill b { font-size: calc(11px * var(--bk, 1)); letter-spacing: .06em; }
+        .fhang { position: relative; width: 92px; height: 98px; flex: none; }
+        .fhang .tj { position: absolute; left: 50%; top: 44px; width: 1.5px; height: 6px; margin: -40px 0 0 -.75px; background: #3d4148; transform-origin: .75px 40px; }
+        .fhang .tj.n { height: 8px; width: 2px; margin-left: -1px; transform-origin: 1px 40px; }
+        .fhang .tsz { position: absolute; top: 36px; font: 700 calc(8px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; color: #3d4148; }
+        .kgomb { position: absolute; left: 50%; top: 44px; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; touch-action: none; cursor: grab;
+          background: repeating-conic-gradient(#d8dbdf 0 5deg, #7d828a 5deg 10deg); box-shadow: 0 4px 8px rgba(0,0,0,.45), 0 0 0 1.5px #50545a; }
+        .kgomb .ksapka { inset: 5px; }
+        .kgomb .ksapka::after { top: 4px; width: 3px; height: 12px; margin-left: -1.5px; }
+        .fhang .tcim { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font: 700 calc(9px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .22em; color: #3d4148; }
+        .fhang .tcim span { letter-spacing: .04em; color: #5b6068; }
+        .fzar { align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 6px; border: 0; background: none; cursor: pointer; padding: 0; -webkit-tap-highlight-color: transparent; }
+        .fzar i { display: block; width: 46px; height: 22px; border-radius: 3px; border: 1px solid #7c8189; background: linear-gradient(180deg, #fafbfc, #dde0e4 70%, #c9cdd2); box-shadow: 0 4px 0 #80858c, 0 5px 5px rgba(0,0,0,.25); transition: transform .12s, box-shadow .12s; }
+        .fzar:active i { transform: translateY(3px); box-shadow: 0 1px 0 #80858c; }
+        .fmeg { flex-basis: 100%; text-align: center; font: 500 calc(12px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; color: #4a4e55; }
+        .fido { position: absolute; left: 14px; right: 14px; bottom: 4px; height: 2px; border-radius: 1px; background: rgba(0,0,0,.18); transform-origin: 0 50%; }
+        .fedel.nyitva .fido { animation: fedfogy var(--fido, 20s) linear forwards; }
+        @keyframes fedfogy { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+        :host([fekete]) .fedfog { background: linear-gradient(180deg, #0c0d0f, #1d1e21); color: #9a9ea5; box-shadow: inset 0 2px 3px rgba(0,0,0,.8); }
+        :host([fekete]) .fedel { color: #d5d8dc;
+          background: repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, rgba(0,0,0,.08) 1px 2px, transparent 2px 3px), linear-gradient(180deg, #2a2c30, #17181b);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 1px #050506, 0 -6px 18px rgba(0,0,0,.5), 0 14px 26px rgba(0,0,0,.6); }
+        :host([fekete]) .fedel small, :host([fekete]) .fhang .tcim, :host([fekete]) .fhang .tsz, :host([fekete]) .fmeg { color: #9a9ea5; }
+        :host([fekete]) .fhang .tj { background: #9a9ea5; }
+        :host([fekete]) .fzar i { border-color: #000; background: linear-gradient(180deg, #34373c, #1c1e21); box-shadow: 0 4px 0 #08090a, 0 5px 5px rgba(0,0,0,.5); }
+        :host([keskeny]) .fedel { left: 6px; right: 6px; padding: 14px 10px 12px; gap: 10px 14px; }
+        :host([keskeny]) .fbem { flex-basis: 100%; }
+        :host([keskeny]) .fbill { justify-content: center; }
+        :host([keskeny]) .fbill .bill { flex: 1 1 0; min-width: 0; max-width: 104px; padding: 13px 3px 4px; }
+        :host([keskeny]) .fbill .bill b { font-size: calc(10px * var(--bk, 1)); letter-spacing: .02em; }
         .uzreteg { position: absolute; left: 0; right: 0; z-index: 60; display: flex; justify-content: center; pointer-events: none; transform: translateY(-50%); }
         .uzablak { pointer-events: none; opacity: 0; transform: translateY(-12px) scale(.97); transition: opacity .35s ease, transform .45s cubic-bezier(.2,1.2,.4,1);
           position: relative; overflow: hidden; box-sizing: border-box; width: min(86%, 440px); padding: 11px 16px 13px; border-radius: 7px; cursor: pointer;
@@ -1643,12 +1705,12 @@ class CantabileCard extends HTMLElement {
         :host([fekete]) .bill.akt, :host([fekete]) .bill:active { box-shadow: 0 1px 0 #08090a, 0 2px 3px rgba(0,0,0,.5); background: linear-gradient(180deg, #34373c, #1c1e21); }
         :host([fekete]) .sleep:active, :host([fekete]) .fgomb:active, :host([fekete]) .ogomb:active { box-shadow: 0 1px 0 #08090a; }
         /* tárcsák: fekete recézés, sötét eloxált sapka, fehér jelölő */
-        :host([fekete]) .gomb { background: repeating-conic-gradient(#3a3d42 0 2.5deg, #0e0f11 2.5deg 5deg); box-shadow: 0 6px 12px rgba(0,0,0,.6), 0 0 0 2px #000; }
+        :host([fekete]) .gomb, :host([fekete]) .kgomb { background: repeating-conic-gradient(#3a3d42 0 2.5deg, #0e0f11 2.5deg 5deg); box-shadow: 0 6px 12px rgba(0,0,0,.6), 0 0 0 2px #000; }
         :host([fekete]) .vgomb { background: repeating-conic-gradient(#3a3d42 0 5deg, #0e0f11 5deg 10deg); box-shadow: 0 4px 8px rgba(0,0,0,.6), 0 0 0 1.5px #000; }
-        :host([fekete]) .sapka, :host([fekete]) .vsapka {
+        :host([fekete]) .sapka, :host([fekete]) .vsapka, :host([fekete]) .ksapka {
           background: conic-gradient(from 20deg, #4a4d53, #1f2124 12%, #44474c 25%, #1b1d20 38%, #4d5056 50%, #1d1f22 62%, #45484d 75%, #1c1e21 88%, #4a4d53);
           box-shadow: inset 0 2px 2px rgba(255,255,255,.18), inset 0 -3px 5px rgba(0,0,0,.6); }
-        :host([fekete]) .sapka::after, :host([fekete]) .vsapka::after { background: #e8eaed; }
+        :host([fekete]) .sapka::after, :host([fekete]) .vsapka::after, :host([fekete]) .ksapka::after { background: #e8eaed; }
         :host([fekete]) .tfog { background: linear-gradient(180deg, #4a4d52, #222427 45%, #3a3d42 55%, #17181b); box-shadow: 0 0 0 1px #000, 0 2px 3px rgba(0,0,0,.6); }
         :host([fekete]) .tfog::after { background: #c9ccd1; }
       </style>
@@ -1674,6 +1736,7 @@ class CantabileCard extends HTMLElement {
             <div class="otg rotg">${btIdx >= 0 ? og("bt", T("BT: ezen a készüléken szól (újra koppintva vissza a hangszóróra)"), "BT") : ""}${og("net", T("Internetes rádióadók (Radio Browser)"), "NET")}${og("sleep", T("Időzített kikapcsolás: 15 · 30 · 45 · 60 · 90 perc · ki"), "SLEEP")}</div>
             ${forgo}
           </div>
+          <button class="fedfog" hidden title="${T("Bemenet és hangszín")}">INPUT · TONE</button>
           <div class="polc" id="netpolc" hidden></div>
           <div class="polc dalpolc" id="dalpolc_r" hidden></div>
         </div>
@@ -1694,9 +1757,11 @@ class CantabileCard extends HTMLElement {
             ${forgo}
             <div class="kap">${valto}<div class="mfelirat"><span id="vufajta">TAPE · NORMAL</span><b id="mallapot"></b></div></div>
           </div>
+          <button class="fedfog" hidden title="${T("Bemenet és hangszín")}">INPUT · TONE</button>
           <div class="polc" id="polc" hidden></div>
           <div class="polc dalpolc" id="dalpolc_m" hidden></div>
         </div>
+        <div class="fedel" id="fedel" hidden></div>
         <div class="beall" id="beall" hidden></div>
       </ha-card>`;
     const sr = this.shadowRoot;
@@ -1721,7 +1786,7 @@ class CantabileCard extends HTMLElement {
     sr.querySelectorAll(".btv").forEach((b) => b.addEventListener("click", () => btAllit(b.dataset.b === "1")));
     sr.querySelectorAll(".tbt .sin").forEach((g) => g.addEventListener("click", () => btAllit(this._hsz !== this._btIdx)));
     sr.querySelectorAll(".valto").forEach((b) => b.addEventListener("click", () => {
-      this._mod = this._mod === "magno" ? "radio" : "magno"; TAR.ir("tablet-radio-mod", this._mod); this._polcZar(); this._netZar(); this._dalZar(); this._frissit(); this._igazitKesobb();
+      this._mod = this._mod === "magno" ? "radio" : "magno"; TAR.ir("tablet-radio-mod", this._mod); this._fedelZar(); this._polcZar(); this._netZar(); this._dalZar(); this._frissit(); this._igazitKesobb();
     }));
     sr.getElementById("power").addEventListener("click", () => this._bekapcs());
     sr.getElementById("kcim").addEventListener("click", (e) => { if (this._kazDal) { e.stopPropagation(); this._dalNyit("m"); } });
@@ -1743,6 +1808,8 @@ class CantabileCard extends HTMLElement {
       g.addEventListener("wheel", (e) => { e.preventDefault(); e.stopPropagation(); hszLep((e.deltaY || e.deltaX) > 0 ? 1 : -1); }, { passive: false });
     });
     sr.querySelectorAll(".fogas").forEach((b) => b.addEventListener("click", () => this._beallNyit()));
+    sr.querySelectorAll(".fedfog").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); this._fedelNyit(); }));
+    this._fedelKezel(sr.getElementById("fedel"));
     sr.querySelectorAll(".mg").forEach((b) => {
       if (b.dataset.k === "rew" || b.dataset.k === "ff") return this._tekerKezel(b);
       b.addEventListener("click", () => this._magnoGomb(b.dataset.k));
@@ -1775,6 +1842,11 @@ class CantabileCard extends HTMLElement {
       const ids = [...[].concat(adat.entity_id || []), ...[].concat(adat.group_members || [])].filter((e) => typeof e === "string" && e.startsWith("media_player."));
       const fr = this._foglaloIds(ids);
       if (fr) { if (!opc.csendes) this._foglaltUzen(fr); return Promise.resolve(); }
+      const bem = !opc.bemenetKesz && ["play_media", "play_tracks", "play_queue"].includes(s) ? ids.filter((e) => this._bemenetrol(e)) : [];
+      if (bem.length) {
+        return Promise.all(bem.map((e) => this._hass.callWS({ type: "cantabile/input/select", entity_id: e, source: "Network", device: ESZKOZ() }).catch(() => {})))
+          .then(() => this._hiv(d, s, adat, { ...opc, bemenetKesz: true }));
+      }
       if (this._foglKesz && ids.length && FOGLALO.has(`${d}.${s}`)) return this._foglal(ids).then((ok) => (ok ? this._hivVegre(d, s, adat, opc) : undefined));
       if (ids.length && ELENGEDO.has(`${d}.${s}`)) return this._hivVegre(d, s, adat, opc).then((v) => { this._elenged(ids); return v; });
     }
@@ -4374,6 +4446,156 @@ class CantabileCard extends HTMLElement {
     return lista;
   }
 
+  // ---- lenyíló előlap: bemenet és hangszín (hangszin.py) ----
+
+  // a hangszóró bemenetei és hangszíne; hangszóróváltáskor és percenként frissül (a fogó csak akkor látszik, ha van mit állítani)
+  _fedelFigyel(hsz) {
+    const e = hsz && hsz.entity !== HELYI && !hsz.tagok ? hsz.entity : null, sr = this.shadowRoot;
+    const t = e && this._vezTar?.[e], van = !!(t?.adat && (t.adat.inputs.length || t.adat.tone));
+    sr.querySelectorAll(".fedfog").forEach((b) => { b.hidden = !van; });
+    if (!e || this._hass?.states[e]?.state === "unavailable") { if (this._fedelE) this._fedelZar(); return; }
+    if (this._fedelE && this._fedelE !== e) this._fedelZar();
+    if (!t || (Date.now() - t.ido > 60000 && !t.tolt)) this._vezerlok(e);
+    else if (this._fedelE === e && !this._fedelHuz) this._fedelRajz();
+  }
+
+  async _vezerlok(e) {
+    this._vezTar = this._vezTar || {};
+    const t = this._vezTar[e] = { ...(this._vezTar[e] || {}), tolt: true, ido: Date.now() };
+    try { t.adat = await this._hass.callWS({ type: "cantabile/controls", entity_id: e }); } catch (_) { t.adat = t.adat || null; }
+    t.tolt = false; t.ido = Date.now();
+    this._fedelFigyel(this._hangszoro());
+    if (this._fedelE === e) this._fedelRajz();
+  }
+
+  // a hangszóró most a saját bemenetéről szól (BT, LINE IN…), nem a hálózatról
+  _bemenetrol(e) {
+    const t = this._vezTar?.[e]?.adat, src = this._hass?.states[e]?.attributes?.source;
+    return !!(t && src && src !== "Network" && t.inputs.includes(src) && t.inputs.includes("Network"));
+  }
+
+  _fedelNyit() {
+    const hsz = this._hangszoro(), p = this.shadowRoot.getElementById("fedel");
+    if (!p || !hsz || hsz.entity === HELYI) return;
+    if (this._fedelE) return this._fedelZar();
+    this._fedelE = hsz.entity;
+    this._fedelRajz();
+    p.hidden = false; void p.offsetWidth; p.classList.add("nyitva");
+    this._fedelEbreszt();
+    this._vezerlok(hsz.entity);
+  }
+
+  _fedelZar() {
+    const p = this.shadowRoot?.getElementById("fedel");
+    this._fedelE = null; clearTimeout(this._fedelIdo);
+    if (!p || p.hidden) return;
+    p.classList.remove("nyitva");
+    setTimeout(() => { if (!this._fedelE) { p.hidden = true; p.innerHTML = ""; } }, 450);
+  }
+
+  // tétlenség után magától becsukódik; minden érintés újraindítja az órát
+  _fedelEbreszt() {
+    const MP = 20, p = this.shadowRoot.getElementById("fedel"), cs = p?.querySelector(".fido");
+    clearTimeout(this._fedelIdo);
+    this._fedelIdo = setTimeout(() => this._fedelZar(), MP * 1000);
+    if (cs) { p.style.setProperty("--fido", `${MP}s`); cs.style.animation = "none"; void cs.offsetWidth; cs.style.animation = ""; }
+  }
+
+  _fedelRajz() {
+    const p = this.shadowRoot.getElementById("fedel"), e = this._fedelE;
+    if (!p || !e) return;
+    const t = this._vezTar?.[e], adat = t?.adat, src = this._hass?.states[e]?.attributes?.source;
+    const kulcs = JSON.stringify([e, adat, src, this._hangTar?.[e]]);
+    if (p.dataset.k === kulcs && p.innerHTML) return;
+    p.dataset.k = kulcs;
+    const zar = `<button class="fzar" title="CLOSE"><i></i><small>CLOSE</small></button><div class="fido"></div>`;
+    if (!adat) { p.innerHTML = `<div class="fmeg">${t?.tolt !== false ? T("Olvasom a hangszóró beállításait…") : T("Ezen a hangszórón nincs állítható bemenet vagy hangszín.")}</div>${zar}`; return this._fedelEbreszt(); }
+    const bem = adat.inputs.length ? `<div class="fbem"><div class="fbill">${adat.inputs.map((n) => `<button class="bill fbe${n === src || (n === "Network" && !adat.inputs.includes(src)) ? " akt" : ""}" data-n="${ESC(n)}" title="${ESC(T("Bemenet: {b}", { b: n }))}"><span class="led"></span><b>${ESC(BEMENET_NEV(n))}</b></button>`).join("")}</div><small>INPUT</small></div>` : "";
+    const ertek = (f) => this._hangTar?.[e]?.[f] ?? adat.tone?.[f] ?? 0;
+    const tarcsa = (f, cim, felirat) => {
+      let jel = "";
+      for (let k = -10; k <= 10; k += 2) jel += `<i class="tj${k % 10 === 0 ? " n" : ""}" style="transform:rotate(${k * 13.5}deg)"></i>`;
+      return `<div class="fhang" data-f="${f}" title="${cim}">${jel}<b class="tsz" style="left:6px">−</b><b class="tsz" style="right:6px">+</b>
+        <div class="kgomb"><div class="ksapka" style="transform:rotate(${ertek(f) * 13.5}deg)"></div></div><div class="tcim">${felirat} <span>${ertek(f) > 0 ? "+" : ""}${ertek(f)}</span></div></div>`;
+    };
+    const hang = adat.tone ? tarcsa("bass", T("Mély: koppintva, húzva vagy görgetve; dupla koppintás: 0"), "BASS") + tarcsa("treble", T("Magas: koppintva, húzva vagy görgetve; dupla koppintás: 0"), "TREBLE") : "";
+    p.innerHTML = (bem || hang ? bem + hang : `<div class="fmeg">${T("Ezen a hangszórón nincs állítható bemenet vagy hangszín.")}</div>`) + zar;
+    p.querySelectorAll(".fhang").forEach((h) => this._kisTarcsa(h, e));
+    this._fedelEbreszt();
+  }
+
+  // a fedél kezelése egyszer, eseménydelegálással (a tartalma újrarajzolódik)
+  _fedelKezel(p) {
+    if (!p) return;
+    ["pointerdown", "wheel", "keydown"].forEach((ev) => p.addEventListener(ev, () => this._fedelEbreszt(), { passive: true }));
+    p.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      if (ev.target.closest(".fzar")) return this._fedelZar();
+      const b = ev.target.closest(".fbe");
+      if (b && !b.classList.contains("akt")) this._bemenetValt(this._fedelE, b.dataset.n);
+    });
+  }
+
+  async _bemenetValt(e, n) {
+    if (!e) return;
+    const fr = this._foglaloIds([e]);
+    if (fr) return this._foglaltUzen(fr);
+    this.shadowRoot.querySelectorAll(".fbe").forEach((x) => x.classList.toggle("akt", x.dataset.n === n));
+    try {
+      await this._hass.callWS({ type: "cantabile/input/select", entity_id: e, source: n, device: ESZKOZ() });
+    } catch (err) {
+      const m = String(err?.message || "");
+      if (m.startsWith("busy:")) this._uzen(T("A(z) {h} foglalt: {n} használja.", { h: this._hszNev(e), n: m.slice(5) }));
+      else this._hivHiba(e, err);
+      const p = this.shadowRoot.getElementById("fedel"); if (p) p.dataset.k = "";
+      this._fedelRajz();
+    }
+  }
+
+  // BASS / TREBLE tárcsa: −10 … +10 (±135°); húzás a tárcsa körül, görgő ±1, koppintás a bal / jobb felén ∓1, dupla koppintás 0
+  _kisTarcsa(h, e) {
+    const f = h.dataset.f, g = h.querySelector(".kgomb"), sapka = h.querySelector(".ksapka"), felirat = h.querySelector(".tcim span");
+    this._hangTar = this._hangTar || {};
+    const most = () => this._hangTar[e]?.[f] ?? this._vezTar?.[e]?.adat?.tone?.[f] ?? 0;
+    const allit = (v) => {
+      v = Math.max(-10, Math.min(10, Math.round(v)));
+      if (v === most() && this._hangTar[e]?.[f] != null) return;
+      this._hangTar[e] = { ...(this._hangTar[e] || {}), [f]: v };
+      sapka.style.transform = `rotate(${v * 13.5}deg)`; felirat.textContent = `${v > 0 ? "+" : ""}${v}`;
+      clearTimeout(this._hangKuld?.[f]); this._hangKuld = this._hangKuld || {};
+      this._hangKuld[f] = setTimeout(async () => {
+        try { await this._hass.callWS({ type: "cantabile/tone/set", entity_id: e, [f]: this._hangTar[e][f] }); }
+        catch (err) {
+          const m = String(err?.message || "");
+          if (m.startsWith("busy:")) this._uzen(T("A(z) {h} foglalt: {n} használja.", { h: this._hszNev(e), n: m.slice(5) })); else this._hivHiba(e, err);
+          delete this._hangTar[e][f]; this._fedelRajz();
+        }
+      }, 350);
+    };
+    const szog = (ev) => {
+      const r = g.getBoundingClientRect();
+      let a = (Math.atan2(ev.clientX - (r.left + r.width / 2), (r.top + r.height / 2) - ev.clientY) * 180) / Math.PI;
+      if (a > 135 || a < -135) a = most() > 0 ? 135 : -135;
+      return a / 13.5;
+    };
+    let id = null, mozdult = false, kezd = null;
+    g.addEventListener("pointerdown", (ev) => { ev.stopPropagation(); id = ev.pointerId; g.setPointerCapture(id); mozdult = false; kezd = [ev.clientX, ev.clientY]; this._fedelHuz = true; });
+    g.addEventListener("pointermove", (ev) => {
+      if (ev.pointerId !== id) return;
+      if (!mozdult && Math.hypot(ev.clientX - kezd[0], ev.clientY - kezd[1]) < 6) return;
+      mozdult = true; allit(szog(ev));
+    });
+    const vege = (ev) => {
+      if (ev.pointerId !== id) return;
+      id = null; this._fedelHuz = false;
+      if (!mozdult && ev.type === "pointerup") { const r = g.getBoundingClientRect(); allit(most() + (ev.clientX < r.left + r.width / 2 ? -1 : 1)); }
+    };
+    g.addEventListener("pointerup", vege);
+    g.addEventListener("pointercancel", vege);
+    g.addEventListener("dblclick", (ev) => { ev.stopPropagation(); allit(0); });
+    h.addEventListener("wheel", (ev) => { ev.preventDefault(); ev.stopPropagation(); allit(most() + ((ev.deltaY || -ev.deltaX) < 0 ? 1 : -1)); }, { passive: false });
+  }
+
   // ---- hangerő ----
 
   // hangerő: húzás a gomb körül (−135°…+135° = 0…100%), görgő ±2%; legfeljebb 300 ms-onként hívja a szolgáltatást
@@ -4475,10 +4697,12 @@ class CantabileCard extends HTMLElement {
     sr.querySelectorAll(".hszfej").forEach((x) => { x.textContent = elerheto ? KN(hsz) : `${KN(hsz)} · UNAVAILABLE`; });
     const adoNev = kulso ? kulso.nev : c.adok[i]?.nev;
     const dal = [a.media_artist, a.media_title].filter((x) => x && x !== adoNev && !URLSZERU(x)).join(" – ");
+    const bem = !radioSzol && this._bemenetrol(hsz?.entity) ? BEMENET_NEV(a.source) : "";
     sr.getElementById("ado").innerHTML = radioSzol && kulso ? `<b>${ESC(kulso.nev)}</b> · NET${kulso.orszag ? ` · ${ESC(kulso.orszag)}` : ""}`
       : radioSzol ? `<b>${ESC(c.adok[i].nev)}</b> · ${c.adok[i].virt ? "WEB" : `${MHZ(c.adok[i].frekvencia)} MHz`}`
-      : SZOL(s) ? `<b>TAPE DECK PLAYING</b>` : "OFF";
-    sr.getElementById("cim").textContent = radioSzol ? dal : "";
+      : bem ? `<b>${ESC(bem)}</b>` : SZOL(s) ? `<b>TAPE DECK PLAYING</b>` : "OFF";
+    sr.getElementById("cim").textContent = radioSzol ? dal : bem ? [a.media_artist, a.media_title].filter((x) => x && !/^unknown$/i.test(x)).join(" – ") : "";
+    this._fedelFigyel(hsz);
     {
       // dalszöveghez előadó + cím kell: külön mezőben, vagy „Előadó - Cím” alakban a címben
       let ea = a.media_artist && a.media_artist !== adoNev && !URLSZERU(a.media_artist) ? a.media_artist : "", dc = a.media_title && a.media_title !== adoNev && !URLSZERU(a.media_title) ? a.media_title : "";

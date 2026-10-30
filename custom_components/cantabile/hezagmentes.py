@@ -33,19 +33,28 @@ INDULASI_TURES = 20       # mp, amíg az első számnak el kell indulnia
 DLNA_PLATFORMOK = ("wiim", "linkplay", "dlna_dmr")
 
 
+def gazdagep(hass: HomeAssistant, entity_id: str) -> str | None:
+    """A WiiM / LinkPlay (Arylic, Audio Pro…) eszköz címe a beállításból vagy az eszköz-nyilvántartásból."""
+    ent = er.async_get(hass).async_get(entity_id)
+    if not ent or ent.platform not in ("wiim", "linkplay"):
+        return None
+    bej = hass.config_entries.async_get_entry(ent.config_entry_id) if ent.config_entry_id else None
+    host = (bej.data if bej else {}).get("host")
+    if not host and ent.device_id and (eszk := dr.async_get(hass).async_get(ent.device_id)):
+        host = urlsplit(eszk.configuration_url or "").hostname
+    return host or None
+
+
 def leiro_cim(hass: HomeAssistant, entity_id: str) -> str | None:
-    """A lejátszó UPnP-leírójának címe: DLNA-integrációnál a tárolt cím, WiiM / LinkPlay (Arylic, Audio Pro…)
-    eszköznél a gazdagép a beállításból vagy az eszköz-nyilvántartásból, a szokásos 49152-es porton."""
+    """A lejátszó UPnP-leírójának címe: DLNA-integrációnál a tárolt cím, WiiM / LinkPlay eszköznél a gazdagép a
+    szokásos 49152-es porton."""
     ent = er.async_get(hass).async_get(entity_id)
     if not ent or ent.platform not in DLNA_PLATFORMOK:
         return None
-    bej = hass.config_entries.async_get_entry(ent.config_entry_id) if ent.config_entry_id else None
-    adat = dict(bej.data) if bej else {}
     if ent.platform == "dlna_dmr":
-        return adat.get("url")
-    host = adat.get("host")
-    if not host and ent.device_id and (eszk := dr.async_get(hass).async_get(ent.device_id)):
-        host = urlsplit(eszk.configuration_url or "").hostname
+        bej = hass.config_entries.async_get_entry(ent.config_entry_id) if ent.config_entry_id else None
+        return (bej.data if bej else {}).get("url")
+    host = gazdagep(hass, entity_id)
     return f"http://{host}:{UPNP_PORT}/description.xml" if host else None
 
 

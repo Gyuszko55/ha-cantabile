@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **INPUT · TONE**: a flip-down lower panel on both front panels (tab at the bottom), like the hinged flap of an old hi-fi, with the speaker's own inputs and BASS / TREBLE knobs (−10…+10). It closes with CLOSE or by itself after 20 s without a touch, and appears only when the speaker has something to set.
+  - Inputs come from the player's `source_list` (on Sonos only the line / TV inputs, the rest are favourites); on a WiiM / LinkPlay device whose integration lists none (the WiiM Mini since the 2026.10 WiiM integration), from the device's own report (`plm_support`). Switching keeps the volume (a WiiM stores one per input), and starting music from the card on a speaker that is on BT / LINE IN switches it back to the network first. The radio display shows the input (“BT IN”) with the title the phone sends.
+  - Tone: Sonos bass / treble entities; on a WiiM the 10-band EQ over its local HTTP API (BASS lifts or cuts 31–125 Hz and half of 250 Hz, TREBLE 4–16 kHz and half of 2 kHz; both at 0 turns the EQ off and restores “Flat”).
+  - New websocket commands `cantabile/controls`, `cantabile/input/select`, `cantabile/tone/set` (the input switch claims the speaker, both respect the speaker lock).
+
 ## 1.12.19 – 2026-10-30
 
 - TV mirror started and stopped at once when the TV was playing a music-folder tape: the sequence player took the TV going quiet for the end of the track and sent the next one to the TV, which ended the mirror. The card now starts the mirror only after moving the music, and the sequence player stops when its TV switches to mirroring.

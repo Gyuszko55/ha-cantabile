@@ -56,6 +56,12 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
   (pl. WiiM – az albumot az integráció számonként játssza le).
 - **BT**: azon a készüléken szól, amelyiken a kártya nyitva van (fülhallgató, Bluetooth hangszóró).
 - Hangszóróváltáskor a zene átkerül, mint egy igazi hangszóró-választón.
+- **INPUT · TONE** – lenyíló alsó előlap (a fogója mindkét előlap alján), mint a régi hi-fi lenyitható fedele: a hangszóró
+  saját **bemenetei** (WiiM-en pl. NET · BT IN · LINE IN) és **BASS / TREBLE** tárcsa (−10…+10). Sonos-on a saját
+  mély / magas beállítása, WiiM-en a 10 sávos EQ (BASS: 31–250 Hz, TREBLE: 2–16 kHz; mindkettő 0-n kikapcsolja az EQ-t).
+  Bemenetváltáskor a hangerő marad (a WiiM bemenetenként külön hangerőt tárol), és ha a kártyáról indul zene, a hangszóró
+  visszavált a hálózatra. CLOSE-zal zárható, 20 mp érintés nélkül magától becsukódik. Csak azokon a hangszórókon jelenik
+  meg, ahol van mit állítani; a bemenet és a hangszín is figyeli a hangszóró-foglalást.
 
 **TV (Cantabile TV)**
 - A TV-k is hangszórók lesznek, a képernyőn a számmal: **Cast**-eszközön (TV-stick, Android TV-doboz, Nest Hub) teljes

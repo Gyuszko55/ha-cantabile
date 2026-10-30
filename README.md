@@ -56,6 +56,12 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
   (e.g. WiiM – albums are played track by track by the integration).
 - **BT**: play on the device the card is open on (headphones, Bluetooth speaker).
 - Switching speakers carries the music over, like a real speaker selector.
+- **INPUT · TONE** – the flip-down lower panel (the tab at the bottom of either front panel), like the hinged flap of
+  an old hi-fi: the speaker's own **inputs** (e.g. NET · BT IN · LINE IN on a WiiM) and **BASS / TREBLE** knobs (−10…+10).
+  Sonos uses its own bass / treble; a WiiM its 10-band EQ (BASS: 31–250 Hz, TREBLE: 2–16 kHz; both at 0 turns the EQ off).
+  The volume is kept when the input changes (a WiiM remembers a separate volume per input), and starting music from the
+  card switches the speaker back to the network. The panel closes with CLOSE, or by itself after 20 s without a touch.
+  It appears only on speakers that have something to set; inputs and tone respect the speaker lock.
 
 **TV (Cantabile TV)**
 - TVs become speakers, with the track on the screen: on **Cast** devices (TV sticks, Android TV boxes, Nest Hub) a
