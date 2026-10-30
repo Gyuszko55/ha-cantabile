@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 from datetime import timedelta
 from typing import Any
@@ -31,9 +32,11 @@ from homeassistant.components.http.auth import async_sign_path
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import foglalas
+from .library import ELOTAG, media_ut
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,6 +66,34 @@ def ma_sor_szol(hass: HomeAssistant, entity_id: str) -> bool:
     st = hass.states.get(entity_id)
     cid = str(st.attributes.get("media_content_id") or "") if st else ""
     return bool(st and st.attributes.get("app_id") == MA and re.match(r"^[\w.-]+://", cid) and not cid.lower().startswith(("http://", "https://")))
+
+
+def parok(hass: HomeAssistant) -> dict[str, str]:
+    """Saját lejátszó → ugyanannak a készüléknek az MA-lejátszója. Az MA a lejátszó azonosítóját sokszor a gyártói
+    azonosítóból veszi (Sonos RINCON_…, Cast uuid, WiiM wiim_uuid:…); ahol nem (univerzális lejátszó), ott az egyetlen,
+    azonos nevű eszköz dönt."""
+    ereg, dreg = er.async_get(hass), dr.async_get(hass)
+    sajat = [e for e in ereg.entities.values() if e.domain == "media_player" and e.platform not in (MA, "cantabile") and not e.disabled_by]
+    uid = {}
+    for e in sajat:
+        uid.setdefault(e.unique_id.lower(), e.entity_id)
+    nevek: dict[str, list[str]] = {}
+    for e in sajat:
+        d = dreg.async_get(e.device_id) if e.device_id else None
+        if d and (n := (d.name_by_user or d.name or "").strip().casefold()):
+            nevek.setdefault(n, []).append(e.entity_id)
+    ki: dict[str, str] = {}
+    for e in ereg.entities.values():
+        if e.domain != "media_player" or e.platform != MA or e.disabled_by:
+            continue
+        u = e.unique_id.lower()
+        cel = uid.get(u) or uid.get(re.sub(r"^[a-z]+_(?=uuid:)", "", u))
+        if not cel and e.device_id and (d := dreg.async_get(e.device_id)):
+            jo = nevek.get((d.name_by_user or d.name or "").strip().casefold(), [])
+            cel = jo[0] if len(jo) == 1 else None
+        if cel:
+            ki[cel] = e.entity_id
+    return ki
 
 
 def _kep(hass: HomeAssistant, url: Any) -> str | None:
@@ -159,7 +190,7 @@ def regisztral(hass: HomeAssistant) -> None:
         e = bejegyzes(hass)
         jat = [{"entity_id": s.entity_id, "name": s.attributes.get("friendly_name") or s.entity_id, "available": s.state != "unavailable"}
                for s in hass.states.async_all("media_player") if s.attributes.get("mass_player_type")] if e else []
-        conn.send_result(msg["id"], {"available": bool(e), "players": jat})
+        conn.send_result(msg["id"], {"available": bool(e), "players": jat, "pairs": parok(hass) if e else {}})
 
     @websocket_api.websocket_command({
         vol.Required("type"): "cantabile/ma/library",
@@ -250,6 +281,49 @@ def regisztral(hass: HomeAssistant) -> None:
         })
 
     @websocket_api.websocket_command({
+        vol.Required("type"): "cantabile/ma/now",
+        vol.Required("entity_id"): str,
+        vol.Optional("mappa"): str,
+    })
+    @websocket_api.async_response
+    async def ws_now(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        """Az MA-lejátszón szóló szám – és ha a zenemappából (MA Filesystem) szól, a fájl a kártya zenemappájában
+        (media-source azonosítóval), hogy a Cantabile ugyanonnan folytathassa egy nem MA-hangszórón."""
+        e = msg["entity_id"]
+        try:
+            _entry()
+            v = await _hiv(hass, "get_queue", {"entity_id": e}) if ma_lejatszo(hass, e) else None
+        except HomeAssistantError as err:
+            conn.send_error(msg["id"], "nem_sikerult", str(err))
+            return
+        q = (v or {}).get(e) if isinstance(v, dict) else None
+        ci = q.get("current_item") if isinstance(q, dict) else None
+        if not isinstance(ci, dict):
+            conn.send_result(msg["id"], {"active": False})
+            return
+        sd = ci.get("stream_details") if isinstance(ci.get("stream_details"), dict) else {}
+        ki: dict[str, Any] = {"active": bool(q.get("active")), "elapsed": q.get("elapsed_time"), "provider": str(sd.get("provider") or ""),
+                              "current": _sor_elem(hass, ci)}
+        rel = str(sd.get("item_id") or "")
+        mappa = str(msg.get("mappa") or "").rstrip("/")
+        if ki["provider"].startswith("filesystem") and rel and mappa.startswith(ELOTAG):
+            forras, _, alrel = mappa[len(ELOTAG):].partition("/")
+            alap = hass.config.media_dirs.get(forras)
+            gyoker = media_ut(alap, alrel) if alap else None
+            if gyoker:
+                # az MA mappája lehet maga a zenemappa, vagy a fölötte lévő (pl. /media, és a relatív út NAS310/…-val kezdődik)
+                elso, _, tobbi = rel.partition("/")
+                for ut in (rel, tobbi if elso == os.path.basename(gyoker) else None):
+                    if not ut:
+                        continue
+                    teljes = media_ut(gyoker, ut)
+                    if teljes and await hass.async_add_executor_job(os.path.isfile, teljes):
+                        ki["file"] = f"{mappa}/{ut}"
+                        ki["folder"] = f"{mappa}/{ut.rsplit('/', 1)[0]}" if "/" in ut else mappa
+                        break
+        conn.send_result(msg["id"], ki)
+
+    @websocket_api.websocket_command({
         vol.Required("type"): "cantabile/ma/transfer",
         vol.Required("source"): str,
         vol.Required("target"): str,
@@ -269,5 +343,5 @@ def regisztral(hass: HomeAssistant) -> None:
             return
         conn.send_result(msg["id"])
 
-    for c in (ws_info, ws_library, ws_search, ws_play, ws_queue, ws_transfer):
+    for c in (ws_info, ws_library, ws_search, ws_play, ws_queue, ws_now, ws_transfer):
         websocket_api.async_register_command(hass, c)

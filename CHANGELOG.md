@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Switching speakers with a Music Assistant queue now finds a way to keep playing on any output:**
+  - target is a Music Assistant player, or the same device has one (Sonos 1 ↔ its MA player, Technics ↔ WiiM MA, Nest Hub…): Music Assistant moves the queue there, and the selector moves to that MA player if it's on the card;
+  - no MA counterpart (a Cantabile TV, BT on this device…) but the track comes from the music folder: Cantabile takes over – the album from the music folder, from the same track and position – and Music Assistant stops;
+  - otherwise (a Music Assistant streaming provider) it stays where it plays and the card says why.
+  The pairing comes from Home Assistant's registries (same Sonos / Cast / WiiM id, or the one device with the same name). New websocket command `cantabile/ma/now`; `cantabile/ma/info` also returns `pairs`.
+
 ## 2.0.1 – 2026-10-30
 
 - MA tab: the library list is fetched in the background when the shelf opens and kept for 5 minutes, so the tab shows up at once (the first request can take several seconds while Home Assistant / Music Assistant warm up).

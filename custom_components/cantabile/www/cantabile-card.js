@@ -345,7 +345,9 @@ const EN = {
   "Indítsd a zenét az eszköz bármelyik appjában – a hang a hangszóróból szól. A kártyán a kazetta „BT IN”-t mutat.": "Start the music in any app on the device – the sound comes from the speaker. On the card the cassette shows “BT IN”.",
   "ISMERT ESZKÖZÖK": "KNOWN DEVICES",
   "Keresés a Music Assistantban…": "Search Music Assistant…",
-  "A Music Assistant sora csak Music Assistant-lejátszóra vihető át – a(z) {r} szól tovább.": "The Music Assistant queue can only move to a Music Assistant player – {r} keeps playing.",
+  "Music Assistant: a sor átkerült a(z) {h} készülékre (az MA-lejátszóján át).": "Music Assistant: the queue moved to {h} (through its Music Assistant player).",
+  "A Music Assistant a zenemappából játszotta – a(z) {h} hangszórón a Cantabile folytatja ugyanonnan.": "Music Assistant was playing it from the music folder – on {h} Cantabile carries on from the same point.",
+  "Ezt a Music Assistant-számot ({p}) csak Music Assistant-lejátszó játszhatja – a(z) {r} szól tovább.": "This Music Assistant track ({p}) can only play on a Music Assistant player – {r} keeps playing.",
   "Music Assistant sora: az MA keresi elő, tölti és játssza le (saját motorral)": "Music Assistant queue: Music Assistant finds, loads and plays it (with its own engine)",
   "Ez nem Music Assistant-lejátszó.": "This isn't a Music Assistant player.",
   "A Music Assistant tartalma Music Assistant-lejátszón szól: {l}.": "Music Assistant content plays on a Music Assistant player: {l}.",
@@ -2538,16 +2540,43 @@ class CantabileCard extends HTMLElement {
       if (!eszk) { this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); this._uzen(T("A Spotify Connect-lejátszás csak Spotify Connect-hangszóróra vihető át – a(z) {r} szól tovább.", { r: KN(regi) })); return this._frissit(); }
       return this._hiv("media_player", "select_source", { entity_id: this._stream.spotify_entity, source: eszk });
     }
-    // Music Assistant sora: az MA viszi át a másik MA-lejátszóra (ugyanonnan folytatja); máshová nem vihető
+    // Music Assistant sora: megkeressük, hogyan szólhat tovább az új kimeneten –
+    //  1. MA-lejátszó, vagy a cél készüléknek van MA-párja (Sonos 1 ↔ Sonos MA, Technics ↔ WiiM MA): az MA viszi át;
+    //  2. nincs MA-pár (TV, BT…), de a szám a zenemappából szól: a Cantabile veszi át ugyanattól a számtól és ponttól;
+    //  3. különben (az MA streaming-szolgáltatója): marad, ahol szól
     const ms = this._allapot(regi);
     if (this._maLejatszo(regi.entity) && this._maSorSzol(regi.entity) && (SZOL(ms) || SZUNETEL(ms))) {
-      if (this._maLejatszo(uj.entity)) {
-        try { await this._hass.callWS({ type: "cantabile/ma/transfer", source: regi.entity, target: uj.entity, device: ESZKOZ() }); }
-        catch (err) { this._maHiba(uj.entity, err); }
+      await this._maInfoLeker();
+      const cel = uj.entity === HELYI ? null : this._maLejatszo(uj.entity) ? uj.entity : this._maInfo?.pairs?.[uj.entity] || null;
+      if (cel) {
+        try {
+          await this._hass.callWS({ type: "cantabile/ma/transfer", source: regi.entity, target: cel, device: ESZKOZ() });
+          if (cel !== uj.entity) {
+            // a választó a pár MA-lejátszójára áll (ha a kártyán van), hogy a QUEUE és a kijelző az MA sorát mutassa
+            const i = this._kimenetek.findIndex((h) => h.entity === cel && !h.tagok);
+            if (i >= 0) { this._hsz = i; this._hangUtolso(); TAR.ir("tablet-radio-hangszoro", this._kimenetek[i].kulcs || cel); this._frissit(); }
+            this._uzen(T("Music Assistant: a sor átkerült a(z) {h} készülékre (az MA-lejátszóján át).", { h: KN(uj) }));
+          }
+        } catch (err) { this._maHiba(cel, err); }
         return;
       }
+      let most = null;
+      try { most = await this._hass.callWS({ type: "cantabile/ma/now", entity_id: regi.entity, mappa: String(this._config.magno?.nas || "").replace(/\/$/, "") }); } catch (_) { /* nincs adat */ }
+      if (most?.file && most.folder) {
+        const szamok = await this._albumSzamok(most.folder).catch(() => []);
+        const kezdo = szamok.indexOf(most.file);
+        if (kezdo >= 0) {
+          await this._hiv("media_player", "media_stop", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
+          await this._csoportAllit(uj);
+          const kaz = { forras: "nas", id: most.folder, cim: most.current?.album || FAJLNEV(most.folder), alcim: most.current?.artist || "", szamok };
+          const f = { kaz, kezdo, poz: Number(most.elapsed) || 0 };
+          this._atvitel = { ado: -1, forras: f, hova: uj.entity, ido: Date.now() };
+          this._uzen(T("A Music Assistant a zenemappából játszotta – a(z) {h} hangszórón a Cantabile folytatja ugyanonnan.", { h: KN(uj) }));
+          return this._kazettaFolytat(f, uj);
+        }
+      }
       this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso();
-      this._uzen(T("A Music Assistant sora csak Music Assistant-lejátszóra vihető át – a(z) {r} szól tovább.", { r: KN(regi) }));
+      this._uzen(T("Ezt a Music Assistant-számot ({p}) csak Music Assistant-lejátszó játszhatja – a(z) {r} szól tovább.", { p: most?.provider?.split("--")[0] || "MA", r: KN(regi) }));
       return this._frissit();
     }
     const s = this._allapot(regi);
