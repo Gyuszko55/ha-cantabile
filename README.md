@@ -62,6 +62,12 @@ internet radio, a cassette deck with turning reels and real VU meters, your own 
   The volume is kept when the input changes (a WiiM remembers a separate volume per input), and starting music from the
   card switches the speaker back to the network. The panel closes with CLOSE, or by itself after 20 s without a touch.
   It appears only on speakers that have something to set; inputs and tone respect the speaker lock.
+  While a speaker plays from its own input the tape deck shows the input as the source (“BT IN”) with the title the
+  phone sends; the VU meter is simulated there (the sound never passes the server), STOP pauses, and switching to
+  another speaker pauses it (switching back resumes).
+  > **Bluetooth pairing:** Cantabile doesn't pair or pick the Bluetooth device. Pair and connect your phone / tablet with
+  > the speaker in the phone's Bluetooth settings (or the speaker's app, e.g. WiiM Home); BT IN only switches the
+  > speaker to its Bluetooth input, and what plays into it is chosen on the phone.
 
 **TV (Cantabile TV)**
 - TVs become speakers, with the track on the screen: on **Cast** devices (TV sticks, Android TV boxes, Nest Hub) a

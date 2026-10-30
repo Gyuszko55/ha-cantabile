@@ -1,10 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.12.20 – 2026-10-30
 
 - **INPUT · TONE**: a flip-down lower panel on both front panels (tab at the bottom), like the hinged flap of an old hi-fi, with the speaker's own inputs and BASS / TREBLE knobs (−10…+10). It closes with CLOSE or by itself after 20 s without a touch, and appears only when the speaker has something to set.
   - Inputs come from the player's `source_list` (on Sonos only the line / TV inputs, the rest are favourites); on a WiiM / LinkPlay device whose integration lists none (the WiiM Mini since the 2026.10 WiiM integration), from the device's own report (`plm_support`). Switching keeps the volume (a WiiM stores one per input), and starting music from the card on a speaker that is on BT / LINE IN switches it back to the network first. The radio display shows the input (“BT IN”) with the title the phone sends.
   - Tone: Sonos bass / treble entities; on a WiiM the 10-band EQ over its local HTTP API (BASS lifts or cuts 31–125 Hz and half of 250 Hz, TREBLE 4–16 kHz and half of 2 kHz; both at 0 turns the EQ off and restores “Flat”).
+  - Bluetooth pairing is not done by Cantabile: pair and connect the phone / tablet with the speaker in the phone's Bluetooth settings (or the speaker's app, e.g. WiiM Home). BT IN only switches the speaker to its Bluetooth input; which device plays into it is chosen on that device.
   - New websocket commands `cantabile/controls`, `cantabile/input/select`, `cantabile/tone/set` (the input switch claims the speaker, both respect the speaker lock).
   - While a speaker plays from its own input, the tape deck no longer shows the loaded cassette as playing: the display cassette carries the input as its source tag (“BT IN”, “LINE IN”), the title / artist the phone sends (or the input's name), “Bluetooth | A2DP” as format, and the VU label reads “BT IN · SIMULATED” – the sound goes straight from the phone to the speaker and never passes the server, so there is nothing to measure (the server-side analysis is not started for it).
   - STOP on the tape deck while a speaker plays from its own input pauses it instead: a WiiM doesn't pass a stop on to the phone over Bluetooth, which then started again a few seconds later (a pause it does pass on); PLAY resumes.

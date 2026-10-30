@@ -62,6 +62,12 @@ rádió, tape deck forgó orsókkal és valódi VU-mérőkkel, a saját zenemapp
   Bemenetváltáskor a hangerő marad (a WiiM bemenetenként külön hangerőt tárol), és ha a kártyáról indul zene, a hangszóró
   visszavált a hálózatra. CLOSE-zal zárható, 20 mp érintés nélkül magától becsukódik. Csak azokon a hangszórókon jelenik
   meg, ahol van mit állítani; a bemenet és a hangszín is figyeli a hangszóró-foglalást.
+  Ha a hangszóró a saját bemenetéről szól, a magnón a bemenet a forrás („BT IN”), a telefon küldte címmel; a VU-mérő
+  ilyenkor utánzat (a hang nem halad át a szerveren), a STOP szünetet tart, és másik hangszóróra váltva szünetel
+  (visszaváltva folytatja).
+  > **Bluetooth-párosítás:** a Cantabile nem párosít és nem választ Bluetooth-eszközt. A telefont / tabletet a telefon
+  > Bluetooth-beállításaiban (vagy a hangszóró appjában, pl. WiiM Home) párosítsd és csatlakoztasd a hangszóróhoz; a BT IN
+  > csak a hangszóró Bluetooth-bemenetére vált, hogy mi szóljon rajta, azt a telefonon választod ki.
 
 **TV (Cantabile TV)**
 - A TV-k is hangszórók lesznek, a képernyőn a számmal: **Cast**-eszközön (TV-stick, Android TV-doboz, Nest Hub) teljes
