@@ -4701,7 +4701,7 @@ class CantabileCard extends HTMLElement {
     sr.getElementById("ado").innerHTML = radioSzol && kulso ? `<b>${ESC(kulso.nev)}</b> · NET${kulso.orszag ? ` · ${ESC(kulso.orszag)}` : ""}`
       : radioSzol ? `<b>${ESC(c.adok[i].nev)}</b> · ${c.adok[i].virt ? "WEB" : `${MHZ(c.adok[i].frekvencia)} MHz`}`
       : bem ? `<b>${ESC(bem)}</b>` : SZOL(s) ? `<b>TAPE DECK PLAYING</b>` : "OFF";
-    sr.getElementById("cim").textContent = radioSzol ? dal : bem ? [a.media_artist, a.media_title].filter((x) => x && !/^unknown$/i.test(x)).join(" – ") : "";
+    sr.getElementById("cim").textContent = radioSzol ? dal : bem ? [a.media_artist, a.media_title].filter((x) => x && !/^(unknown|unavailable|not provided|none|null)$/i.test(x)).join(" – ") : "";
     this._fedelFigyel(hsz);
     {
       // dalszöveghez előadó + cím kell: külön mezőben, vagy „Előadó - Cím” alakban a címben
