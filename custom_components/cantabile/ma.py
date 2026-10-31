@@ -197,7 +197,7 @@ def _sor_elem(hass: HomeAssistant, x: Any) -> dict[str, Any] | None:
     mi = x.get("media_item") if isinstance(x.get("media_item"), dict) else {}
     e = _elem(hass, mi) or {"name": "", "artist": "", "album": "", "image": None}
     return {"name": e["name"] or str(x.get("name") or ""), "artist": e["artist"], "album": e["album"], "image": e["image"],
-            "duration": x.get("duration")}
+            "duration": x.get("duration"), "uri": str(mi.get("uri") or "") or None}
 
 
 class MaKep(HomeAssistantView):
@@ -296,7 +296,7 @@ def regisztral(hass: HomeAssistant) -> None:
     @websocket_api.websocket_command({
         vol.Required("type"): "cantabile/ma/play",
         vol.Required("entity_id"): str,
-        vol.Required("uri"): vol.All(str, vol.Length(min=3, max=500)),
+        vol.Required("uri"): vol.Any(vol.All(str, vol.Length(min=3, max=500)), vol.All([vol.All(str, vol.Length(min=3, max=500))], vol.Length(min=1, max=300))),
         vol.Optional("media_type"): vol.In(TIPUSOK),
         vol.Optional("enqueue", default="replace"): vol.In(ENQUEUE),
         vol.Optional("device", default="gep"): vol.In(foglalas.ESZKOZOK),

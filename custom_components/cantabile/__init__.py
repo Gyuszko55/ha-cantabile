@@ -36,7 +36,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
-from . import atmeneti, foglalas, halkitas, hangszin, library, listak, ma, llm, lyrics, music, party, sonossor, streaming, tovabbito, tv, vu
+from . import atmeneti, foglalas, halkitas, hangszin, helyettesit, library, listak, ma, llm, lyrics, music, party, sonossor, streaming, tovabbito, tv, vu
 from .const import (
     CARD_URL, CONF_DUCK_LEVEL, CONF_DUCK_SOURCES, CONF_LLM_API, DOMAIN, DUCK_LEVEL_DEFAULT, STATIC_URL, UID_NET, UID_ROUNDS,
     UID_SLEEP, VERSION,
@@ -71,6 +71,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     ma.regisztral(hass)
     party.regisztral(hass)
     listak.regisztral(hass)
+    helyettesit.regisztral(hass)
 
     @websocket_api.websocket_command({vol.Required("type"): "cantabile/info"})
     @callback
