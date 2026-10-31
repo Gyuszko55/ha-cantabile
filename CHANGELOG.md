@@ -43,6 +43,8 @@
 - **Track order from the tags:** within an album the tracks play (and are listed) by their disc and track number tags, so a music folder whose file names carry only the title (e.g. organised by beets) plays in the right order; without track numbers the file name decides, as before. The tags are read once per file and kept (`.cache/cantabile_sorszam.json`); new websocket command `cantabile/album_order`.
 - The 48 kHz Sonos copies are also found for multi-disc albums (`<hires>/<artist>/<album> [48kHz]/CD<n>/<file>`).
 
+- The music folder skips sub-folders marked with a `.nomedia` file (Kodi's convention, e.g. an archive of the original files): they don't appear in the library, the party, the search or the NAS tab.
+
 ### Fixed (review)
 - Moving a PARTY or a playlist between a Sonos and the Multiroom group that contains it no longer stops it right after it started there.
 - Cantabile TV: with YAML-mode resources the TV page is no longer resent on every play, and the mirror starts; one resend at a time (a play waits for it, and a newer play is never overwritten by the resumed track); a failed resend leaves the player OFF instead of PLAYING; switching to the mirror no longer restarts the old track; the automatic reload only runs in the daytime (starting the Cast app can wake a TV over HDMI-CEC).

@@ -5132,7 +5132,9 @@ class CantabileCard extends HTMLElement {
       const hol = pl.ut.length ? pl.ut[pl.ut.length - 1] : { id: nasGyoker, cim: "NAS" };
       const r = await this._bongesz(hol.id);
       if (allapot !== kulcs(this._polc)) return;
-      const mappak = (r.children || []).filter((x) => x.can_expand && !(!pl.ut.length && [this._telMappa(), this._config.magno?.hires].includes(x.title))).sort((x, y) => x.title.localeCompare(y.title, NYELV(), { numeric: true }));
+      // a gyökérben a feltöltési és a 48 kHz-es mappa, meg a .nomedia jelzésű (pl. archívum) mappák nem látszanak
+      const rejtett = !pl.ut.length ? ((await this._nasLista().catch(() => null))?.rejtett || []) : [];
+      const mappak = (r.children || []).filter((x) => x.can_expand && !(!pl.ut.length && [this._telMappa(), this._config.magno?.hires, ...rejtett].includes(x.title))).sort((x, y) => x.title.localeCompare(y.title, NYELV(), { numeric: true }));
       const szamok = await this._sorrendben(hol.id, (r.children || []).filter(ZENE));
       if (allapot !== kulcs(this._polc)) return;
       if (!pl.ut.length) {

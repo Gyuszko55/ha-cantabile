@@ -123,8 +123,14 @@ def media_ut(alap: str, rel: str) -> str | None:
 def _bejar(gyoker: str) -> dict[str, Any]:
     mappak: list[str] = []
     fajlok: list[str] = []
+    rejtett: list[str] = []
     latott: set[tuple[int, int]] = set()
     for hol, almappak, nevek in os.walk(gyoker, followlinks=True):
+        if ".nomedia" in nevek and hol != gyoker:
+            # a Kodi szokása: a .nomedia jelzésű mappa (pl. egy archívum) nem része a zenetárnak
+            rejtett.append(os.path.relpath(hol, gyoker).replace(os.sep, "/"))
+            almappak.clear()
+            continue
         try:
             st = os.stat(hol)
         except OSError:
@@ -142,7 +148,7 @@ def _bejar(gyoker: str) -> dict[str, Any]:
         for nev in rendez(hol, hang):               # az albumon belül sorszám szerint (ha a címkékben van)
             fajlok.append(nev if rel == "." else f"{rel}/{nev}".replace(os.sep, "/"))
     sorszam_ment()
-    return {"mappak": mappak, "fajlok": fajlok}
+    return {"mappak": mappak, "fajlok": fajlok, "rejtett": rejtett}
 
 
 @callback
