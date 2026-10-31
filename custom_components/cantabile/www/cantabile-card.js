@@ -278,6 +278,10 @@ const EN = {
   "Kinézet": "Look",
   "Forgó bakelit körspektrummal": "Spinning vinyl with circular spectrum",
   "Equalizer-sávok": "Equaliser bars",
+  "Ismeretlen előadó vagy cím – nem lehet dalszöveget keresni": "Unknown artist or title – no lyrics to look up",
+  "A dalszöveg-szolgáltatások (LRCLIB, lyrics.ovh) most nem érhetők el – két perc múlva újra próbálom": "The lyrics services (LRCLIB, lyrics.ovh) are unavailable right now – trying again in two minutes",
+  "Ehhez a számhoz nem találtam dalszöveget (LRCLIB, lyrics.ovh)": "No lyrics found for this track (LRCLIB, lyrics.ovh)",
+  "Instrumentális szám – nincs dalszöveg": "Instrumental track – no lyrics",
   "TV-ablak: amit a TV mutatna erről a hangszóróról": "TV window: what the TV would show for this speaker",
   "A TV-ablak hangszóróhoz tartozik – válassz hangszórót.": "The TV window belongs to a speaker – choose a speaker.",
   "A(z) {h} AirPlay-jelet kap a telefonról – ezt a telefonon (AirPlay-ikon) lehet átküldeni a(z) {u} hangszóróra.": "{h} is receiving AirPlay from a phone – send it to {u} from the phone (AirPlay icon).",
@@ -779,6 +783,7 @@ class CantabileCard extends HTMLElement {
     if (!elso && regiNy && Date.now() - this._utolsoFr < 10000 && ujNy.length === regiNy.length && ujNy.every((x, i) => x === regiNy[i])) return;
     this._utolsoNy = ujNy; this._utolsoFr = Date.now();
     this._frissit();
+    this._tvAblakFigyel();
   }
 
   _lenyomat(h) {
@@ -5951,20 +5956,37 @@ class CantabileCard extends HTMLElement {
     ab.addEventListener("click", (ev) => { ev.stopPropagation(); this._tvAblakZar(); });
     const tv = document.createElement("cantabile-tv");
     // az ablakban a borítós nézet (kicsiben ez a legolvashatóbb), a hangszóró adataival
-    tv.setConfig({ elonezet: hsz.entity, visual: "cover", weather: false });
+    tv.setConfig({ elonezet: hsz.entity, visual: "cover", ...(this._tvIdojaras ? { weather: this._tvIdojaras } : {}) });
     ab.querySelector(".tvhely").appendChild(tv);
     kartya.appendChild(r);
-    // a 16:9-es kép a kártyába férjen (rádió módban a kártya alacsony): szélesség a kártya szélessége és magassága szerint
-    const kr = kartya.getBoundingClientRect(), fent = Math.max(0, -kr.top), lent = Math.min(kr.height, innerHeight - kr.top);
-    const w = Math.max(240, Math.min(kr.width * 0.96, 760, ((lent - fent) - 46) / 0.5625 + 20));
+    // a kártya tetejétől a látható gombsor (rádió: adógombok, magnó: billentyűk) tetejéig fér el – a gombokat nem takarja
+    const kr = kartya.getBoundingClientRect(), gs = [...this.shadowRoot.querySelectorAll(".gombsor")].find((x) => x.offsetParent);
+    const alja = gs ? gs.getBoundingClientRect().top - kr.top - 6 : kr.height * 0.6, fent = 4;
+    const w = Math.max(220, Math.min(kr.width * 0.96, 760, (alja - fent - 30) / 0.5625 + 20));
     ab.style.width = `${Math.round(w)}px`;
-    r.style.top = `${Math.round(fent + Math.max(6, ((lent - fent) - (w - 20) * 0.5625 - 40) / 2))}px`;
+    r.style.top = `${fent}px`;
     tv.hass = this._hass;
     requestAnimationFrame(() => ab.classList.add("lat"));
+    // az időjárás ugyanaz, mint a TV-kön (a cantabile-tv kártya `weather:` beállítása) – egyszer lekérjük
+    if (this._tvIdojaras === undefined) {
+      this._tvIdojaras = null;
+      this._hass.callWS({ type: "lovelace/config", url_path: "cantabile-tv" }).then((c) => {
+        const k = JSON.stringify(c).match(/"weather":\s*"(weather\.[\w]+)"/);
+        if (k) { this._tvIdojaras = k[1]; if (this._tvAblakE === hsz.entity) this._tvAblakNyit(); }
+      }, () => {});
+    }
+  }
+
+  // a zene megállt (vége az albumnak, leállították): 5 mp múlva az ablak magától bezárul
+  _tvAblakFigyel() {
+    if (!this._tvAblakE) return;
+    const st = this._hass?.states[this._tvAblakE], szol = SZOL(st) || SZUNETEL(st);
+    if (szol) { clearTimeout(this._tvAblakVege); this._tvAblakVege = null; }
+    else if (!this._tvAblakVege) this._tvAblakVege = setTimeout(() => { this._tvAblakVege = null; const s2 = this._hass?.states[this._tvAblakE]; if (this._tvAblakE && !SZOL(s2) && !SZUNETEL(s2)) this._tvAblakZar(); }, 5000);
   }
 
   _tvAblakZar(azonnal = false) {
-    this._tvAblakE = null;
+    this._tvAblakE = null; clearTimeout(this._tvAblakVege); this._tvAblakVege = null;
     const sr = this.shadowRoot;
     sr?.querySelectorAll(".tvg").forEach((b) => b.classList.remove("be"));
     const r = sr?.querySelector(".tvreteg"), a = r?.querySelector(".uzablak");
@@ -7352,6 +7374,12 @@ class CantabileTv extends HTMLElement {
       .dsz.lep p { animation: dszlep .45s ease; }
       @keyframes dszlep { from { transform: translateY(26px); opacity: .2; } to { transform: none; opacity: 1; } }
       .dsz .d2 { color: rgba(243,234,216,.5); }
+      /* nincs dalszöveg: az ok vízszintesen, végtelenítve fut */
+      .dsz .dszuz { display: none; overflow: hidden; white-space: nowrap; font: 400 15px/1 Michroma, "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em;
+        color: rgba(255,200,120,.75); }
+      .dsz.uz p { display: none; } .dsz.uz .dszuz { display: block; }
+      .dsz .dszuz span { display: inline-block; padding-left: 100%; animation: dszfut 22s linear infinite; }
+      @keyframes dszfut { from { transform: translateX(0); } to { transform: translateX(-100%); } }
       .var { position: absolute; left: 0; right: 0; top: 250px; text-align: center; opacity: 0; transition: opacity .8s; pointer-events: none; }
       .ures2 .var { opacity: 1; }
       .var b { display: block; font: 400 110px/1 Michroma, "Cantabile Sans", Arial, sans-serif; letter-spacing: .04em; color: #f3ead8; }
@@ -7364,7 +7392,7 @@ class CantabileTv extends HTMLElement {
       <div class="tart"><div class="bor ures"><div class="lem">${TV_SVG_LEMEZ}</div></div>
         <div class="adat"><div class="cimke"><i></i><span class="ck">NOW PLAYING</span></div><div class="cim"></div><div class="elo"></div><div class="alb"></div><div class="csipek"></div></div></div>
       <canvas class="eq"></canvas><canvas class="bk"></canvas>
-      <div class="dsz"><p class="d0"></p><p class="d1"></p><p class="d2"></p></div>
+      <div class="dsz"><p class="d0"></p><p class="d1"></p><p class="d2"></p><div class="dszuz"><span></span></div></div>
       <div class="hal"><span class="most">0:00</span><div class="sav"><div class="tel"></div><div class="gomb"></div></div><span class="vege">0:00</span><span class="eloj">● LIVE</span></div>
     </div>`;
     this.toggleAttribute("teljes", this._teljes);
@@ -7747,20 +7775,32 @@ class CantabileTv extends HTMLElement {
     const sr = this.shadowRoot, d = sr.querySelector(".dsz"), kulcs = `${m.artist}|${m.title}`;
     if (this._dszKulcs === kulcs) return;
     this._dszKulcs = kulcs; this._dsz = null; this._dszI = -2;
-    d.classList.remove("van");
-    if (!this._dszBe || radio || !m.artist || !m.title || !this._h) return;
+    clearTimeout(this._dszUjra);
+    d.classList.remove("van", "uz");
+    if (!this._dszBe || radio || !this._h) return;
+    // ha nincs dalszöveg, az ok vízszintesen fut a helyén
+    const uzen = (t) => { d.querySelector(".dszuz span").textContent = `♪  ${t}  ♪`; d.classList.add("van", "uz"); };
+    if (!m.artist || !m.title) return uzen(T("Ismeretlen előadó vagy cím – nem lehet dalszöveget keresni"));
     let v = null;
     try { v = await this._h.callWS({ type: "cantabile/lyrics", artist: String(m.artist), title: String(m.title), album: m.album || null, duration: m.duration || null }); }
-    catch (e) { return; }
-    if (this._dszKulcs !== kulcs || !v?.found || v.instrumental) return;
+    catch (e) {
+      if (this._dszKulcs !== kulcs) return;
+      uzen(T("A dalszöveg-szolgáltatások (LRCLIB, lyrics.ovh) most nem érhetők el – két perc múlva újra próbálom"));
+      this._dszUjra = setTimeout(() => { if (this._dszKulcs === kulcs) { this._dszKulcs = null; this._dszKer(m, radio); } }, 120000);
+      return;
+    }
+    if (this._dszKulcs !== kulcs) return;
+    if (!v?.found) return uzen(T("Ehhez a számhoz nem találtam dalszöveget (LRCLIB, lyrics.ovh)"));
+    if (v.instrumental) return uzen(T("Instrumentális szám – nincs dalszöveg"));
     if (v.synced?.length) this._dsz = { szinkron: true, sorok: v.synced.filter((x) => x[1]) };
     else if (v.plain) this._dsz = { szinkron: false, sorok: v.plain.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).map((x) => [0, x]) };
     if (this._dsz?.sorok.length) d.classList.add("van");
+    else uzen(T("Ehhez a számhoz nem találtam dalszöveget (LRCLIB, lyrics.ovh)"));
   }
 
   _dszLep() {
     const z = this._dsz;
-    if (!z) return;
+    if (!z || !z.sorok.length) return;
     const sr = this.shadowRoot, t = this._tukor, a = this._a;
     // a most-idő képkockánként (a _halad fél másodpercenként frissít – a karaoke-csík ennél simább legyen)
     let most = this._most || 0;

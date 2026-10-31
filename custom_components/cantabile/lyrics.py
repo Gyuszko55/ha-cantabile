@@ -2,7 +2,9 @@
 
 A forrás az LRCLIB (lrclib.net) nyilvános, kulcs nélküli API-ja: előadó + cím (+ album és hossz, ha van) alapján
 keres, és ha van, időzített (LRC) szöveget ad – ebből a kártya a lejátszással együtt kiemeli az épp szóló sort. Ha
-pontos egyezés nincs, a keresőből a hosszban legközelebbi, lehetőleg időzített találatot választja. A szöveget a
+pontos egyezés nincs, a keresőből a hosszban legközelebbi, lehetőleg időzített találatot választja. Ha az LRCLIB nem
+érhető el, vagy nincs nála a szám, a lyrics.ovh-ból pótolja (az csak sima, időzítés nélküli szöveget ad); ha egyik sem
+válaszol, hibát ad (és nem tárolja el, hogy később újra lehessen próbálni). A szöveget a
 szerver nem tárolja tartósan, csak a memóriában (legfeljebb 200 dal), hogy ugyanazt ne kérje le újra.
 """
 
@@ -13,6 +15,7 @@ import logging
 import re
 from collections import OrderedDict
 from typing import Any
+from urllib.parse import quote
 
 import aiohttp
 import voluptuous as vol
@@ -26,6 +29,7 @@ from .const import VERSION, szoveg
 _LOGGER = logging.getLogger(__name__)
 
 API = "https://lrclib.net/api"
+OVH = "https://api.lyrics.ovh/v1"        # tartalék: kulcs nélküli, csak sima (időzítés nélküli) szöveg
 UA = f"Cantabile/{VERSION} (https://github.com/Gyuszko55/ha-cantabile)"
 TAR_MERET = 200
 IDOTURES = 8          # mp eltérés a hosszban, ami még ugyanaz a felvétel
@@ -73,9 +77,21 @@ async def _ker(sess: aiohttp.ClientSession, ut: str, param: dict[str, Any]) -> A
             if v.status >= 500 and proba < 2:
                 await asyncio.sleep(1 + proba)
                 continue
-            v.raise_for_status()
+            v.raise_for_status()                 # tartós 5xx: hiba (nem „nincs dalszöveg”)
             return await v.json()
     return None
+
+
+async def _ovh(sess: aiohttp.ClientSession, eloado: str, cim: str) -> str | None:
+    """lyrics.ovh: sima szöveg, vagy None, ha nincs; hálózati / szerverhibánál kivétel."""
+    url = f"{OVH}/{quote(eloado, safe='')}/{quote(cim, safe='')}"
+    async with sess.get(url, headers={"User-Agent": UA}, timeout=aiohttp.ClientTimeout(total=10)) as v:
+        if v.status == 404:
+            return None
+        v.raise_for_status()
+        szoveg = str((await v.json(content_type=None)).get("lyrics") or "").replace("\r\n", "\n").strip()
+    sorok = [s for s in szoveg.split("\n") if not s.lower().startswith("paroles de la chanson")]
+    return "\n".join(sorok).strip() or None
 
 
 def _legjobb(talalatok: list[dict[str, Any]], hossz: float | None) -> dict[str, Any] | None:
@@ -95,18 +111,37 @@ async def keres(hass: HomeAssistant, eloado: str, cim: str, album: str | None, h
         return _tar[kulcs]
     sess = async_get_clientsession(hass)
     adat = None
-    if hossz:
-        param = {"artist_name": eloado, "track_name": cim, "duration": round(hossz)}
-        if album:
-            param["album_name"] = album
-        adat = await _ker(sess, "get", param)
-    if not adat:
-        tiszta = _TOLDALEK.sub("", cim).strip() or cim
-        talalatok = await _ker(sess, "search", {"artist_name": eloado, "track_name": tiszta}) or []
-        if not talalatok and tiszta != cim:
-            talalatok = await _ker(sess, "search", {"artist_name": eloado, "track_name": cim}) or []
-        adat = _legjobb(talalatok, hossz)
+    tiszta = _TOLDALEK.sub("", cim).strip() or cim
+    lrclib_hiba: Exception | None = None
+    try:
+        if hossz:
+            param = {"artist_name": eloado, "track_name": cim, "duration": round(hossz)}
+            if album:
+                param["album_name"] = album
+            adat = await _ker(sess, "get", param)
+        if not adat:
+            talalatok = await _ker(sess, "search", {"artist_name": eloado, "track_name": tiszta}) or []
+            if not talalatok and tiszta != cim:
+                talalatok = await _ker(sess, "search", {"artist_name": eloado, "track_name": cim}) or []
+            adat = _legjobb(talalatok, hossz)
+    except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+        lrclib_hiba = err
+        _LOGGER.debug("LRCLIB nem elérhető, a tartalékot próbálom: %s", err)
     eredmeny = _eredmeny(adat)
+    if eredmeny.get("found"):
+        eredmeny["source"] = "LRCLIB"
+    else:
+        # tartalék: lyrics.ovh (sima szöveg) – ha az LRCLIB nem érhető el, vagy nincs nála a szám
+        try:
+            sima = await _ovh(sess, eloado, tiszta)
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
+            _LOGGER.debug("lyrics.ovh nem elérhető: %s", err)
+            sima = None
+        if sima:
+            eredmeny = {"found": True, "instrumental": False, "synced": None, "plain": sima, "artist": eloado, "title": cim, "source": "lyrics.ovh"}
+        elif lrclib_hiba is not None:
+            # egyik sem válaszolt rendesen: hiba (nem tároljuk – később újra próbálható)
+            raise lrclib_hiba
     _tar[kulcs] = eredmeny
     while len(_tar) > TAR_MERET:
         _tar.popitem(last=False)

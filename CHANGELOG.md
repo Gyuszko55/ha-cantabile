@@ -58,6 +58,10 @@
 - **TV window on the card:** a TV button before ⓘ opens, over the deck, a small copy of the Cantabile TV page for the selected speaker – cover, track details, background pictures, progress and running lyrics, the same data as the TV mirror (new subscription `cantabile/tv/preview`, which doesn't sign in as a TV). It follows a speaker change; a tap closes it.
 - The **cover look is the new default** of the TV page (`visual: cover`) and got a new layout: a smaller cover with the details beside it, and the lyrics across the full width at the bottom, centred, so long lines wrap onto two lines.
 
+- **Lyrics fallback:** when LRCLIB is down or doesn't have the track, the lyrics come from lyrics.ovh (plain, untimed text) automatically. A service outage is now reported as such (it used to look like “no lyrics” and was cached).
+- When there are no lyrics, the TV page shows the reason in a scrolling line: the services are unavailable (retried after two minutes), no lyrics found, instrumental track, or unknown artist / title.
+- TV window: it sits above the button row (never covers the buttons), shows the weather like the TVs (the `weather:` of the TV card), and closes by itself 5 seconds after the music stops (end of album, STOP).
+
 ### Fixed (review)
 - Moving a PARTY or a playlist between a Sonos and the Multiroom group that contains it no longer stops it right after it started there.
 - Cantabile TV: with YAML-mode resources the TV page is no longer resent on every play, and the mirror starts; one resend at a time (a play waits for it, and a newer play is never overwritten by the resumed track); a failed resend leaves the player OFF instead of PLAYING; switching to the mirror no longer restarts the old track; the automatic reload only runs in the daytime (starting the Cast app can wake a TV over HDMI-CEC).
