@@ -1434,8 +1434,9 @@ class CantabileCard extends HTMLElement {
         .ogomb .led { position: absolute; top: 4px; left: 50%; width: 10px; height: 3px; margin-left: -5px; border-radius: 2px; background: #6b5a35; }
         .ogomb.be .led { background: #ffb020; box-shadow: 0 0 6px #ffb020; }
         .ogomb i { display: flex; position: relative; }
-        .ogomb .oszam { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 800 calc(9.5px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; color: #2b2e33; padding-top: 1px;
-          text-shadow: 0 0 1px #e8eaed, 0 0 2px #e8eaed, 0 0 2px #e8eaed, 1px 0 1px #e8eaed, -1px 0 1px #e8eaed; }
+        /* az ismétlésszám az ikon mellett jobbra (nem az ikonra írva) */
+        .ogomb .oszam { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 3px; font: 800 calc(10px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif;
+          color: #2b2e33; white-space: nowrap; }
         .ogomb .oszam.vegt { font-size: calc(12px * var(--bk, 1)); }
         .ogomb.be .oszam { color: #8a5a00; } .ogomb svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
         .ogomb:active { transform: translateY(1px); box-shadow: 0 1px 0 #80858c; }

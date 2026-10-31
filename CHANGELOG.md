@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The REPEAT button shows the number of rounds to the right of its icon, not on top of it.
+
 ## 2.2.0 – 2026-10-31
 
 Cantabile 2.2: one button per speaker, switching speakers without a gap from the exact position, the same track from
