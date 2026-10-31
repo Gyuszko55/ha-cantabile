@@ -555,6 +555,8 @@ const MUFAJ_CSALAD = [[464, /metal/], [116, /\brap\b|hip[ -]?hop|gangsta|\btrap\
   [466, /folk|world|ethnic|nepzene|country/], [95, /gyerek|kids|child/], [2, /afri/], [16, /asia|j-?pop|k-?pop/], [81, /india|bollywood/], [132, /pop|synth|schlager|vocal|easy listening|chanson|slager/]];
 // mentés után a HA újraépíti a kártyát: az eredményüzenet (és a gombja) az új példányon jelenik meg
 let ATADANDO = null;
+// a hangszórók Music Assistant-párjai (saját lejátszó → MA-lejátszó, ma.py): egy készülék = egy gomb a választón
+let MA_PAROK = null;
 const RB_SZERVEREK = () => (RB_LISTA ||= (async () => {
   const ctl = new AbortController(), ido = setTimeout(() => ctl.abort(), 5000);
   try {
@@ -714,7 +716,15 @@ class CantabileCard extends HTMLElement {
     this._config = { magno: {}, ...config, adok: adok.sort((a, b) => a.frekvencia - b.frekvencia) };
     // multiroom: ha legalább két Sonos van, a SPEAKERS kapcsoló kap egy közös állást is (mint a receivereken az A+B) –
     // ilyenkor a Sonos egy csoportba fogja őket (media_player.join), a hangerő mindegyikre megy; `multiroom: false` kikapcsolja
-    const hl = [...config.hangszorok], sonosok = hl.filter((h) => h.mod === "sonos");
+    // egy készülék = egy gomb: a hangszóró MA-lejátszója (pl. Sonos MA a Sonos 1 mellett) nem külön gomb – az MA tartalma
+    // a gomb mögött az MA-lejátszón szól, minden más (zenemappa, rádió, Deezer) a saját lejátszón
+    let hl = config.hangszorok.map((h) => ({ ...h }));
+    if (MA_PAROK) {
+      const parja = (e) => Object.keys(MA_PAROK).find((n) => MA_PAROK[n] === e);
+      hl.forEach((h) => { if (MA_PAROK[h.entity]) h.ma = MA_PAROK[h.entity]; });
+      hl = hl.filter((h) => !(parja(h.entity) && hl.some((k) => k.entity === parja(h.entity))));
+    }
+    const sonosok = hl.filter((h) => h.mod === "sonos");
     if (sonosok.length >= 2 && config.multiroom !== false) {
       const utolso = hl.lastIndexOf(sonosok[sonosok.length - 1]);
       hl.splice(utolso + 1, 0, { nev: sonosok.map((h) => h.nev).join(" + "), rovid: "Multiroom", entity: sonosok[0].entity, mod: "sonos", tagok: sonosok.map((h) => h.entity), kulcs: "multiroom" });
@@ -762,6 +772,11 @@ class CantabileCard extends HTMLElement {
   async _infoKer() {
     try { const v = await this._hass.callWS({ type: "cantabile/info" }); this._ent = v.entities || {}; this._haIndult = v.started ? v.started * 1000 : null; this._stream = v.streaming || {}; this._tvMap = v.tv || {}; }
     catch (e) { this._ent = {}; this._nincsIntegracio = true; }
+    if (!this._nincsIntegracio && MA_PAROK === null) {
+      await this._maInfoLeker();
+      MA_PAROK = this._maInfo?.available ? this._maInfo.pairs || {} : {};
+      if (Object.keys(MA_PAROK).length) { this.setConfig(this._eredetiCfg); return; }   // a gombok összevonva
+    }
     this._foglalasFeliratkozas();
     this._frissit();
   }
@@ -849,7 +864,7 @@ class CantabileCard extends HTMLElement {
       const cs = h.findIndex((x) => x.tagok && x.entity === h[szolo].entity && this._egyutt(x));
       return cs >= 0 ? cs : szolo;
     }
-    const tarolt = h.findIndex((x) => (x.kulcs || x.entity) === TAR.olvas("tablet-radio-hangszoro"));
+    const t = TAR.olvas("tablet-radio-hangszoro"), tarolt = h.findIndex((x) => (x.kulcs || x.entity) === t || (!x.tagok && x.ma === t));
     return tarolt >= 0 ? tarolt : 0;
   }
 
@@ -2780,36 +2795,30 @@ class CantabileCard extends HTMLElement {
       this._hass.callWS({ type: "cantabile/lock/release", entity_id: regi.entity }).catch(() => {});
       return;
     }
-    // Music Assistant sora: megkeressük, hogyan szólhat tovább az új kimeneten –
-    //  1. MA-lejátszó, vagy a cél készüléknek van MA-párja (Sonos 1 ↔ Sonos MA, Technics ↔ WiiM MA): az MA viszi át;
+    // Music Assistant sora (a gomb MA-lejátszóján): megkeressük, hogyan szólhat tovább az új kimeneten –
+    //  1. a cél gombja mögött is van MA-lejátszó (Sonos 1 → Technics: a WiiM MA-ja): az MA viszi át;
     //  2. nincs MA-pár (TV, BT…), de a szám a zenemappából szól: a Cantabile veszi át ugyanattól a számtól és ponttól;
     //  3. különben (az MA streaming-szolgáltatója): marad, ahol szól
-    const ms = this._allapot(regi);
-    if (this._maLejatszo(regi.entity) && this._maSorSzol(regi.entity) && (SZOL(ms) || SZUNETEL(ms))) {
+    const rma = this._maE(regi);
+    if (rma && this._maSorGomb(regi)) {
       await this._maInfoLeker();
-      // a zenemappából szól, és a cél nem MA-lejátszó (pl. Sonos 1): a Cantabile veszi át, nem az MA-pár (az ugyanaz lehet)
+      // a zenemappából szól, és a cél gombja mögött nincs MA-lejátszó (TV, BT…): a Cantabile veszi át ugyanonnan
       let most = null;
-      const mostLeker = async () => { try { most = await this._hass.callWS({ type: "cantabile/ma/now", entity_id: regi.entity, mappa: String(this._config.magno?.nas || "").replace(/\/$/, "") }); } catch (_) { /* nincs adat */ } };
-      if (uj.entity !== HELYI && !this._maLejatszo(uj.entity)) await mostLeker();
-      const cel = uj.entity === HELYI || (most?.file && most.folder) ? null : this._maLejatszo(uj.entity) ? uj.entity : this._maInfo?.pairs?.[uj.entity] || null;
-      if (cel) {
-        try {
-          await this._hass.callWS({ type: "cantabile/ma/transfer", source: regi.entity, target: cel, device: ESZKOZ() });
-          if (cel !== uj.entity) {
-            // a választó a pár MA-lejátszójára áll (ha a kártyán van), hogy a QUEUE és a kijelző az MA sorát mutassa
-            const i = this._kimenetek.findIndex((h) => h.entity === cel && !h.tagok);
-            if (i >= 0) { this._hsz = i; this._hangUtolso(); TAR.ir("tablet-radio-hangszoro", this._kimenetek[i].kulcs || cel); this._frissit(); }
-            this._uzen(T("Music Assistant: a sor átkerült a(z) {h} készülékre (az MA-lejátszóján át).", { h: KN(uj) }));
-          }
-        } catch (err) { this._maHiba(cel, err); }
+      const mostLeker = async () => { try { most = await this._hass.callWS({ type: "cantabile/ma/now", entity_id: rma, mappa: String(this._config.magno?.nas || "").replace(/\/$/, "") }); } catch (_) { /* nincs adat */ } };
+      const cel = this._maE(uj);
+      if (!cel) await mostLeker();
+      if (cel && cel !== rma) {
+        try { await this._hass.callWS({ type: "cantabile/ma/transfer", source: rma, target: cel, device: ESZKOZ() }); }
+        catch (err) { this._maHiba(cel, err); }
         return;
       }
+      if (cel === rma) return this._csoportAllit(uj);
       if (!most) await mostLeker();
       if (most?.file && most.folder) {
         const szamok = await this._albumSzamok(most.folder).catch(() => []);
         const kezdo = szamok.indexOf(most.file);
         if (kezdo >= 0) {
-          await this._hiv("media_player", "media_stop", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
+          await this._hiv("media_player", "media_stop", { entity_id: rma }, { csendes: true }).catch(() => {});
           await this._csoportAllit(uj);
           const kaz = { forras: "nas", id: most.folder, cim: most.current?.album || FAJLNEV(most.folder), alcim: most.current?.artist || "", szamok };
           const f = { kaz, kezdo, poz: Number(most.elapsed) || 0 };
@@ -4658,8 +4667,8 @@ class CantabileCard extends HTMLElement {
 
   async _sorRajz(lista) {
     const pl = this._polc; if (!pl) return;
-    const mh = this._hangszoro()?.entity;
-    if (this._maLejatszo(mh) && this._maSorSzol(mh)) return this._maSorRajz(lista, mh);
+    const mh = this._maE(this._hangszoro());
+    if (mh && this._maSorGomb(this._hangszoro())) return this._maSorRajz(lista, mh);
     const f = this._sorForras();
     if (f.mod === "radio") { lista.innerHTML = `<div class="puzenet">${T("Rádióadó szól – ott nincs lejátszási sor.")}</div>`; return; }
     if (f.mod === "nincs") { lista.innerHTML = `<div class="puzenet">${T("A(z) {h} hangszórón most nincs lejátszási sor. Tegyél be egy kazettát.", { h: ESC(KN(f.hsz)) })}</div>`; return; }
@@ -5149,7 +5158,7 @@ class CantabileCard extends HTMLElement {
         const sz = kever(l.fajlok.filter((f) => f.startsWith(`${rel}/`))).slice(0, 80).map((f) => `${nas}/${f}`);
         if (sz.length) { this._polcZar(); return this._betolt({ cim: T("{e} – keverve", { e: e.cim }), alcim: T("{n} szám, véletlen sorrendben", { n: sz.length }), forras: "nas", id: e.nas, szamok: sz }); }
       }
-      if (e.ma && this._maInfo?.available && this._maLejatszo(this._hangszoro()?.entity)) return this._maJatszik({ name: e.cim, uri: e.ma, type: "artist" });
+      if (e.ma && this._maInfo?.available && this._maLejatszo(this._hangszoro()?.entity) && !this._hangszoro()?.ma) return this._maJatszik({ name: e.cim, uri: e.ma, type: "artist" });
       if (e.dz) {
         const t = (await this._dz(`/artist/${e.dz}/top?limit=50`)).data || [];
         if (t.length) { const l = kever(t.map((x) => x.link)); this._polcZar(); return this._betolt({ cim: T("{e} – keverve", { e: e.cim }), alcim: T("{n} szám, véletlen sorrendben", { n: l.length }), forras: "stream", tipus: "deezer", id: l[0], szamok: l, kep: e.kep || null }); }
@@ -5760,6 +5769,10 @@ class CantabileCard extends HTMLElement {
   // ---- Music Assistant (ma.py): választható forrás, ha a HA-ban be van állítva ----
 
   _maLejatszo(e) { return !!e && !!this._hass?.states[e]?.attributes?.mass_player_type; }
+  // a gomb MA-lejátszója: maga, ha MA-lejátszó; különben a készülék MA-párja (ha van)
+  _maE(h) { return !h || h.entity === HELYI || h.tagok ? null : this._maLejatszo(h.entity) ? h.entity : h.ma || null; }
+  // a gomb mögött az MA saját sora szól (a Sonos is szólhat az MA-ból: akkor az MA-lejátszója a mérvadó)
+  _maSorGomb(h) { const m = this._maE(h); return !!m && this._maSorSzol(m) && (SZOL(this._hass?.states[m]) || SZUNETEL(this._hass?.states[m])); }
   // az MA saját sora szól: az MA-lejátszó akkor is „Music Assistant Queue”-t jelez, ha kívülről (pl. a Sonos appból) szól
   // valami – ezért az MA-azonosítójú szám (library://…, spotify://…) dönt
   _maSorSzol(e) {
@@ -5818,8 +5831,8 @@ class CantabileCard extends HTMLElement {
     const kerdes = pl.keres || "", hely = pl.ut[pl.ut.length - 1], tip = pl.maTip || "album", keres = KERES_NORM(kerdes).length >= 2;
     const allapot = JSON.stringify([kerdes, tip, pl.ut.map((x) => x.id)]);
     const friss = () => this._polc === pl && pl.ful === "ma" && allapot === JSON.stringify([pl.keres || "", pl.maTip || "album", pl.ut.map((x) => x.id)]);
-    const hsz = this._hangszoro(), maNevek = this._kimenetek.filter((h) => h.entity !== HELYI && !h.tagok && this._maLejatszo(h.entity)).map(KN);
-    const figy = this._maLejatszo(hsz?.entity) ? "" : `<div class="puzenet">${ESC(maNevek.length ? T("A Music Assistant tartalma Music Assistant-lejátszón szól: {l}.", { l: maNevek.join(", ") }) : T("A Music Assistant tartalma Music Assistant-lejátszón szól – vegyél fel egyet a hangszórók közé (⚙)."))}</div>`;
+    const hsz = this._hangszoro(), maNevek = this._kimenetek.filter((h) => this._maE(h)).map(KN);
+    const figy = this._maE(hsz) ? "" : `<div class="puzenet">${ESC(maNevek.length ? T("A Music Assistant tartalma Music Assistant-lejátszón szól: {l}.", { l: maNevek.join(", ") }) : T("A Music Assistant tartalma Music Assistant-lejátszón szól – vegyél fel egyet a hangszórók közé (⚙)."))}</div>`;
     const TIP = [["album", "ALBUMS"], ["artist", "ARTISTS"], ["playlist", "PLAYLISTS"], ["track", "TRACKS"], ["radio", "RADIO"]];
     const fulek = hely || keres ? "" : `<div class="maful">${TIP.map(([k, n]) => `<button class="pful${tip === k ? " akt" : ""}" data-mt="${k}">${n}</button>`).join("")}</div>`;
     lista.innerHTML = figy + fulek + `<div class="puzenet">${T("Betöltés…")}</div>`;
@@ -5863,9 +5876,9 @@ class CantabileCard extends HTMLElement {
   // MA-tartalom indítása: csak MA-lejátszón (a sor az MA-é); máshol felajánlja a kártya MA-lejátszóit
   async _maJatszik(x, cel = null) {
     if (!x) return;
-    const hsz = cel || this._hangszoro(), e = hsz?.entity;
-    if (!this._maLejatszo(e)) {
-      const lista = this._kimenetek.map((h, i) => [h, i]).filter(([h]) => h.entity !== HELYI && !h.tagok && this._maLejatszo(h.entity));
+    const hsz = cel || this._hangszoro(), e = this._maE(hsz);
+    if (!e) {
+      const lista = this._kimenetek.map((h, i) => [h, i]).filter(([h]) => this._maE(h));
       if (!lista.length) return this._uzen(T("A Music Assistant tartalma Music Assistant-lejátszón szól – vegyél fel egyet a hangszórók közé (⚙)."));
       return this._uzen(T("„{c}” a Music Assistanté – Music Assistant-lejátszón szól. Hol szóljon?", { c: x.name }),
         lista.slice(0, 4).map(([h, i]) => ({ szoveg: `▶ ${KN(h)}`, fn: () => { this._kimenetValt(i, false); this._maJatszik(x, h); } })));
@@ -6510,7 +6523,7 @@ class CantabileCard extends HTMLElement {
     const nasMost = /\/media\/local\//.test(id) || /\/media\/local\//.test(a.media_title || "");
     // a hangszóró saját bemenetéről (BT IN, LINE IN) szól: a forrás a bemenet, a betöltött kazetta nem szól
     const bem = megy && hsz && hsz.entity !== HELYI && this._bemenetrol(hsz.entity) ? BEMENET_NEV(a.source) : "";
-    const maSor = megy && !bem && this._maSorSzol(hsz?.entity);       // a Music Assistant sora szól (nem a betöltött kazetta)
+    const maSor = megy && !bem && this._maSorGomb(hsz);       // a Music Assistant sora szól (nem a betöltött kazetta)
     const kaz = bem || maSor ? null : !kazTarolt || !megy ? kazTarolt
       : kazTarolt.forras === "nas" ? (nasMost && (!kazTarolt.szamok?.length || this._szamIndex(kazTarolt, a) >= 0) ? kazTarolt : null)
       : kazTarolt.forras === "stream" ? (nasMost ? null : kazTarolt) : kazTarolt;

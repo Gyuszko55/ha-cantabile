@@ -13,6 +13,8 @@
   - Radio wheel: a broken saved list or a list replaced meanwhile no longer leaves the wheel stuck or plays the wrong station; a pending wheel step is cancelled when the card goes away.
   - The result message after a save goes only to the card that was rebuilt with the same speakers and stations.
 
+- **One button per speaker.** A speaker and its Music Assistant player (e.g. *Sonos 1* and *Sonos MA*, the same device) are one position on the speaker selector. Music Assistant content plays on the Music Assistant player behind the button, everything else (music folder, radio, Deezer) on the speaker's own player, so a music-folder track no longer ends up in a Music Assistant queue. Existing configurations are merged automatically; a Music Assistant player without a paired speaker keeps its own button.
+
 ### Fixed (review)
 - Moving a PARTY or a playlist between a Sonos and the Multiroom group that contains it no longer stops it right after it started there.
 - Cantabile TV: with YAML-mode resources the TV page is no longer resent on every play, and the mirror starts; one resend at a time (a play waits for it, and a newer play is never overwritten by the resumed track); a failed resend leaves the player OFF instead of PLAYING; switching to the mirror no longer restarts the old track; the automatic reload only runs in the daytime (starting the Cast app can wake a TV over HDMI-CEC).
