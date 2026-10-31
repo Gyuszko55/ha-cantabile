@@ -2869,19 +2869,56 @@ class CantabileCard extends HTMLElement {
       this._uzen(T("Ezt, ami most szól, nem tudom átvinni a(z) {h} hangszóróra – a(z) {r} szól tovább.", { h: KN(uj), r: KN(regi) }));
       return this._frissit();
     }
-    if (regi.mod === "url") this._szkriptLeallit(regi);
-    await this._hiv("media_player", regi.mod === "sonos" ? "media_pause" : "media_stop", { entity_id: regi.entity });
-    // Sonos célnál a csoport mindig a választás szerinti (egyedül, vagy mindkettő) – különben egy korábbi Multiroom-csoport
-    // tagja is megszólalna
+    // előbb az új szól (ugyanattól a ponttól), csak utána áll le a régi – így nincs csend, és ha az új nem indul el,
+    // a régi szól tovább. Sonos célnál a csoport mindig a választás szerinti (egyedül, vagy mindkettő).
+    const regiLe = async () => {
+      if (regi.mod === "url") this._szkriptLeallit(regi);
+      // a Sonost szüneteltetjük, nem állítjuk le: a STOP a sorát az elejére teszi
+      await this._hiv("media_player", regi.mod === "sonos" ? "media_pause" : "media_stop", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
+    };
+    if (!szol) await regiLe();                      // csak töltött / szünetelt: nincs mit átfedni
     await this._csoportAllit(uj);
-    if (ado >= 0 || ado === KULSO) this._atvitel = { ado, hova: uj.entity, ido: Date.now() };
-    if (ado >= 0) return this._hangol(ado);
-    if (ado === KULSO) { const k = this._kulso(); if (k) return this._netIndit({ name: k.nev, url_resolved: k.url, favicon: k.ikon, countrycode: k.orszag, codec: k.kodek, bitrate: k.kbps }, false); }
-    if (forras) {
+    let ok = true;
+    if (ado >= 0 || ado === KULSO) {
+      this._atvitel = { ado, hova: uj.entity, ido: Date.now() };
+      if (ado >= 0) await this._hangol(ado);
+      else { const k = this._kulso(); if (k) await this._netIndit({ name: k.nev, url_resolved: k.url, favicon: k.ikon, countrycode: k.orszag, codec: k.kodek, bitrate: k.kbps }, false); }
+      ok = await this._szolMar(uj, () => true);
+    } else if (forras) {
       this._atvitel = { ado: -1, forras, hova: uj.entity, ido: Date.now() };
-      if (forras.tel) return this._telAtmenet(forras.kaz, forras.kezdo, forras.poz, uj);
-      await this._kazettaFolytat(forras, uj);
+      if (szol) forras.t0 = forras.t0 || Date.now();        // a régi közben tovább szól: a tekerésnél ennyivel később
+      if (forras.tel) await this._telAtmenet(forras.kaz, forras.kezdo, forras.poz, uj);
+      else ok = await this._kazettaFolytat(forras, uj);
     }
+    if (szol && !ok && this._hangszoro() === uj) {
+      // az új nem indult el: a régi szól tovább, a választó visszaáll
+      this._hiv("media_player", "media_stop", { entity_id: uj.entity }, { csendes: true }).catch(() => {});
+      this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); this._frissit();
+      return this._uzen(T("A(z) {h} nem indult el – a(z) {r} szól tovább.", { h: KN(uj), r: KN(regi) }));
+    }
+    if (szol) await regiLe();
+  }
+
+  // az új kimenet ténylegesen szól (és a `jo` feltétel szerint az átvitt dolgot); a TV-oldal kiküldése lassabb
+  async _szolMar(uj, jo) {
+    const tv = /^media_player\.cantabile_tv_/.test(uj.entity), hatar = Date.now() + (tv ? 45000 : 15000);
+    while (Date.now() < hatar) {
+      const s = this._allapot(uj);
+      if ((s?.state === "playing" || uj.entity === HELYI && this._aktAudio && !this._aktAudio.paused) && jo(s)) return true;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return false;
+  }
+
+  // a kimenet mostani helye a számban (mp): Sonosnál közvetlenül a hangszórótól, BT-n a böngészőből, máshol az állapotból
+  async _helye(h) {
+    if (h.entity === HELYI) return this._aktAudio?.currentTime ?? null;
+    if (h.mod === "sonos") {
+      try { const ps = await this._hass.callWS({ type: "cantabile/sonos_position", entity_id: this._hass.states[h.entity]?.attributes?.group_members?.[0] || h.entity }); if (ps?.position >= 0) return ps.position; } catch (_) { /* régebbi integráció */ }
+    }
+    const s = this._allapot(h), a = s?.attributes || {};
+    if (a.media_position == null) return null;
+    return a.media_position + (s.state === "playing" && a.media_position_updated_at ? (Date.now() - Date.parse(a.media_position_updated_at)) / 1000 : 0);
   }
 
   // saját zene (a böngészőben lévő fájlok) nem BT kimeneten: számonként átmenetileg feltölti a HA-ra (24 óra múlva
@@ -2922,23 +2959,31 @@ class CantabileCard extends HTMLElement {
   }
 
   // a kazetta folytatása az új kimeneten: ugyanattól a számtól, ugyanonnan
+  // Igazat ad, ha az új kimenet szól.
   async _kazettaFolytat(f, uj) {
     await this._betolt(f.kaz, f.kezdo);
-    if (!(f.poz > 3)) return;
     // a tekerés csak akkor hat, ha az új kimenet már ténylegesen az átvitt számot játssza (a Cast / WiiM lassabban tölt be,
     // és előtte még mást is szólhatott)
-    const ezSzol = () => {
-      const s = this._allapot(uj), a = s?.attributes || {};
-      if (s?.state !== "playing") return false;
+    const ezSzol = (s) => {
+      const a = s?.attributes || {};
       if (uj.entity === HELYI) return this._helyiLista?.i === f.kezdo;
       if (uj.mod === "sonos") return (Number(a.queue_position) || 0) - 1 === f.kezdo;
       const i = this._szamIndex(f.kaz, a);
       return i === f.kezdo || i < 0 && !URLSZERU(a.media_title);
     };
-    for (let t = 0; t < 24 && !ezSzol(); t++) await new Promise((r) => setTimeout(r, 500));
+    if (!(await this._szolMar(uj, ezSzol))) return false;
+    if (!(f.poz > 3)) return true;
     // a WiiM / Cast a címet már a betöltéskor kiírja, de tekerni csak kicsivel később tud
     await new Promise((r) => setTimeout(r, uj.mod === "sonos" || uj.entity === HELYI ? 800 : 2500));
-    this._hiv("media_player", "media_seek", { entity_id: uj.entity, seek_position: Math.round(f.poz) }, { csendes: true }).catch(() => {});
+    // ahol a régi épp tart: az átvitel kezdetekor kiolvasott hely + azóta eltelt idő (a régi közben szólt)
+    for (let k = 0; k < 3; k++) {
+      const cel = f.poz + (f.t0 ? (Date.now() - f.t0) / 1000 : 0);
+      await this._hiv("media_player", "media_seek", { entity_id: uj.entity, seek_position: Math.round(cel) }, { csendes: true }).catch(() => {});
+      await new Promise((r) => setTimeout(r, 1500));
+      const most = await this._helye(uj);
+      if (most == null || Math.abs(most - (cel + 1.5)) < 4) break;   // nem tudjuk ellenőrizni, vagy jó helyen van
+    }
+    return true;
   }
 
   // a szóló (vagy szünetelő) kazetta számsora és helye, magától a lejátszótól: Sonosnál a sorából, WiiM-nél az integráció

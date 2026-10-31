@@ -15,6 +15,8 @@
 
 - **One button per speaker.** A speaker and its Music Assistant player (e.g. *Sonos 1* and *Sonos MA*, the same device) are one position on the speaker selector. Music Assistant content plays on the Music Assistant player behind the button, everything else (music folder, radio, Deezer) on the speaker's own player, so a music-folder track no longer ends up in a Music Assistant queue. Existing configurations are merged automatically; a Music Assistant player without a paired speaker keeps its own button.
 
+- **Switching speakers keeps the exact position.** The new speaker starts first, the card waits until it really plays the same track, seeks to where the old one is *now* (the seconds spent switching are added), checks the position and retries if needed – and only then stops the old one. If the new speaker doesn't start, the old one keeps playing and the card says so.
+
 ### Fixed (review)
 - Moving a PARTY or a playlist between a Sonos and the Multiroom group that contains it no longer stops it right after it started there.
 - Cantabile TV: with YAML-mode resources the TV page is no longer resent on every play, and the mirror starts; one resend at a time (a play waits for it, and a newer play is never overwritten by the resumed track); a failed resend leaves the player OFF instead of PLAYING; switching to the mirror no longer restarts the old track; the automatic reload only runs in the daytime (starting the Cast app can wake a TV over HDMI-CEC).
