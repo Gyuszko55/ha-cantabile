@@ -43,6 +43,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import CARD_URL, DOMAIN, VERSION, szoveg
@@ -122,7 +123,25 @@ class TvKozpont:
         self._deezer: dict[str, str | None] = {}
         self._adb: dict[str, tuple[float, list[str]]] = {}
         self._video_zar: dict[str, asyncio.Lock] = {}
-        self.elo: dict[str, tuple[str, str]] = {}      # élő DLNA-videó: kulcs → (adatlap képe, adó címe)
+        self.elo: dict[str, tuple[str, str, float, float]] = {}   # élő DLNA-videó: kulcs → (adatlap képe, cím, kezdet, hossz)
+        # melyik TV melyik hangszórót tükrözi – újraindítás után, amikor a TV-oldal visszajelentkezik, onnan folytatja
+        self._tukor_tar = Store(hass, 1, "cantabile_tv_tukor")
+        self.tukrok: dict[str, dict[str, Any]] = {}
+        self.tukrok_kesz = asyncio.Event()
+
+    async def tukrok_betolt(self) -> None:
+        try:
+            self.tukrok = dict(await self._tukor_tar.async_load() or {})
+        finally:
+            self.tukrok_kesz.set()
+
+    @callback
+    def tukor_ment(self, tv: str, cel: str | None) -> None:
+        if cel:
+            self.tukrok[tv] = {"cel": cel, "ido": time.time()}
+        elif self.tukrok.pop(tv, None) is None:
+            return
+        self._tukor_tar.async_delay_save(lambda: self.tukrok, 5)
 
     # ---- oldal ↔ lejátszó ----
     @callback
@@ -931,6 +950,7 @@ async def ws_reload(hass: HomeAssistant, conn: websocket_api.ActiveConnection, m
 
 def regisztral(hass: HomeAssistant) -> None:
     kp = hass.data[DOMAIN]["tv"] = TvKozpont(hass)
+    hass.async_create_background_task(kp.tukrok_betolt(), "cantabile_tv_tukrok")
     # a régi kártyakóddal futó, épp nem szóló TV-oldalak újraküldése (frissítés után)
     async_track_time_interval(hass, kp._frissit_ellenoriz, timedelta(seconds=60))
     hass.http.register_view(TvKep(hass))

@@ -112,7 +112,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self.async_on_remove(async_track_state_change_event(self.hass, [self.cast], self._cast_valtozott))
 
     async def async_will_remove_from_hass(self) -> None:
-        self.tukor_vege(kuld=False)
+        self.tukor_vege(kuld=False, felejt=False)      # újratöltés / leállás: a tükör a mentésből folytatódik
         if self._ugrik_le:
             self._ugrik_le()
             self._ugrik_le = None
@@ -140,11 +140,31 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         if self._allapot == MediaPlayerState.OFF:
             self._allapot = MediaPlayerState.IDLE
         self.async_write_ha_state()
+        if not self.dlna and self._tukor is None and self._allapot != MediaPlayerState.PLAYING:
+            self.hass.async_create_background_task(self._tukor_folytat(), f"cantabile_tv_tukor_vissza_{self.entity_id}")
+
+    async def _tukor_folytat(self) -> None:
+        """A TV-oldal visszajelentkezett (pl. újraindítás után): ha tükrözött, folytatja – ha a hangszóró még nem szól
+        (az is épp indul), legfeljebb 3 percig vár rá."""
+        from .runtime import var    # noqa: PLC0415
+
+        kp = kozpont(self.hass)
+        await kp.tukrok_kesz.wait()
+        m = kp.tukrok.get(self.entity_id)
+        if not m or time.time() - float(m.get("ido") or 0) > 12 * 3600:
+            return
+        cel = m["cel"]
+        szol = lambda st: bool(st and st.state in ("playing", "paused"))  # noqa: E731
+        if not await var(self.hass, cel, szol, 180):
+            return
+        await asyncio.sleep(2)                     # az oldal berendezkedik
+        if self.oldal is not None and self._tukor is None and self._allapot != MediaPlayerState.PLAYING:
+            self.tukroz(cel)
 
     @callback
     def oldal_ki(self, conn: websocket_api.ActiveConnection, msg_id: int) -> None:
         if self.oldal == (conn, msg_id):
-            self.tukor_vege(kuld=False)
+            self.tukor_vege(kuld=False, felejt=False)  # a kapcsolat szakadt meg (újraindítás, TV ki): a tükör megmarad
             self.oldal = None
             self.oldal_jott.clear()
             if self.ujratolt:                  # frissítés miatt újraküldjük: az állapot marad, az új oldal folytatja
@@ -382,6 +402,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             async_track_time_interval(self.hass, self._tukor_ellenoriz, timedelta(seconds=60)),
         ]
         self._tukor_frissit(elso=True)
+        kozpont(self.hass).tukor_ment(self.entity_id, cel)
         self.async_write_ha_state()
 
     async def _friss_oldallal_tukroz(self, cel: str) -> None:
@@ -394,9 +415,11 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             self.tukroz(cel, ellenoriz=False)               # épp most kapta meg a friss oldalt
 
     @callback
-    def tukor_vege(self, kuld: bool = True) -> None:
+    def tukor_vege(self, kuld: bool = True, felejt: bool = True) -> None:
         if self._tukor is None:
             return
+        if felejt and not self.hass.is_stopping:
+            kozpont(self.hass).tukor_ment(self.entity_id, None)
         for le in self._tukor_le:
             le()
         self._tukor_le, self._tukor = [], None
