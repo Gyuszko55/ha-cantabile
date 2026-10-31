@@ -19,6 +19,7 @@ import asyncio
 import logging
 import os
 import re
+from urllib.parse import unquote
 from datetime import timedelta
 from typing import Any
 
@@ -59,6 +60,62 @@ def bejegyzes(hass: HomeAssistant) -> Any | None:
 def ma_lejatszo(hass: HomeAssistant, entity_id: str) -> bool:
     st = hass.states.get(entity_id)
     return bool(st and st.attributes.get("mass_player_type"))
+
+
+def _lecsupal(nev: str, eloado: str, album: str = "") -> str:
+    """Mappa- vagy fájlnév összevethető alakban: kiterjesztés, [..] (..), sorszám, évszám és „Előadó -”, „Album -” előtag nélkül."""
+    from .music import norm    # noqa: PLC0415 – körkörös import nélkül
+
+    t = norm(re.sub(r"\.[A-Za-z0-9]{2,4}$", "", re.sub(r"\[[^\]]*\]|\([^)]*\)", " ", nev)))
+    for _ in range(3):                                  # az előtagok bármilyen sorrendben
+        for el in (eloado, album):
+            if el and t.startswith(f"{el} "):
+                t = t[len(el) + 1:]
+        t = re.sub(r"^\d{1,4} (?=\S)", "", t)
+    return t
+
+
+async def konyvtari(hass: HomeAssistant, media_id: str) -> tuple[str, str, set[str]] | None:
+    """Zenemappás fájl (media-source azonosító, `…/előadó/album/fájl`) Music Assistant-könyvtári megfelelője:
+    (azonosító, típus, a szóló szám lehetséges azonosítói), vagy None. Így az MA a szám valódi címét és borítóját mutatja –
+    a puszta címből csak a kódolt fájlnevet. Egy fájlos (CUE-lapos) albumnál az egész album."""
+    from .music import norm, tiszta    # noqa: PLC0415
+
+    e = bejegyzes(hass)
+    resz = str(media_id or "").split("/")
+    if e is None or not str(media_id).startswith("media-source://") or len(resz) < 6:
+        return None
+    eloado = norm(resz[-3])
+    album = _lecsupal(resz[-2], eloado)
+    fajl = _lecsupal(resz[-1], eloado, album)
+    if not (eloado and album and fajl):
+        return None
+    egesz = fajl == album                              # az egész album egy fájlban
+    tipus = "album" if egesz else "track"
+    try:
+        v = await asyncio.wait_for(_hiv(hass, "search", {"config_entry_id": e.entry_id, "name": album if egesz else fajl,
+                                                          "media_type": [tipus], "limit": 25, "library_only": True}), 8)
+    except (HomeAssistantError, TimeoutError):
+        return None
+    talalat = [x for x in (v or {}).get(f"{tipus}s") or [] if isinstance(x, dict) and x.get("uri")]
+
+    def elo_e(x: dict[str, Any], szigoru: bool = False) -> bool:
+        nevek = [norm(a.get("name")) for a in x.get("artists") or [] if isinstance(a, dict)]
+        return eloado in nevek or (not nevek and not szigoru)
+
+    def alb_e(n: Any) -> bool:
+        n = tiszta(str(n or ""))
+        return bool(n) and (n == album or n.startswith(f"{album} ") or album.startswith(f"{n} "))
+
+    for x in talalat:
+        if egesz and alb_e(x.get("name")) and elo_e(x):
+            return x["uri"], "album", set()
+        if not egesz and tiszta(x.get("name")) == fajl and alb_e((x.get("album") or {}).get("name")) and elo_e(x):
+            return x["uri"], "track", {x["uri"]}
+    for x in talalat:                                  # más albumon (válogatás, eltérő albumnév): az előadó és a cím egyezik
+        if not egesz and tiszta(x.get("name")) == fajl and elo_e(x, szigoru=True):
+            return x["uri"], "track", {x["uri"]}
+    return None
 
 
 def ma_sor_szol(hass: HomeAssistant, entity_id: str) -> bool:
@@ -323,6 +380,16 @@ def regisztral(hass: HomeAssistant) -> None:
                         ki["file"] = f"{mappa}/{ut}"
                         ki["folder"] = f"{mappa}/{ut.rsplit('/', 1)[0]}" if "/" in ut else mappa
                         break
+        if "file" not in ki and mappa.startswith(ELOTAG):
+            # a Cantabile (vagy más) puszta címként adta az MA-nak a zenemappás fájlt: …/media/local/NAS310/…?authSig=…
+            mi = ci.get("media_item") if isinstance(ci.get("media_item"), dict) else {}
+            for u in (str(ci.get("uri") or ""), str(mi.get("uri") or ""), rel):
+                m = re.search(r"https?://[^/]+/media/(.+?)(?:\?|$)", u)
+                ut = unquote(m.group(1)) if m else ""
+                if ut and f"{ELOTAG}{ut}".startswith(f"{mappa}/"):
+                    ki["file"] = f"{ELOTAG}{ut}"
+                    ki["folder"] = ki["file"].rsplit("/", 1)[0]
+                    break
         conn.send_result(msg["id"], ki)
 
     @websocket_api.websocket_command({

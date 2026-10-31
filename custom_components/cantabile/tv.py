@@ -40,6 +40,7 @@ from homeassistant.components.http import HomeAssistantView
 from homeassistant.components.http.auth import async_sign_path
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
@@ -868,13 +869,34 @@ def ws_report(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: di
 def ws_follow(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
     """A kártyán hangszórót váltottak (`source` → `target`): a TV, amelyről elváltottak – vagy amelyik az előzőt
     tükrözte –, ezentúl hang nélkül az újat mutatja; ha épp erre a TV-re váltottak, a tükre véget ér."""
+    cel_t = terulet(hass, msg["target"])
     for lj in list(kozpont(hass).lejatszok.values()):
         if lj.entity_id == msg["target"]:
             lj.tukor_vege()
         elif (lj.entity_id == msg["source"] and lj.friss_szolt()) or lj._tukor == msg["source"]:  # noqa: SLF001
-            if msg["target"].startswith("media_player."):
+            tv_t = terulet(hass, lj.entity_id, lj.cast)
+            if tv_t and cel_t and tv_t != cel_t:
+                lj.tukor_vege()             # más szobában szól: a TV nem mutatja (csak az azonos területű hangszórót)
+            elif msg["target"].startswith("media_player."):
                 lj.tukroz(msg["target"])
     conn.send_result(msg["id"])
+
+
+def terulet(hass: HomeAssistant, *entity_ids: str | None) -> str | None:
+    """Az első ismert terület az entitások közül (az entitásé, különben a készüléké); MA-lejátszónál a párjáé is."""
+    from .ma import parok    # noqa: PLC0415
+
+    ent, eszk = er.async_get(hass), dr.async_get(hass)
+    jeloltek = [e for e in entity_ids if e]
+    jeloltek += [n for e in list(jeloltek) for n, m in parok(hass).items() if m == e]   # Sonos MA → Sonos
+    for e in jeloltek:
+        if (r := ent.async_get(e)) is None:
+            continue
+        if r.area_id:
+            return r.area_id
+        if r.device_id and (d := eszk.async_get(r.device_id)) and d.area_id:
+            return d.area_id
+    return None
 
 
 @websocket_api.websocket_command({vol.Required("type"): "cantabile/tv/reload", vol.Required("entity_id"): str})

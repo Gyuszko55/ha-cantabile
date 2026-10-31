@@ -2787,7 +2787,11 @@ class CantabileCard extends HTMLElement {
     const ms = this._allapot(regi);
     if (this._maLejatszo(regi.entity) && this._maSorSzol(regi.entity) && (SZOL(ms) || SZUNETEL(ms))) {
       await this._maInfoLeker();
-      const cel = uj.entity === HELYI ? null : this._maLejatszo(uj.entity) ? uj.entity : this._maInfo?.pairs?.[uj.entity] || null;
+      // a zenemappából szól, és a cél nem MA-lejátszó (pl. Sonos 1): a Cantabile veszi át, nem az MA-pár (az ugyanaz lehet)
+      let most = null;
+      const mostLeker = async () => { try { most = await this._hass.callWS({ type: "cantabile/ma/now", entity_id: regi.entity, mappa: String(this._config.magno?.nas || "").replace(/\/$/, "") }); } catch (_) { /* nincs adat */ } };
+      if (uj.entity !== HELYI && !this._maLejatszo(uj.entity)) await mostLeker();
+      const cel = uj.entity === HELYI || (most?.file && most.folder) ? null : this._maLejatszo(uj.entity) ? uj.entity : this._maInfo?.pairs?.[uj.entity] || null;
       if (cel) {
         try {
           await this._hass.callWS({ type: "cantabile/ma/transfer", source: regi.entity, target: cel, device: ESZKOZ() });
@@ -2800,8 +2804,7 @@ class CantabileCard extends HTMLElement {
         } catch (err) { this._maHiba(cel, err); }
         return;
       }
-      let most = null;
-      try { most = await this._hass.callWS({ type: "cantabile/ma/now", entity_id: regi.entity, mappa: String(this._config.magno?.nas || "").replace(/\/$/, "") }); } catch (_) { /* nincs adat */ }
+      if (!most) await mostLeker();
       if (most?.file && most.folder) {
         const szamok = await this._albumSzamok(most.folder).catch(() => []);
         const kezdo = szamok.indexOf(most.file);

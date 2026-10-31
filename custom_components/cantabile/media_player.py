@@ -511,7 +511,13 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         extra: dict[str, Any] = {"title": meta.get("title") or meta.get("station") or "Cantabile", "metadata": adat}
         self._mcid, self._meta = media_id, {k: v for k, v in meta.items() if not k.startswith("_")}
         if fajl:
-            video = await kp.dlna_video(meta, fajl)
+            # a videó legfeljebb 15 mp-ig készülhet (egy órás, CUE-lapos albumfájlnál ennél tovább tart): utána a zene
+            # borítóval indul, a videó a háttérben elkészül a következő alkalomra
+            kesz = self.hass.async_create_background_task(kp.dlna_video(meta, fajl), f"cantabile_tv_video_{self.entity_id}")
+            try:
+                video = await asyncio.wait_for(asyncio.shield(kesz), 15)
+            except TimeoutError:
+                video = None
         elif re.match(r"^https?://", cim := await kp.feloldas(media_id, self.entity_id)):
             video = await kp.dlna_elo(meta, cim)          # webes adó: élő videó
         else:

@@ -30,7 +30,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.util import dt as dt_util
 
-from . import hezagmentes
+from . import hezagmentes, ma
 from .const import ROUNDS_INFINITE, SIGNAL_NET, SIGNAL_SLEEP
 
 _LOGGER = logging.getLogger(__name__)
@@ -223,15 +223,21 @@ class Cantabile:
             if dmr is not None:
                 await hezagmentes.lejatszik(self.hass, dmr, entity_id, sorrend)
                 return
+            ma_e = ma.ma_lejatszo(self.hass, entity_id)
             for id_ in sorrend:
                 sorrend.most = id_
                 fajl = id_.rsplit("/", 1)[-1]
                 valtozatok = {fajl, quote(fajl), quote_plus(fajl)}
                 elozo = self.hass.states.get(entity_id)
                 elotte = str(elozo.attributes.get("media_content_id") or "") if elozo else ""   # ami eddig szólt
+                # MA-lejátszón az MA könyvtárának ugyanez a száma (valódi cím, borító); ha nincs meg, a fájl címe
+                mit, tipus = id_, "music"
+                if ma_e and (kt := await ma.konyvtari(self.hass, id_)):
+                    mit, tipus = kt[0], kt[1]
+                    valtozatok |= kt[2]
                 await self.hass.services.async_call(
                     "media_player", "play_media",
-                    {"entity_id": entity_id, "media_content_id": id_, "media_content_type": "music"}, blocking=True,
+                    {"entity_id": entity_id, "media_content_id": mit, "media_content_type": tipus}, blocking=True,
                 )
                 if not await var(self.hass, entity_id, lambda st: bool(st and st.state == "playing"), 30):
                     return

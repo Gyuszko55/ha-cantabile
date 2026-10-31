@@ -19,6 +19,10 @@
 - TV weather: `weather: true` no longer hides it, and a missing temperature no longer shows as 0°.
 - GENRES: a failed Deezer load on a genre page is retried; *drum* alone (Steel Drum…) no longer counts as Electro, only drum & bass / drumstep.
 - PARTY on Sonos with the hi-res folder: tracks with the same file name in another album (01.flac) no longer end the party.
+- Music Assistant players: a music-folder track now plays as the same track of the Music Assistant library (its real title and cover, not the file name as an encoded link); an album in one file (with a CUE sheet) plays as the whole library album. When nothing matches, the file is played as before.
+- Switching from a Music Assistant player that plays a music-folder file to a speaker that isn't a Music Assistant player (e.g. Sonos 1 from Sonos MA) lets Cantabile take over from the same track and position, instead of handing the queue back to the same Music Assistant player.
+- Cantabile TV on DLNA TVs: when the still video of a long file (e.g. a one-hour album with a CUE sheet) isn't ready within 15 s, the music starts right away with the cover, and the video is finished in the background for the next time.
+- Cantabile TV mirror: a TV only shows a speaker that is in the same area (when both have one), so the living-room TV doesn't show what plays in the bedroom.
 
 ## 2.1.0 – 2026-10-30
 
