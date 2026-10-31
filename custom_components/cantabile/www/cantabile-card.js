@@ -602,6 +602,11 @@ const ATKULCS = (o, t) => Array.isArray(o) ? o.map((x) => ATKULCS(x, t)) : o && 
 const KIJELZO_BE = { vu: "deprez", vfd: "fluor" }, KIJELZO_KI = { deprez: "vu", fluor: "vfd" };
 const KARTYAK = ["custom:cantabile-card", "custom:tablet-radio"];
 // media_player-szolgáltatások és a hozzájuk kellő képesség-bit (supported_features)
+// BT (a böngésző hangja) logaritmikus hangerő-görbéje: a gomb állása (0…1) → hangerő 50 dB-es tartományban, mint egy
+// hi-fi hangerőszabályzó (a böngésző hangereje lineáris – nélküle alul nagyot ugrik, fent alig változik). A Sonos és a WiiM
+// a saját görbéjével dolgozik, ott a gomb állása megy át változatlanul.
+const BT_GORBE = (v) => (v <= 0 ? 0 : Math.min(1, Math.pow(10, -2.5 * (1 - Math.min(1, v)))));
+const BT_ALLAS = (a) => (a <= 0 ? 0 : Math.max(0, Math.min(1, 1 + Math.log10(a) / 2.5)));
 const KEPESSEG = { volume_set: 4, shuffle_set: 32768, repeat_set: 262144, join: 524288, media_seek: 2 };
 // a kártya beállításának „személyazonossága” a mentéshez: a hangszórók és az adók sora (a nevek, rövid nevek nem számítanak)
 const LENYOMAT = (y) => { const c = ATKULCS(y || {}, KULCS); return JSON.stringify([(c.hangszorok || []).map((h) => h?.entity), (c.adok || []).map((a) => a?.url)]); };
@@ -2465,7 +2470,7 @@ class CantabileCard extends HTMLElement {
     const au = new Audio();
     if (elemzett) this._audioE = au; else this._audio = au;
     au.preload = "none";
-    au.volume = this._aktAudio ? this._aktAudio.volume : 0.4;   // fülhallgatóhoz óvatos kezdő hangerő
+    au.volume = this._aktAudio ? this._aktAudio.volume : BT_GORBE(0.6);   // fülhallgatóhoz óvatos kezdő hangerő (a gomb 60%-án)
     if (elemzett) {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (Ctx) {
@@ -2567,7 +2572,7 @@ class CantabileCard extends HTMLElement {
     if (s === "media_stop") { au.pause(); au.removeAttribute("src"); au.load(); this._helyiId = null; this._helyiLista = null; return this._frissit(); }
     if (s === "media_pause") return au.pause();
     if (s === "media_play") return au.play().catch(() => {});
-    if (s === "volume_set") { au.volume = Math.max(0, Math.min(1, adat.volume_level)); return; }
+    if (s === "volume_set") { au.volume = BT_GORBE(Math.max(0, Math.min(1, adat.volume_level))); return; }
     if (s === "media_seek") { try { au.currentTime = adat.seek_position; } catch (e) { /* még nem töltött be */ } return; }
     if (s === "media_next_track" || s === "media_previous_track") {
       if (this._helyiLista) return this._helyiSzam(this._helyiLista.i + (s === "media_next_track" ? 1 : -1));
@@ -2584,7 +2589,7 @@ class CantabileCard extends HTMLElement {
     return {
       state: au.paused ? "paused" : au.readyState < 3 ? "buffering" : "playing",
       attributes: {
-        volume_level: au.volume, media_content_id: id,
+        volume_level: BT_ALLAS(au.volume), media_content_id: id,
         media_title: nas ? FAJLNEV(id) : this._helyiNevek?.get(id) || null,
         media_artist: nas && resz.length > 3 ? decodeURIComponent(resz[resz.length - 3]) : this._helyiNevek?.has(id) ? T("Telefon") : null,
         media_album_name: nas && resz.length > 2 ? decodeURIComponent(resz[resz.length - 2]) : null,
