@@ -2771,7 +2771,9 @@ class CantabileCard extends HTMLElement {
       if (futo) {
         const vissza = () => { this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); this._frissit(); };
         if (this._hass?.states[uj.entity]?.state === "unavailable") { vissza(); return this._nemElerheto(uj.entity); }
-        if (!(await this._partyIndit(uj, pk.cfg))) return vissza();       // a régi szól tovább
+        // ugyanaz a szám szól tovább, ugyanonnan (a kívánságok és a vendéglink is átjön)
+        const poz = await this._helye(regi).catch(() => null);
+        if (!(await this._partyIndit(uj, pk.cfg, { entity: regi.entity, poz }))) return vissza();       // a régi szól tovább
         if (!(uj.tagok || [uj.entity]).includes(regi.entity)) {             // ugyanaz a hangszóró (Sonos ↔ Multiroom): a szerver már átvitte
           await this._hass.callWS({ type: "cantabile/party/stop", entity_id: regi.entity }).catch(() => {});
           await this._hiv("media_player", "media_stop", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
@@ -5484,7 +5486,7 @@ class CantabileCard extends HTMLElement {
   }
 
   // ---- PARTY (party.py): végtelen keverés a zenemappából a szerveren, vendégkívánságok QR-kóddal ----
-  async _partyIndit(hsz, cfg) {
+  async _partyIndit(hsz, cfg, folytat = null) {
     cfg = cfg || { cim: "PARTY" };
     const nas = String(this._config.magno?.nas || "").replace(/\/$/, "");
     if (!nas) { this._uzen(T("A PARTY a zenemappából szól – adj meg zenemappát (⚙ → Tape deck → Zenemappa).")); return false; }
@@ -5494,7 +5496,8 @@ class CantabileCard extends HTMLElement {
     this._szkriptLeallit();
     try {
       await this._hass.callWS({ type: "cantabile/party/start", entity_id: hsz.entity, tagok: hsz.tagok || [hsz.entity], mod: hsz.mod === "sonos" ? "sonos" : "url",
-        mappa: nas, ...(cfg.albumok ? { albumok: cfg.albumok } : {}), cim: cfg.cim, hires: this._config.magno?.hires || null, device: ESZKOZ() });
+        mappa: nas, ...(cfg.albumok ? { albumok: cfg.albumok } : {}), cim: cfg.cim, hires: this._config.magno?.hires || null, device: ESZKOZ(),
+        ...(folytat ? { folytat: folytat.entity, ...(folytat.poz != null ? { poz: folytat.poz } : {}) } : {}) });
     } catch (err) {
       const m = String(err?.message || err);
       this._uzen(m.startsWith("busy:") ? T("A(z) {h} foglalt: {n} használja.", { h: KN(hsz), n: m.slice(5) }) : T("A PARTY nem indult: {h}", { h: m }));

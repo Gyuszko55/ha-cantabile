@@ -14,6 +14,7 @@ Vendégoldal: `/api/cantabile/party/<token>` (és `/state`, `/search`, `/request
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import random
 import re
@@ -93,11 +94,32 @@ class Party:
         self._utolso_kiv: dict[str, Any] | None = None
         self._index: list[tuple[str, str]] | None = None
         self._keres_ido: dict[str, float] = {}
+        self._elso: str | None = None               # átvételkor: a régi helyen épp szóló szám jön elsőnek
         self.aktiv = True
+
+    def atvesz(self, regi: Party) -> None:
+        """Hangszóróváltás: a régi party folytatása – ugyanaz a szám szól tovább, a kívánságok, az előzmények és a
+        vendéglink is átjön."""
+        self.elozmeny.extend(regi.elozmeny)
+        self.eloadok.extend(regi.eloadok)
+        self.kivansag, self.lejatszva, self.kerte = regi.kivansag, regi.lejatszva, regi.kerte
+        self.token, self.vendeg = regi.token, regi.vendeg
+        regi.kivansag = deque()
+        most = regi.szol()
+        if most and (rel := most.get("f")) and rel in self.pool_halmaz():
+            self._elso = rel
+
+    def pool_halmaz(self) -> set[str]:
+        return set(self.pool)
 
     # ---- válogatás ----
     def kovetkezo_rel(self) -> str:
         self._utolso_kiv = None
+        if self._elso:
+            f, self._elso = self._elso, None
+            self.elozmeny.append(f)
+            self.eloadok.append(_eloado(f))
+            return f
         if self.kivansag:
             k = self.kivansag.popleft()
             f = k["f"]
@@ -349,6 +371,26 @@ def _qr(szoveg: str) -> str | None:
     return segno.make(szoveg, error="m").svg_inline(scale=5, border=2, dark="#15161a", light="#f3ead8", omitsize=True)
 
 
+async def _odateker(p: Party, rel: str, poz: float, t0: float) -> None:
+    """Átvett partynál: ha az új helyen már az átvett szám szól, odateker, ahol a régi tartott (a váltás idejével együtt)."""
+    from .runtime import var    # noqa: PLC0415
+
+    def ez(st: Any) -> bool:
+        if not st or st.state != "playing":
+            return False
+        if p.mod == "sonos":
+            return p._rel(str(st.attributes.get("media_content_id") or "")) == rel  # noqa: SLF001
+        return bool(p.most) and p.most.endswith(f"/{rel}")
+
+    if not await var(p.hass, p.e, ez, 45) or not p.aktiv:
+        return
+    await asyncio.sleep(2)
+    try:
+        await p.hass.services.async_call("media_player", "media_seek", {"entity_id": p.e, "seek_position": round(poz + time.monotonic() - t0)}, blocking=True)
+    except Exception as err:  # noqa: BLE001 – nem minden lejátszó tud tekerni
+        _LOGGER.debug("Cantabile PARTY: a tekerés nem sikerült (%s): %s", p.e, err)
+
+
 def regisztral(hass: HomeAssistant) -> None:
     kp = hass.data[DOMAIN]["party"] = Partik(hass)
     hass.http.register_view(VendegOldal())
@@ -371,6 +413,8 @@ def regisztral(hass: HomeAssistant) -> None:
         vol.Optional("cim", default="PARTY"): vol.All(str, vol.Length(max=80)),
         vol.Optional("hires"): vol.Any(None, str),
         vol.Optional("device", default="gep"): vol.In(foglalas.ESZKOZOK),
+        vol.Optional("folytat"): str,                    # hangszóróváltás: ennek a partyját viszi tovább
+        vol.Optional("poz"): vol.Coerce(float),          # …és a szóló számot innen (mp)
     })
     @websocket_api.async_response
     async def ws_start(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
@@ -385,11 +429,16 @@ def regisztral(hass: HomeAssistant) -> None:
                       {"id": conn.user.id, "nev": conn.user.name or "?"})
             if not p.pool:
                 raise HomeAssistantError("empty")
+            if (regi := kp.partik.get(msg.get("folytat") or "")) is not None:
+                p.atvesz(regi)
+            elso = p._elso  # noqa: SLF001
             for t in tagok:
                 kp.vege(t)
             kp.partik[e] = p
             await p.indit()
             foglalas.kozpont(hass).foglal(tagok, conn.user.id, conn.user.name or "?", msg["device"])
+            if elso and (msg.get("poz") or 0) > 3:
+                hass.async_create_background_task(_odateker(p, elso, msg["poz"], time.monotonic()), f"cantabile_party_teker_{e}")
         except (HomeAssistantError, HibaUzenet) as err:
             if p is not None and kp.partik.get(e) is p:     # csak a most indított partyt, egy másik futóét nem
                 kp.vege(e)
