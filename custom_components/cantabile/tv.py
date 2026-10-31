@@ -52,6 +52,7 @@ if TYPE_CHECKING:
     from .media_player import CantabileTv
 
 _LOGGER = logging.getLogger(__name__)
+VIDEO_MAX = 20 * 60                 # ennél hosszabb fájlból nem készül DLNA-videó (sokáig tartana, és terhelné a gépet)
 
 _ffmpeg: bool | None = None
 
@@ -445,6 +446,8 @@ class TvKozpont:
         így teljes képernyőn mutatják az adatlapot, a saját haladásjelzőjükkel; a fájl tekerhető. Aláírt belső cím, vagy None."""
         if not await ffmpeg_van(self.hass):
             return None
+        if float(meta.get("duration") or 0) > VIDEO_MAX:
+            return None                              # hosszú fájl (pl. CUE-lapos album egyben): nem készül el időben – borítóval szól
         kep = await self.dlna_kepfajl(meta)
         if not kep:
             return None
