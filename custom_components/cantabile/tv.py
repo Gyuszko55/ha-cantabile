@@ -499,17 +499,19 @@ class TvKozpont:
             return None
         return self.belso_cim(f"{VIDEO_URL}/{os.path.basename(cel)}")
 
-    async def dlna_elo(self, meta: dict[str, Any], url: str) -> str | None:
-        """Webes adó „élő videóként” (az adatlap + az adó hangja, menet közben kódolva, MPEG-TS); aláírt belső cím."""
+    async def dlna_elo(self, meta: dict[str, Any], url: str, kezdet: float = 0) -> str | None:
+        """Webes adó „élő videóként” (az adatlap + az adó hangja, menet közben kódolva, MPEG-TS); aláírt belső cím.
+        Zenemappás fájlnál (`url` a fájl útja) a `kezdet` másodperctől – hangszóróváltáskor azonnal indul."""
         if not await ffmpeg_van(self.hass):
             return None
         kep = await self.dlna_kepfajl(meta)
         if not kep:
             return None
-        kulcs = hashlib.sha1(f"{kep}|{url}".encode()).hexdigest()[:20]
+        kulcs = hashlib.sha1(f"{kep}|{url}|{kezdet}".encode()).hexdigest()[:20]
         if len(self.elo) > 50:
             self.elo.clear()
-        self.elo[kulcs] = (kep, url)
+        hossz = float(meta.get("duration") or 0) - kezdet if url.startswith("/") else 0
+        self.elo[kulcs] = (kep, url, round(kezdet, 1), round(hossz, 2) if hossz > 0 else 0)
         return self.belso_cim(f"{ELO_URL}/{kulcs}.ts")
 
     async def dlna_kepfajl(self, meta: dict[str, Any]) -> str | None:
@@ -800,7 +802,7 @@ class TvElo(HomeAssistantView):
     def __init__(self, hass: HomeAssistant) -> None:
         self.hass = hass
 
-    def _cel(self, v: str) -> tuple[str, str] | None:
+    def _cel(self, v: str) -> tuple[str, str, float, float] | None:
         m = re.fullmatch(r"([0-9a-f]{20})\.ts", v)
         return kozpont(self.hass).elo.get(m.group(1)) if m else None
 
@@ -814,12 +816,15 @@ class TvElo(HomeAssistantView):
         cel = self._cel(v)
         if not cel:
             return web.Response(status=404)
-        kep, url = cel
+        kep, url, kezdet, hossz = cel
+        fajl = url.startswith("/")                    # zenemappás fájl (hangszóróváltás): a kezdőponttól, a végén leáll
+        bemenet = (["-ss", str(kezdet)] if kezdet else []) + ["-i", url] if fajl else \
+            ["-user_agent", "Cantabile (Home Assistant)", "-reconnect", "1", "-reconnect_streamed", "1", "-i", url]
         kodolo = ["-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage"] if await x264_van() else ["-c:v", "mpeg4", "-q:v", "3"]
         try:
             p = await asyncio.create_subprocess_exec(
-                "ffmpeg", "-v", "error", "-loop", "1", "-framerate", "1", "-i", kep, "-user_agent", "Cantabile (Home Assistant)",
-                "-reconnect", "1", "-reconnect_streamed", "1", "-i", url, "-map", "0:v", "-map", "1:a", "-vf", "scale=1280:720",
+                "ffmpeg", "-v", "error", "-loop", "1", "-framerate", "1", "-i", kep, *bemenet,
+                "-map", "0:v", "-map", "1:a", "-vf", "scale=1280:720", *(["-shortest"] if fajl else []), *(["-t", str(hossz)] if hossz else []),
                 *kodolo, "-pix_fmt", "yuv420p", "-r", "1", "-g", "4", "-c:a", "aac", "-b:a", "192k", "-f", "mpegts", "pipe:1",
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
         except OSError:

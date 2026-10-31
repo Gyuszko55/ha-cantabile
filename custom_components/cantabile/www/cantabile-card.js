@@ -2295,7 +2295,8 @@ class CantabileCard extends HTMLElement {
       }
       adat = { ...adat, entity_id: Array.isArray(adat.entity_id) ? ids : ids[0] };
     }
-    const p = this._hass.callService(d, s, adat);
+    // csendes hívás: a HA se dobjon fel hibaablakot (pl. a hangszóróváltás utáni tekerés egy DLNA-s TV-n)
+    const p = this._hass.callService(d, s, adat, undefined, !csendes);
     // semmi ne hiúsuljon meg csendben: a sikertelen hívás mindig üzenetet ad (a hívó pontosabb üzenete felülírhatja)
     if (!csendes) p.catch((err) => this._hivHiba(adat?.entity_id, err));
     return p;
@@ -3057,6 +3058,7 @@ class CantabileCard extends HTMLElement {
     };
     if (!(await this._szolMar(uj, ezSzol))) return false;
     if (!(f.poz > 3)) return true;
+    if (/^media_player\.cantabile_tv_/.test(uj.entity)) return true;   // a TV már a kezdőponttól indult: nincs tekerés
     // a WiiM / Cast a címet már a betöltéskor kiírja, de tekerni csak kicsivel később tud
     await new Promise((r) => setTimeout(r, uj.mod === "sonos" || uj.entity === HELYI ? 800 : 2500));
     // ahol a régi épp tart: az átvitel kezdetekor kiolvasott hely + azóta eltelt idő (a régi közben szólt)

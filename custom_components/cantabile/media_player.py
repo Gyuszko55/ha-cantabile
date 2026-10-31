@@ -25,6 +25,7 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event, async_track_time_interval
@@ -90,6 +91,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self.oldal_kepes: set[str] = set()      # mit tud a TV-n futó oldal (a régebbi kártyakód nem ismeri a tükröt)
         self._ujrakuldes: asyncio.Task | None = None
         self._eltolas = 0.0                     # DLNA: a köztes pontról induló videó kezdete (mp)
+        self._elo = False                       # DLNA: élő videó szól (nem tekerhető)
         self.ujratoltve: str | None = None     # erre a kártyaváltozatra már újraküldtük az oldalt (ne ismételje)
         self.ujratolt = False                  # az oldal újraküldése alatt a lejátszó nem megy „ki”
         self.ujrakuldes_zar = asyncio.Lock()   # egyszerre egy újraküldés; a lejátszás megvárja
@@ -514,7 +516,10 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
                                    "releaseDate": meta.get("year"), "genre": meta.get("genre")}.items() if v}
         extra: dict[str, Any] = {"title": meta.get("title") or meta.get("station") or "Cantabile", "metadata": adat}
         self._mcid, self._meta = media_id, {k: v for k, v in meta.items() if not k.startswith("_")}
-        if fajl:
+        if fajl and kezdet > 3 and kezdet < float(meta.get("duration") or 0) - 5:
+            # hangszóróváltás: élő videó a kezdőponttól (azonnal indul, nem kell megvárni a kódolást)
+            video = await kp.dlna_elo(meta, fajl, kezdet)
+        elif fajl:
             # a videó legfeljebb 15 mp-ig készülhet (egy órás, CUE-lapos albumfájlnál ennél tovább tart): utána a zene
             # borítóval indul, a videó a háttérben elkészül a következő alkalomra
             # hangszóróváltásnál a videó ott kezdődik, ahol a régi tartott (a DLNA-s TV-k nem mindig tudnak tekerni)
@@ -532,6 +537,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         hossz = float(meta.get("duration") or 0)
         # a videó a kezdőponttól indul: a TV ettől számolja az időt (a pozíció és a tekerés ennyivel eltolva)
         self._eltolas = float(round(kezdet)) if video and fajl and 3 < kezdet < hossz - 5 else 0.0
+        self._elo = bool(video and "/live/" in str(video)) or bool(video and not fajl)
         if video:
             cel, fajta = video, "video"
         else:
@@ -602,7 +608,14 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         if self._tukor:
             return
         if self.dlna:
-            await self._cel_hiv("media_seek", seek_position=max(0.0, position - self._eltolas))
+            # sok DLNA-s TV nem tud tekerni (vagy élő videónál nem lehet): csendben kimarad, nem hibaüzenet
+            st = self.hass.states.get(self.cast)
+            if not st or not int(st.attributes.get("supported_features") or 0) & MediaPlayerEntityFeature.SEEK or self._elo:
+                return
+            try:
+                await self._cel_hiv("media_seek", seek_position=max(0.0, position - self._eltolas))
+            except HomeAssistantError as err:
+                _LOGGER.debug("Cantabile TV: a DLNA-s TV nem tekert (%s): %s", self.cast, err)
             return
         self.uzen({"cmd": "seek", "position": position})
 
