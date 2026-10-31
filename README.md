@@ -120,6 +120,9 @@ BT; for a Music Assistant queue the current and next track.
   (e.g. NET · BT IN · LINE IN on a WiiM) and **BASS / TREBLE** knobs (−10…+10; Sonos bass / treble, WiiM 10-band EQ).
   The volume is kept when the input changes. While a speaker plays from its own input the tape shows it (“BT IN”) with
   the title the phone sends; STOP pauses, and switching speakers pauses it (switching back resumes).
+  **AirPlay**: when a phone sends AirPlay to a Sonos or WiiM, the tape shows AIRPLAY with the title and artist from the
+  phone; STOP pauses (the phone stops too). It can't be moved to another speaker from the card – choose the other speaker
+  in the phone's AirPlay menu.
   > **Bluetooth pairing:** Cantabile doesn't pair or pick the Bluetooth device. Pair your phone / tablet with the speaker
   > in its Bluetooth settings (or the speaker's app); BT IN only switches the speaker to its Bluetooth input.
 - **PAIR** (WiiM): switches to BT IN and guides you through connecting a phone – the speaker's Bluetooth name, pairing
@@ -150,8 +153,18 @@ Cantabile only uses Home Assistant's official Music Assistant services – it ha
 ## TV (Cantabile TV)
 
 TVs become speakers, with the track on the screen: on **Cast** devices (TV sticks, Android TV boxes, Nest Hub) a
-full-screen TV page – artist image, cover, title, artist, album, format, an equalizer that follows the music and a
-progress bar; on **DLNA** TVs a full-screen still track card. See *TV players* below.
+full-screen TV page – the cover, title, artist, album, format, artist pictures in the background, a progress bar and the
+**lyrics running along** at the bottom; on **DLNA** TVs a full-screen still track card (mid-track a live video that
+starts right at the position). Looks: **cover** (default), **spinning vinyl** with a circular spectrum, or the equaliser
+– chosen in ⚙ → *TV look* or with the `select` / `switch` entities below. When a TV is switched to another speaker it
+keeps showing that speaker's track (mirror), also after a Home Assistant restart.
+
+The **TV button** on the card (before ⓘ) opens the same page in a small window over the deck for the selected speaker;
+it closes by itself 5 seconds after the music stops.
+
+Lyrics come from [LRCLIB](https://lrclib.net) (timed, karaoke-style highlight); when it is down or doesn't have the
+track, from [lyrics.ovh](https://lyrics.ovh) (plain text). Without lyrics, the reason runs along in their place. See
+*TV players* below.
 
 ![Cantabile TV on a Cast TV: artist image, cover, track details, equalizer and progress bar](docs/images/tv-cast.png)
 
@@ -292,9 +305,9 @@ After setting up the integration, open your conversation agent's options (e.g. *
    ```
    Optional: `weather: weather.your_entity` on the `cantabile-tv` card shows the current weather (icon and temperature)
    before the clock; without it `weather.home` or the first weather entity is used, `weather: false` hides it.
-   The TV page shows a spinning vinyl record with the cover as its label and a circular spectrum around it, and the
-   lyrics running along under the track details (`lyrics: false` hides them). `visual: bars`, `wave` or `both` shows the
-   equaliser instead of the record.
+   `visual:` sets the look – `cover` (default: the cover, the details beside it, the lyrics across the bottom), `vinyl`
+   (a spinning record with the cover as its label and a circular spectrum), `bars`, `wave` or `both` (the equaliser);
+   `lyrics: false` hides the lyrics. The same can be set in ⚙ → *TV look* or with the entities below.
    The TV loads this page through Home Assistant's Cast receiver, so Home Assistant must be reachable from the TV over
    https (Home Assistant Cloud or your own external URL).
 3. On the card: **⚙ → Speakers → + New speaker** → choose the **“Cantabile TV · …”** player (not the TV's own Cast /
@@ -417,6 +430,8 @@ The earlier Hungarian keys (`hangszorok`, `adok`, `magno`, `nas` …) are accept
 | `number.cantabile_repeat_rounds` | REPEAT: 1–5 rounds, 6 = endless |
 | `sensor.cantabile_sleep_timer` | Running sleep timers (`timers` attribute: player → stop time) |
 | `sensor.cantabile_voice_started_station` | The internet station started by voice, so the card recognises it |
+| `select.cantabile_tv_look` | The look of the TV page: cover, spinning vinyl, equaliser bars, waveform, bars and waveform |
+| `switch.cantabile_tv_lyrics` | Running lyrics on the TV page |
 
 | Service | Purpose |
 |---|---|

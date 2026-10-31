@@ -120,6 +120,9 @@ Music Assistant sornál a szóló és a következő szám.
   BT IN · LINE IN egy WiiM-en) és **BASS / TREBLE** gombok (−10…+10; Sonos mély / magas, WiiM 10 sávos EQ). Bemenetváltáskor
   a hangerő marad. Ha a hangszóró a saját bemenetéről szól, a magnó ezt mutatja („BT IN”) a telefon küldte címmel; a STOP
   szüneteltet, hangszóróváltáskor szünetel (visszaváltva folytatja).
+  **AirPlay**: ha egy telefon AirPlay-jel küld zenét a Sonosra vagy a WiiM-re, a kazettán AIRPLAY áll a telefon által
+  küldött címmel és előadóval; a STOP szünetet küld (a telefon is megáll). A kártyáról nem vihető át másik hangszóróra –
+  a telefon AirPlay-menüjében kell a másikat választani.
   > **Bluetooth-párosítás:** a Cantabile nem párosít és nem választ BT-eszközt. A telefont / tabletet a Bluetooth-beállításaiban
   > (vagy a hangszóró appjában) párosítsd; a BT IN csak a hangszóró Bluetooth-bemenetére vált.
 - **PAIR** (WiiM): BT IN-re vált, és végigvezet a telefon csatlakoztatásán – a hangszóró Bluetooth-neve, magától bekapcsolt
@@ -148,8 +151,18 @@ A Cantabile csak a Home Assistant hivatalos Music Assistant-szolgáltatásait ha
 ## TV (Cantabile TV)
 
 A TV-k hangszóróként is választhatók, a szám a képernyőn: **Cast** eszközökön (TV-stick, Android TV box, Nest Hub)
-teljes képernyős TV-oldal – előadókép, borító, cím, előadó, album, formátum, a zenét követő equalizer és haladásjelző;
-**DLNA** TV-n teljes képernyős álló számkártya. Lásd lent: *TV-lejátszók*.
+teljes képernyős TV-oldal – borító, cím, előadó, album, formátum, a háttérben előadóképek, haladásjelző, alul pedig
+**futó dalszöveg**; **DLNA** TV-n teljes képernyős álló számkártya (szám közben váltva élő videó, rögtön a kezdőponttól).
+Kinézet: **borító** (alapértelmezés), **forgó bakelit** körspektrummal, vagy az equalizer – a ⚙ → *TV-kinézet* résznél
+vagy a lenti `select` / `switch` entitásokkal. Ha a TV-ről másik hangszóróra váltasz, a TV tovább mutatja annak a
+számát (tükör), a Home Assistant újraindítása után is.
+
+A kártya **TV-gombja** (az ⓘ előtt) ugyanezt az oldalt kis ablakban mutatja a kiválasztott hangszóróról, a kijelző
+fölött; a zene megállása után 5 mp-cel magától bezárul.
+
+A dalszöveg az [LRCLIB](https://lrclib.net)-ből jön (időzítve, karaoke-szerű kiemeléssel); ha az nem érhető el, vagy
+nincs nála a szám, a [lyrics.ovh](https://lyrics.ovh)-ból (sima szöveg). Ha nincs dalszöveg, a helyén az oka fut.
+Lásd lent: *TV-lejátszók*.
 
 ![Cantabile TV Cast TV-n: előadókép, borító, a szám adatai, equalizer és haladásjelző](docs/images/tv-cast.png)
 
@@ -291,8 +304,9 @@ Az integráció beállítása után nyisd meg a beszélgetőügynök beállítá
    ```
    Elhagyható: a `cantabile-tv` kártyán `weather: weather.entitasod` – az óra előtt a pillanatnyi időjárás (ikon és hőfok);
    nélküle a `weather.home`, vagy az első időjárás-entitás látszik, `weather: false` elrejti.
-   A TV-oldalon forgó bakelitlemez látszik (a borító a címkéje) körspektrummal, az adatok alatt pedig fut a dalszöveg
-   (`lyrics: false` elrejti). `visual: bars`, `wave` vagy `both` esetén a lemez helyett az equalizer.
+   `visual:` a kinézet – `cover` (alapértelmezés: borító, mellette az adatok, alul a dalszöveg teljes szélességben),
+   `vinyl` (forgó lemez, a borító a címkéje, körspektrummal), `bars`, `wave` vagy `both` (equalizer); `lyrics: false`
+   elrejti a dalszöveget. Ugyanez a ⚙ → *TV-kinézet* résznél vagy a lenti entitásokkal is beállítható.
    A TV ezt az oldalt a Home Assistant Cast-vevőjén át tölti be, ezért a Home Assistantnak a TV felől https-en
    elérhetőnek kell lennie (Home Assistant Cloud vagy saját külső cím).
 3. A kártyán: **⚙ → Hangszórók → + Új hangszóró** → a **„Cantabile TV · …”** lejátszót válaszd (ne a TV saját Cast- /
@@ -415,6 +429,8 @@ A korábbi magyar kulcsok (`hangszorok`, `adok`, `magno`, `nas` …) is működn
 | `number.cantabile_ismetlesszam` | REPEAT: 1–5 kör, 6 = végtelen |
 | `sensor.cantabile_alvasidozito` | A futó alvásidőzítők (`timers` attribútum: lejátszó → leállás ideje) |
 | `sensor.cantabile_hanggal_inditott_ado` | A hanggal indított internetes adó, hogy a kártya felismerje |
+| `select.cantabile_tv_kinezet` | A TV-oldal kinézete: borító, forgó bakelit, equalizer-sávok, hullámforma, sávok és hullámforma |
+| `switch.cantabile_tv_dalszoveg` | Futó dalszöveg a TV-oldalon |
 
 | Szolgáltatás | Mire való |
 |---|---|
