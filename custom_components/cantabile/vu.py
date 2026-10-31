@@ -31,9 +31,11 @@ from homeassistant.components import websocket_api
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant, State, callback
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import dt as dt_util
 
+from .const import DOMAIN, SIGNAL_UPNP
 from .library import media_ut
 
 _LOGGER = logging.getLogger(__name__)
@@ -120,7 +122,10 @@ class Figyelo:
     def feliratkozik(self, hallgato: Callable[[dict[str, Any]], None]) -> Callable[[], None]:
         self._hallgatok.add(hallgato)
         if self._leiratkozas is None:
-            self._leiratkozas = async_track_state_change_event(self.hass, [self.entity_id], self._valtozott)
+            le1 = async_track_state_change_event(self.hass, [self.entity_id], self._valtozott)
+            # hézagmentes WiiM-lejátszásnál a számváltást a HA-entitás nem mindig jelzi: a Cantabile UPnP-állapota igen
+            le2 = async_dispatcher_connect(self.hass, SIGNAL_UPNP, lambda e: self._ujraertekel() if e == self.entity_id else None)
+            self._leiratkozas = lambda: (le1(), le2())
             self._ujraertekel()
         hallgato({"allapot": self._allapot, "formatum": self._formatum})
 
@@ -145,9 +150,21 @@ class Figyelo:
     def _valtozott(self, _event: Event) -> None:
         self._ujraertekel()
 
+    def _upnp(self) -> dict[str, Any] | None:
+        z = self.hass.data.get(DOMAIN, {}).get("zene")
+        return z.rt.upnp_allapot(self.entity_id) if z is not None else None
+
     @callback
     def _ujraertekel(self) -> None:
         state = self.hass.states.get(self.entity_id)
+        u = self._upnp()
+        if u and u.get("url"):
+            # a renderelő pontos állapota: a ténylegesen szóló fájl, és a helye benne
+            szolo = u["allapot"] == "playing"
+            state = State(self.entity_id, "playing" if szolo else "paused", {"media_content_id": u["url"]})
+            poz0 = float(u.get("poz") or 0) + (time.time() - u["ido"] if szolo else 0)
+        else:
+            poz0 = None
         uj = forras(state, self.hass.config.media_dirs)
         if uj == self._kulcs and (self._feladat and not self._feladat.done()):
             return
@@ -159,7 +176,7 @@ class Figyelo:
         if uj is None:
             self._jelez("nincs" if state is not None and state.state in SZOLO else "all")
             return
-        self._feladat = self.hass.async_create_background_task(self._elemez(uj, pozicio(state)), f"cantabile signal {self.entity_id}")
+        self._feladat = self.hass.async_create_background_task(self._elemez(uj, poz0 if poz0 is not None else pozicio(state)), f"cantabile signal {self.entity_id}")
 
     @callback
     def _megallit(self) -> None:

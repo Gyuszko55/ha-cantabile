@@ -31,6 +31,7 @@ UID_TV_LYRICS = "tv_lyrics"
 
 SIGNAL_SLEEP = f"{DOMAIN}_sleep_changed"
 SIGNAL_NET = f"{DOMAIN}_net_changed"
+SIGNAL_UPNP = f"{DOMAIN}_upnp_state"     # a hézagmentes lejátszó (UPnP) pontos állapota változott: (entity_id)
 
 PLAYING = ("playing", "buffering")
 ROUNDS_INFINITE = 6               # az ismétlésszám 1–5 kör, 6 = végtelen

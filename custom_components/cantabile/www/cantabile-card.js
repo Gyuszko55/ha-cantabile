@@ -278,6 +278,8 @@ const EN = {
   "Kinézet": "Look",
   "Forgó bakelit körspektrummal": "Spinning vinyl with circular spectrum",
   "Equalizer-sávok": "Equaliser bars",
+  "A(z) {h} AirPlay-jelet kap a telefonról – ezt a telefonon (AirPlay-ikon) lehet átküldeni a(z) {u} hangszóróra.": "{h} is receiving AirPlay from a phone – send it to {u} from the phone (AirPlay icon).",
+  "iPhone / iPad / Mac AirPlay-jele": "AirPlay from an iPhone / iPad / Mac",
   "Csak borító": "Cover only",
   "Hullámforma": "Waveform",
   "Sávok és hullámforma": "Bars and waveform",
@@ -526,7 +528,7 @@ const HELYI = "helyi:bt";
 const FOGLALO = new Set(["media_player.play_media", "media_player.media_play", "media_player.join", "media_player.select_source", "cantabile.play_tracks", "sonos.play_queue"]);
 const ELENGEDO = new Set(["media_player.media_stop", "cantabile.stop_tracks"]);
 // a hangszóró saját bemenetei (hangszin.py) rövid, előlapi névvel
-const BEMENET_NEV = (n) => ({ network: "NET", bluetooth: "BT IN", "line in": "LINE IN", "line-in": "LINE IN", "optical in": "OPT IN", optical: "OPT IN", tv: "TV", hdmi: "HDMI",
+const BEMENET_NEV = (n) => ({ network: "NET", airplay: "AIRPLAY", bluetooth: "BT IN", "line in": "LINE IN", "line-in": "LINE IN", "optical in": "OPT IN", optical: "OPT IN", tv: "TV", hdmi: "HDMI",
   "phono in": "PHONO", phono: "PHONO", aux: "AUX", coaxial: "COAX", usb: "USB", cd: "CD", tuner: "TUNER" })[String(n || "").toLowerCase()] || String(n || "").toUpperCase();
 // a WiiM EQ-sávjai, amelyeket a BASS / TREBLE mozgat (súllyal; ugyanaz, mint a hangszin.py-ban)
 const EQ_MELY = { band31hz: 1, band63hz: 1, band125hz: 1, band250hz: 0.5 };
@@ -2273,7 +2275,8 @@ class CantabileCard extends HTMLElement {
       const ids = [...[].concat(adat.entity_id || []), ...[].concat(adat.group_members || [])].filter((e) => typeof e === "string" && e.startsWith("media_player."));
       const fr = this._foglaloIds(ids);
       if (fr) { if (!opc.csendes) this._foglaltUzen(fr); return Promise.resolve(); }
-      const bem = !opc.bemenetKesz && ["play_media", "play_tracks", "play_queue"].includes(s) ? ids.filter((e) => this._bemenetrol(e)) : [];
+      // a hangszóró bemenetről szól: előbb a hálózatra vált (AirPlay-nél nem kell – az új lejátszás magától átveszi)
+      const bem = !opc.bemenetKesz && ["play_media", "play_tracks", "play_queue"].includes(s) ? ids.filter((e) => this._bemenetrol(e) && !this._airplay(e)) : [];
       if (bem.length) {
         return Promise.all(bem.map((e) => this._hass.callWS({ type: "cantabile/input/select", entity_id: e, source: "Network", device: ESZKOZ() })
           .catch((err) => console.warn("Cantabile: a hálózatra váltás nem sikerült", e, err))))
@@ -2749,6 +2752,11 @@ class CantabileCard extends HTMLElement {
     // a hangszóró saját bemenete (BT IN, LINE IN) nem vihető át: a régi szünetel (BT-n a telefon is megáll), az új hallgat;
     // ha visszaváltunk rá, onnan folytatja – hacsak nem visszük rá épp más zenét
     const regiBem = regi.entity !== HELYI && this._bemenetrol(regi.entity);
+    if (regiBem && this._airplay(regi.entity)) {
+      // AirPlay: a telefon küldi a hangot – azt nem tudjuk átirányítani; a telefonon kell a másik hangszórót választani
+      this._uzen(T("A(z) {h} AirPlay-jelet kap a telefonról – ezt a telefonon (AirPlay-ikon) lehet átküldeni a(z) {u} hangszóróra.", { h: KN(regi), u: KN(uj) }));
+      return this._csoportAllit(uj);
+    }
     if (regiBem) {
       const rs = this._allapot(regi), forras = rs?.attributes?.source;
       if (SZOL(rs) && /^bluetooth$/i.test(forras || "") && !this._foglaloIds([regi.entity])) {
@@ -3001,6 +3009,9 @@ class CantabileCard extends HTMLElement {
     if (h.mod === "sonos") {
       try { const ps = await this._hass.callWS({ type: "cantabile/sonos_position", entity_id: this._hass.states[h.entity]?.attributes?.group_members?.[0] || h.entity }); if (ps?.position >= 0) return ps.position; } catch (_) { /* régebbi integráció */ }
     }
+    if (h.mod !== "sonos" && !this._nincsIntegracio) {
+      try { const t = await this._hass.callWS({ type: "cantabile/tracks", entity_id: h.entity }); if (t?.position != null) return t.position; } catch (_) { /* nincs sorozat */ }
+    }
     const s = this._allapot(h), a = s?.attributes || {};
     if (a.media_position == null) return null;
     return a.media_position + (s.state === "playing" && a.media_position_updated_at ? (Date.now() - Date.parse(a.media_position_updated_at)) / 1000 : 0);
@@ -3115,6 +3126,8 @@ class CantabileCard extends HTMLElement {
         const t = await this._hass.callWS({ type: "cantabile/tracks", entity_id: hsz.entity });
         // a ténylegesen szóló szám a címmezőből (a sorozat a következőt már előre megadta a WiiM-nek)
         if (t?.tracks?.length) { szamok = t.tracks; const i2 = this._szamIndex({ szamok }, a); kezdo = i2 >= 0 ? i2 : Math.max(0, t.current); }
+        // a hézagmentes (UPnP) lejátszó pontos adatai: a szóló szám és a hely benne (a HA-entitás ilyenkor elavult lehet)
+        if (t?.position != null && t.current >= 0) { kezdo = t.current; poz = t.position; }
       } catch (e) { /* régebbi integráció: a kártya emlékezete */ }
       const k = TAR.json("tablet-magno-kazetta");
       if (!szamok && k?.forras === "nas" && k.szamok?.length && k.entity === hsz.entity) { szamok = k.szamok; kezdo = Math.max(0, this._szamIndex(k, a)); }
@@ -5948,7 +5961,7 @@ class CantabileCard extends HTMLElement {
     if (!helyi && e && this._bemenetrol(e)) {
       fajta = "bem";
       const ki = vez?.bt?.devices?.find((d) => d.connected);
-      forras = { cim: BEMENET_NEV(a.source), al: [/bluetooth/i.test(a.source || "") ? (ki ? `Bluetooth · ${ki.name}` : T("telefon / tablet Bluetooth-on")) : T("külső készülék a bemeneten"), cimSor].filter(Boolean) };
+      forras = { cim: this._airplay(e) ? "AIRPLAY" : BEMENET_NEV(a.source), al: [this._airplay(e) ? T("iPhone / iPad / Mac AirPlay-jele") : /bluetooth/i.test(a.source || "") ? (ki ? `Bluetooth · ${ki.name}` : T("telefon / tablet Bluetooth-on")) : T("külső készülék a bemeneten"), cimSor].filter(Boolean) };
       lepes = [T("Közvetlen bemenet: a hang egyenesen a hangszóróba megy, a Home Assistanton nem halad át")];
     } else if (ra.szol) {
       fajta = "radio";
@@ -6184,7 +6197,14 @@ class CantabileCard extends HTMLElement {
   }
 
   // a hangszóró most a saját bemenetéről szól (BT, LINE IN…), nem a hálózatról
+  // AirPlay-jel szól a hangszórón (iPhone / Mac küldi): a Sonos és a WiiM a forrásban jelzi
+  _airplay(e) {
+    const a = this._hass?.states[e]?.attributes || {};
+    return /airplay/i.test(`${a.source || ""} ${a.app_name || ""}`) || /airplay/i.test(String(a.media_content_id || "").slice(0, 120));
+  }
+
   _bemenetrol(e) {
+    if (e && e !== HELYI && this._airplay(e)) return true;          // az AirPlay úgy kezelendő, mint egy bemenet
     const t = this._vezTar?.[e]?.adat, src = this._hass?.states[e]?.attributes?.source;
     if (!src || src === "Network") return false;
     // még nem olvastuk ki a bemeneteit (pl. épp most töltött be a kártya): a BT- és vonalbemenet neve is elárulja

@@ -16,6 +16,7 @@ import contextlib
 import logging
 import re
 import time
+from urllib.parse import urlsplit
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -27,11 +28,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event, async_track_time_interval
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_TV_PLAYERS
+from .const import CONF_TV_PLAYERS, SIGNAL_UPNP
 from .entity import CantabileEntity
 from .tv import TV_DASHBOARD, TV_VIEW, kozpont
 
@@ -400,6 +402,8 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self._tukor_le = [
             async_track_state_change_event(self.hass, [cel], self._tukor_valtozott),
             async_track_time_interval(self.hass, self._tukor_ellenoriz, timedelta(seconds=60)),
+            # WiiM hézagmentes lejátszásnál a pontos állapot (számváltás, hely) a Cantabile UPnP-lekérdezéséből jön
+            async_dispatcher_connect(self.hass, SIGNAL_UPNP, lambda e: self._tukor_frissit() if e == self._tukor else None),
         ]
         self._tukor_frissit(elso=True)
         kozpont(self.hass).tukor_ment(self.entity_id, cel)
@@ -443,20 +447,26 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             return
         a = st.attributes
         allapot = {"playing": "playing", "buffering": "playing", "paused": "paused"}.get(st.state, "idle")
+        u = self.rt.upnp_allapot(self._tukor)
+        if u:
+            allapot = u["allapot"]
         if allapot == "playing":
             self._tukor_csend = None
         elif self._tukor_csend is None:
             self._tukor_csend = time.monotonic()
         ido = a.get("media_position_updated_at")
-        allas = self._tukor_allas({"target": self._tukor, "state": allapot, "position": a.get("media_position"), "duration": a.get("media_duration"),
-                                   "at": ido.timestamp() if isinstance(ido, datetime) else time.time()})
+        if u:          # a renderelő pontos helye és hossza
+            allas = {"target": self._tukor, "state": allapot, "position": u.get("poz"), "duration": u.get("hossz"), "at": u["ido"]}
+        else:
+            allas = self._tukor_allas({"target": self._tukor, "state": allapot, "position": a.get("media_position"), "duration": a.get("media_duration"),
+                                       "at": ido.timestamp() if isinstance(ido, datetime) else time.time()})
         if elso:
             self.uzen({"cmd": "mirror", **allas})       # a TV-oldal azonnal elhallgat; az adatok utána jönnek
-        kulcs = (a.get("media_content_id"), a.get("media_title"), a.get("media_artist"), a.get("media_album_name"))
+        kulcs = (urlsplit(u["url"]).path,) if u and u.get("url") else (a.get("media_content_id"), a.get("media_title"), a.get("media_artist"), a.get("media_album_name"))
         if kulcs != self._tukor_kulcs and any(kulcs):            # a NAS-számnál a Sonos csak a címet adja (cím, előadó nélkül)
             self._tukor_kulcs = kulcs
             self._tukor_javit = None                 # új szám: a régi javítás nem érvényes
-            self.hass.async_create_background_task(self._tukor_meta(st, allas, kulcs), f"cantabile_tv_tukor_{self.entity_id}")
+            self.hass.async_create_background_task(self._tukor_meta(st, allas, kulcs, u), f"cantabile_tv_tukor_{self.entity_id}")
         elif not elso:
             self.uzen({"cmd": "mirror_state", **allas})
 
@@ -473,11 +483,11 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         j.setdefault("szunet", most)
         return {**allas, "duration": j["hossz"], "position": min(j["hossz"], j["szunet"] - j["t0"]), "at": most}
 
-    async def _tukor_meta(self, st: Any, allas: dict[str, Any], kulcs: tuple[Any, ...]) -> None:
+    async def _tukor_meta(self, st: Any, allas: dict[str, Any], kulcs: tuple[Any, ...], u: dict[str, Any] | None = None) -> None:
         """A követett hangszóró szóló számának adatai: zenemappás fájlnál a címkék, a mappa képei és a borító (mint a TV
         saját lejátszásánál), streamnél a hangszóró adatai és borítója; mindkettőnél az előadó képei (Deezer, TheAudioDB)."""
         kp, a = kozpont(self.hass), st.attributes
-        mcid = str(a.get("media_content_id") or "")
+        mcid = str((u or {}).get("url") or a.get("media_content_id") or "")      # UPnP-nál a ténylegesen szóló fájl
         fajl = None
         if re.match(r"^(https?://|/media/)", mcid):
             with contextlib.suppress(Exception):
@@ -505,7 +515,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         # a hely a számváltástól
         hossz = float(meta.get("duration") or 0)
         self._tukor_javit = None
-        if fajl and hossz:
+        if fajl and hossz and not u:                # UPnP-nál a hossz és a hely pontos, nincs mit javítani
             jh = a.get("media_duration")
             if jh is None or abs(float(jh) - hossz) > 2 or allas.get("position") is None:
                 self._tukor_javit = {"hossz": hossz, "t0": time.time()}
@@ -532,6 +542,8 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             honnan = "Deezer"
         elif "tidal.com" in mcid:
             honnan = "TIDAL"
+        elif "airplay" in f"{st.attributes.get('source') or ''} {st.attributes.get('app_name') or ''} {mcid[:120]}".lower():
+            honnan = "AirPlay"
         else:
             honnan = st.attributes.get("app_name") or None
         return " · ".join(x for x in (hol, honnan) if x)

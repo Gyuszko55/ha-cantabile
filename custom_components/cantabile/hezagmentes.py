@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Iterator
+import time
+from collections.abc import Callable, Iterator
+from typing import Any
 from urllib.parse import unquote, urlsplit
 
 from async_upnp_client.aiohttp import AiohttpSessionRequester
@@ -85,8 +87,11 @@ async def _link(hass: HomeAssistant, dmr: DmrDevice, entity_id: str, id_: str) -
     return url, meta
 
 
-async def lejatszik(hass: HomeAssistant, dmr: DmrDevice, entity_id: str, sorrend: Iterator[str]) -> None:
-    """A számok lejátszása egymás után, hézag nélkül. Visszatér, ha a sor véget ért, vagy más kezdett szólni."""
+async def lejatszik(hass: HomeAssistant, dmr: DmrDevice, entity_id: str, sorrend: Iterator[str],
+                    jelent: Callable[[dict[str, Any]], None] | None = None) -> None:
+    """A számok lejátszása egymás után, hézag nélkül. Visszatér, ha a sor véget ért, vagy más kezdett szólni.
+    `jelent`: másodpercenként a renderelő pontos állapota (melyik szám, hol tart, milyen hosszú) – a HA WiiM-entitása
+    hézagmentes váltásnál a régi szám adatait mutathatja, ezt a TV-tükör, a VU és a hangszóróváltás innen veszi."""
     most = next(sorrend, None)
     if most is None:
         return
@@ -105,6 +110,12 @@ async def lejatszik(hass: HomeAssistant, dmr: DmrDevice, entity_id: str, sorrend
         vart += 1
         await dmr.async_update(do_ping=False)
         allapot, szol = dmr.transport_state, _ut(dmr.current_track_uri)
+        if jelent is not None:
+            ido = dmr.media_position_updated_at
+            jelent({"most": getattr(sorrend, "most", None) or most, "url": dmr.current_track_uri,
+                    "poz": dmr.media_position, "hossz": dmr.media_duration, "ido": ido.timestamp() if ido else time.time(),
+                    "allapot": "playing" if allapot in (TransportState.PLAYING, TransportState.TRANSITIONING)
+                    else "paused" if allapot == TransportState.PAUSED_PLAYBACK else "idle"})
         if allapot in (TransportState.PLAYING, TransportState.TRANSITIONING) and szol == most_ut:
             indult = True
         if not indult:

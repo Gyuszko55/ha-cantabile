@@ -32,7 +32,7 @@ from homeassistant.helpers.event import async_call_later, async_track_state_chan
 from homeassistant.util import dt as dt_util
 
 from . import hezagmentes, ma
-from .const import ROUNDS_INFINITE, SIGNAL_NET, SIGNAL_SLEEP
+from .const import ROUNDS_INFINITE, SIGNAL_NET, SIGNAL_SLEEP, SIGNAL_UPNP
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -128,6 +128,7 @@ class Cantabile:
         self._alvas: dict[str, Callable[[], None]] = {}
         self._szamlalo: dict[str, dict[str, int]] = {}
         self._le: list[Callable[[], None]] = []
+        self._upnp: dict[str, dict[str, Any]] = {}  # a hézagmentes lejátszó pontos állapota lejátszónként (hezagmentes.py)
 
     # ---- indítás / leállítás ----
     @callback
@@ -210,7 +211,30 @@ class Cantabile:
         if s is None or not self.tracks_running(entity_id):
             return None
         most = s.most or s.utolso
-        return {"tracks": list(s.szamok), "current": s.szamok.index(most) if most in s.szamok else -1}
+        ki: dict[str, Any] = {"tracks": list(s.szamok), "current": s.szamok.index(most) if most in s.szamok else -1}
+        if (u := self.upnp_allapot(entity_id)) and u.get("poz") is not None:
+            # a renderelő pontos helye (a HA WiiM-entitása hézagmentes váltásnál elavult lehet)
+            ki["position"] = u["poz"] + (time.time() - u["ido"] if u["allapot"] == "playing" else 0)
+            ki["duration"] = u.get("hossz")
+        return ki
+
+    @callback
+    def _upnp_jelent(self, entity_id: str, adat: dict[str, Any]) -> None:
+        """A renderelő állapota: számváltáskor, állapotváltáskor és 5 mp-enként jelez a figyelőknek (TV-tükör, VU)."""
+        regi = self._upnp.get(entity_id)
+        adat["frissult"] = time.monotonic()
+        self._upnp[entity_id] = adat
+        if not regi or regi.get("url") != adat.get("url") or regi.get("allapot") != adat.get("allapot") \
+                or adat["frissult"] - regi.get("jelezve", 0) >= 5:
+            adat["jelezve"] = adat["frissult"]
+            async_dispatcher_send(self.hass, SIGNAL_UPNP, entity_id)
+        else:
+            adat["jelezve"] = regi.get("jelezve", 0)
+
+    def upnp_allapot(self, entity_id: str) -> dict[str, Any] | None:
+        """A hézagmentes lejátszó friss (3 mp-nél nem régebbi) pontos állapota, vagy None."""
+        a = self._upnp.get(entity_id)
+        return a if a and time.monotonic() - a["frissult"] < 3 else None
 
     def tracks_running(self, entity_id: str) -> bool:
         t = self._sorozat.get(entity_id)
@@ -225,7 +249,7 @@ class Cantabile:
                 _LOGGER.debug("Cantabile: %s UPnP-n nem érhető el, számonként indítom", entity_id, exc_info=True)
             self._sorrend[entity_id] = sorrend
             if dmr is not None:
-                await hezagmentes.lejatszik(self.hass, dmr, entity_id, sorrend)
+                await hezagmentes.lejatszik(self.hass, dmr, entity_id, sorrend, lambda a: self._upnp_jelent(entity_id, a))
                 return
             ma_e = ma.ma_lejatszo(self.hass, entity_id)
             for id_ in sorrend:
@@ -282,6 +306,8 @@ class Cantabile:
         except Exception:  # noqa: BLE001
             _LOGGER.exception("Cantabile: a sorozatlejátszás hibával leállt (%s)", entity_id)
         finally:
+            if self._upnp.pop(entity_id, None) is not None:
+                async_dispatcher_send(self.hass, SIGNAL_UPNP, entity_id)
             if self._sorozat.get(entity_id) is asyncio.current_task():
                 self._sorozat.pop(entity_id, None)
                 self._sorrend.pop(entity_id, None)
