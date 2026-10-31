@@ -177,6 +177,7 @@ async def osszes_hangszoro(hass: HomeAssistant) -> set[str]:
         dashboards = ll.get("dashboards")
     talalt: set[str] = set()
     adok: set[str] = set()
+    nevek: dict[str, str] = {}
 
     def bejar(o: Any) -> None:
         if isinstance(o, dict):
@@ -184,6 +185,8 @@ async def osszes_hangszoro(hass: HomeAssistant) -> set[str]:
                 for h in o.get("speakers") or o.get("hangszorok") or []:
                     if isinstance(h, dict) and h.get("entity"):
                         talalt.add(h["entity"])
+                        if n := h.get("short") or h.get("rovid") or h.get("name") or h.get("nev"):
+                            nevek.setdefault(h["entity"], str(n))
                 for a in o.get("stations") or o.get("adok") or []:
                     if isinstance(a, dict) and a.get("url"):
                         adok.add(cim(a["url"]))
@@ -198,8 +201,14 @@ async def osszes_hangszoro(hass: HomeAssistant) -> set[str]:
             bejar(await d.async_load(False))
         except Exception:  # noqa: BLE001 – üres vagy YAML-hibás vezérlőpult
             continue
-    _hangszoro_tar.update(ido=time.monotonic(), h=talalt, a=adok)
+    _hangszoro_tar.update(ido=time.monotonic(), h=talalt, a=adok, n=nevek)
     return talalt
+
+
+async def hangszoro_nev(hass: HomeAssistant, entity_id: str) -> str | None:
+    """A hangszóró kártyán használt (rövid) neve – bármelyik vezérlőpult bármelyik Cantabile kártyájáról."""
+    await osszes_hangszoro(hass)
+    return (_hangszoro_tar.get("n") or {}).get(entity_id)
 
 
 @callback

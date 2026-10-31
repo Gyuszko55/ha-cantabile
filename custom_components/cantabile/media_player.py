@@ -87,6 +87,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self._tukor_le: list[Any] = []
         self._tukor_kulcs: tuple[Any, ...] | None = None
         self._tukor_csend: float | None = None
+        self._tukor_javit: dict[str, float] | None = None   # a tükörben: a fájl hossza és a számváltás ideje (ha a hangszóró elavultat jelent)
         self._szolt = 0.0                       # mikor szólt utoljára (a váltáskor a tükör csak a szóló TV-ről indul)
         self.oldal_kepes: set[str] = set()      # mit tud a TV-n futó oldal (a régebbi kártyakód nem ismeri a tükröt)
         self._ujrakuldes: asyncio.Task | None = None
@@ -424,16 +425,30 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         elif self._tukor_csend is None:
             self._tukor_csend = time.monotonic()
         ido = a.get("media_position_updated_at")
-        allas = {"target": self._tukor, "state": allapot, "position": a.get("media_position"), "duration": a.get("media_duration"),
-                 "at": ido.timestamp() if isinstance(ido, datetime) else time.time()}
+        allas = self._tukor_allas({"target": self._tukor, "state": allapot, "position": a.get("media_position"), "duration": a.get("media_duration"),
+                                   "at": ido.timestamp() if isinstance(ido, datetime) else time.time()})
         if elso:
             self.uzen({"cmd": "mirror", **allas})       # a TV-oldal azonnal elhallgat; az adatok utána jönnek
         kulcs = (a.get("media_content_id"), a.get("media_title"), a.get("media_artist"), a.get("media_album_name"))
         if kulcs != self._tukor_kulcs and any(kulcs):            # a NAS-számnál a Sonos csak a címet adja (cím, előadó nélkül)
             self._tukor_kulcs = kulcs
+            self._tukor_javit = None                 # új szám: a régi javítás nem érvényes
             self.hass.async_create_background_task(self._tukor_meta(st, allas, kulcs), f"cantabile_tv_tukor_{self.entity_id}")
         elif not elso:
             self.uzen({"cmd": "mirror_state", **allas})
+
+    def _tukor_allas(self, allas: dict[str, Any]) -> dict[str, Any]:
+        """A hangszóró elavult hossza / helye helyett a fájl hossza és a számváltás óta eltelt idő."""
+        j = getattr(self, "_tukor_javit", None)
+        if not j:
+            return allas
+        most = time.time()
+        if allas["state"] == "playing":
+            if "szunet" in j:                       # szünet után: a szünet ideje nem számít bele
+                j["t0"] += most - j.pop("szunet")
+            return {**allas, "duration": j["hossz"], "position": 0.0, "at": j["t0"]}
+        j.setdefault("szunet", most)
+        return {**allas, "duration": j["hossz"], "position": min(j["hossz"], j["szunet"] - j["t0"]), "at": most}
 
     async def _tukor_meta(self, st: Any, allas: dict[str, Any], kulcs: tuple[Any, ...]) -> None:
         """A követett hangszóró szóló számának adatai: zenemappás fájlnál a címkék, a mappa képei és a borító (mint a TV
@@ -445,8 +460,10 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             with contextlib.suppress(Exception):
                 _, fajl = kp.forras(mcid)
         radio = not fajl and (bool(a.get("media_channel")) or bool(RADIO_ID.match(mcid)))
-        extra: dict[str, Any] = {"title": a.get("media_title"), "artist": a.get("media_artist"), "album": a.get("media_album_name"),
-                                 "kind": "stream" if radio else "track", "station": a.get("media_channel") if radio else None}
+        # zenemappás fájlnál a fájl saját címkéi számítanak (a WiiM pl. a fájl nevét jelenti címként)
+        extra: dict[str, Any] = {"kind": "track"} if fajl else {
+            "title": a.get("media_title"), "artist": a.get("media_artist"), "album": a.get("media_album_name"),
+            "kind": "stream" if radio else "track", "station": a.get("media_channel") if radio else None}
         if not fajl and a.get("entity_picture"):
             extra["cover"] = a["entity_picture"]
         try:
@@ -459,17 +476,24 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         meta["source"] = await self._tukor_forras(st, mcid, fajl, radio)
         if self._tukor is None or self._tukor_kulcs != kulcs:
             return                                  # közben új szám jött, vagy véget ért a tükör
+        # hézagmentes lejátszásnál (pl. WiiM) a hangszóró a régi szám hosszát / helyét jelentheti: a fájl hossza számít, és
+        # a hely a számváltástól
+        hossz = float(meta.get("duration") or 0)
+        self._tukor_javit = None
+        if fajl and hossz:
+            jh = a.get("media_duration")
+            if jh is None or abs(float(jh) - hossz) > 2 or allas.get("position") is None:
+                self._tukor_javit = {"hossz": hossz, "t0": time.time()}
+            allas = self._tukor_allas(allas)
         self.uzen({"cmd": "mirror", "meta": {k: v for k, v in meta.items() if not k.startswith("_")}, **allas})
 
     async def _tukor_forras(self, st: Any, mcid: str, fajl: str | None, radio: bool) -> str:
         """„Sonos 2 · Deezer”: hol szól (a kártyán beállított név) és honnan jön (NAS, a Sonos-szolgáltató, rádió)."""
-        from .music import HibaUzenet, kartya
+        from .music import hangszoro_nev
 
         hol = None
-        with contextlib.suppress(HibaUzenet, Exception):
-            c = await kartya(self.hass)
-            h = next((h for h in c.get("hangszorok", []) if h.get("entity") == st.entity_id and not h.get("tagok")), None)
-            hol = h and (h.get("rovid") or h.get("nev"))
+        with contextlib.suppress(Exception):
+            hol = await hangszoro_nev(self.hass, st.entity_id)
         hol = hol or st.attributes.get("friendly_name") or st.entity_id
         if fajl:
             honnan = "NAS"

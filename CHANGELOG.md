@@ -33,6 +33,8 @@
 
 - Cantabile TV on DLNA TVs: the track position, the full track length and so the VU meter are right also when the TV doesn't report its position or plays a video that starts mid-track; the card recognises a music-folder track reported as a media-source id (track counter and tape name instead of “–/–” and the album name), and an album tag like “Artist - Album” is shown without the artist.
 
+- Cantabile TV mirror of a music-folder track: the file's own tags are used (a WiiM reports the file name as the title, e.g. “Cher - Dark Lady.Mp3”); when the speaker reports a stale length or position (gapless playback on a WiiM keeps the previous track's), the file's length and the time since the track change are shown, pauses excluded; the speaker's card name is looked up on every Cantabile card, not only the first one (“TECHNICS · NAS” instead of the device name).
+
 ### Fixed (review)
 - Moving a PARTY or a playlist between a Sonos and the Multiroom group that contains it no longer stops it right after it started there.
 - Cantabile TV: with YAML-mode resources the TV page is no longer resent on every play, and the mirror starts; one resend at a time (a play waits for it, and a newer play is never overwritten by the resumed track); a failed resend leaves the player OFF instead of PLAYING; switching to the mirror no longer restarts the old track; the automatic reload only runs in the daytime (starting the Cast app can wake a TV over HDMI-CEC).
