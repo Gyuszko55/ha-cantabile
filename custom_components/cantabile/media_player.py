@@ -91,6 +91,9 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self._ujrakuldes: asyncio.Task | None = None
         self.ujratoltve: str | None = None     # erre a kártyaváltozatra már újraküldtük az oldalt (ne ismételje)
         self.ujratolt = False                  # az oldal újraküldése alatt a lejátszó nem megy „ki”
+        self.ujrakuldes_zar = asyncio.Lock()   # egyszerre egy újraküldés; a lejátszás megvárja
+        self.inditas = 0                       # a lejátszás-indítások száma (az újraküldés ne írja felül az újabbat)
+        self._ugrik_le: Any = None
 
     async def async_added_to_hass(self) -> None:
         kp = kozpont(self.hass)
@@ -105,6 +108,9 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
 
     async def async_will_remove_from_hass(self) -> None:
         self.tukor_vege(kuld=False)
+        if self._ugrik_le:
+            self._ugrik_le()
+            self._ugrik_le = None
         kp = kozpont(self.hass)
         kp.lejatszok.pop(self.entity_id, None)
         kp.atadas[self.entity_id] = {"oldal": self.oldal, "meta": self._meta, "src": self._src, "mcid": self._mcid, "cue_i": self._cue_i,
@@ -138,9 +144,14 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             self.oldal_jott.clear()
             if self.ujratolt:                  # frissítés miatt újraküldjük: az állapot marad, az új oldal folytatja
                 return
-            self._allapot = MediaPlayerState.OFF
-            self._poz = None
-            self.async_write_ha_state()
+            self.ki()
+
+    @callback
+    def ki(self) -> None:
+        """Nincs oldal a TV-n: a lejátszó „ki”."""
+        self._allapot = MediaPlayerState.OFF
+        self._poz = None
+        self.async_write_ha_state()
 
     @callback
     def uzen(self, adat: dict[str, Any]) -> bool:
@@ -312,11 +323,16 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
 
         @callback
         def ugrik(_now: Any) -> None:
+            self._ugrik_le = None
+            if self._src != src:              # közben más indult: azt nem tekerjük, nem állítjuk meg
+                return
             if p["poz"] > 1:
                 self.uzen({"cmd": "seek", "position": p["poz"]})
             if p["szunet"]:
                 self.uzen({"cmd": "pause"})
-        async_call_later(self.hass, 1.5, ugrik)
+        if self._ugrik_le:
+            self._ugrik_le()
+        self._ugrik_le = async_call_later(self.hass, 1.5, ugrik)
         self.async_write_ha_state()
 
     def ujrakuldes_fut(self) -> bool:
@@ -337,13 +353,13 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         return self._tukor is not None or self._allapot in (MediaPlayerState.PLAYING, MediaPlayerState.PAUSED) or time.monotonic() - self._szolt < 60
 
     @callback
-    def tukroz(self, cel: str) -> None:
+    def tukroz(self, cel: str, ellenoriz: bool = True) -> None:
         """A TV-oldal hang nélkül a `cel` hangszórót mutatja (DLNA-s TV-n nincs ilyen: ott a TV maga játszik)."""
         if self.dlna or self.oldal is None or cel == self.entity_id or cel == self._tukor:
             return
-        if not TUKOR_KEPES <= self.oldal_kepes or kozpont(self.hass).regi_kod(self):
+        if not TUKOR_KEPES <= self.oldal_kepes or (ellenoriz and kozpont(self.hass).regi_kod(self)):
             # régi oldal fut a TV-n: újraküldjük a friss kártyával, és utána indul a tükör
-            if self._ujrakuldes is None or self._ujrakuldes.done():
+            if not self.ujrakuldes_fut() and not self.ujrakuldes_zar.locked():
                 self._ujrakuldes = self.hass.async_create_background_task(self._friss_oldallal_tukroz(cel), f"cantabile_tv_ujrakuld_{self.entity_id}")
             return
         self.tukor_vege(kuld=False)
@@ -358,12 +374,12 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
 
     async def _friss_oldallal_tukroz(self, cel: str) -> None:
         try:
-            await kozpont(self.hass).ujrakuld(self)
+            await kozpont(self.hass).ujrakuld(self, folytatva=False)   # a tükör jön, a régi számot nem indítjuk újra
         except Exception as err:  # noqa: BLE001 – a TV elérhetetlen lett: nincs tükör
             _LOGGER.warning("Cantabile TV: a TV-oldal frissítése nem sikerült (%s): %s", self.cast, err)
             return
         if TUKOR_KEPES <= self.oldal_kepes:
-            self.tukroz(cel)
+            self.tukroz(cel, ellenoriz=False)               # épp most kapta meg a friss oldalt
 
     @callback
     def tukor_vege(self, kuld: bool = True) -> None:
@@ -464,6 +480,10 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
     async def async_play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
         self.tukor_vege(kuld=False)
         kp = kozpont(self.hass)
+        self.inditas += 1
+        if self.ujrakuldes_zar.locked():                  # épp újraküldjük az oldalt: megvárjuk (utána erre az oldalra megy)
+            async with self.ujrakuldes_zar:
+                pass
         if not self.dlna and self.oldal is not None and (not TUKOR_KEPES <= self.oldal_kepes or kp.regi_kod(self)):
             self.ujratoltve = kp.kartya_v()
             await kp.ujrakuld(self, folytatva=False)   # régebbi TV-oldal fut: a friss kártyával indul (az új szám jön)

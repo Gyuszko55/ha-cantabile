@@ -42,6 +42,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.util import dt as dt_util
 
 from .const import CARD_URL, DOMAIN, VERSION, szoveg
 from .library import media_ut
@@ -138,33 +139,42 @@ class TvKozpont:
         jelolt.oldal_be(conn, msg_id)
         return jelolt
 
-    def kartya_v(self) -> str:
-        """A vezérlőpult-erőforrás mostani címének változat-része (pl. „?v=2.1.0”) – ezt tölti be egy frissen kiküldött oldal."""
-        res = getattr(self.hass.data.get("lovelace"), "resources", None)
+    def kartya_vk(self) -> list[str]:
+        """A kártya címeinek változat-része (pl. „?v=2.1.0”), amellyel egy frissen kiküldött oldal betöltheti. Tárolós
+        módban az erőforrásé; YAML-módban a beinjektált cím (?v=VERSION) és a kézi bejegyzés(ek) is – ott mindkettő betöltődik."""
+        ll = self.hass.data.get("lovelace")
+        res = getattr(ll, "resources", None)
+        tarolos = getattr(ll, "resource_mode", "storage") == "storage" and hasattr(res, "async_create_item")
+        vk: list[str] = [] if tarolos else [f"?v={VERSION}"]
         try:
             for elem in res.async_items() if res is not None else []:
                 url = str(elem.get("url", ""))
                 if url.split("?")[0] == CARD_URL:
-                    return url[len(CARD_URL):] or "?"
-        except Exception:  # noqa: BLE001 – YAML-módú vagy még nem betöltött erőforrások
+                    vk.append(url[len(CARD_URL):] or "?")
+        except Exception:  # noqa: BLE001 – még nem betöltött erőforrások
             pass
-        return f"?v={VERSION}"
+        return vk or [f"?v={VERSION}"]
+
+    def kartya_v(self) -> str:
+        return self.kartya_vk()[0]
 
     def regi_kod(self, lj: CantabileTv) -> bool:
-        """A TV-n futó oldal régebbi kártyakóddal fut (nincs változata, vagy más, mint a mostani erőforrásé)."""
+        """A TV-n futó oldal régebbi kártyakóddal fut (nincs változata, vagy egyik mostani címé sem)."""
         if lj.dlna or lj.oldal is None:
             return False
         v = next((k[2:] for k in lj.oldal_kepes if k.startswith("v:")), None)
-        return v != self.kartya_v()
+        return v not in self.kartya_vk()
 
     @callback
     def _frissit_ellenoriz(self, _now: Any = None) -> None:
         """Percenként: ahol a TV-n régi kártyakód fut és épp nem szól semmi, az oldalt újraküldi (változatonként egyszer)."""
+        if not 7 <= dt_util.now().hour < 22:      # éjjel nem: a Cast-alkalmazás indítása (HDMI-CEC) felkeltheti a TV-t
+            return
         v = self.kartya_v()
         for lj in list(self.lejatszok.values()):
             if lj.ujratoltve == v or not self.regi_kod(lj) or lj.friss_szolt():
                 continue
-            if lj.ujrakuldes_fut():
+            if lj.ujrakuldes_fut() or lj.ujrakuldes_zar.locked():
                 continue
             lj.ujratoltve = v
             _LOGGER.info("Cantabile TV: %s régi kártyakóddal fut, újraküldöm az oldalt (%s)", lj.entity_id, v)
@@ -173,8 +183,13 @@ class TvKozpont:
     async def ujrakuld(self, lj: CantabileTv, folytatva: bool = True) -> None:
         """A TV-n futó oldal régebbi kártyakóddal fut (egy frissítés után a Cast-vevő csak újracsatlakozik, a kódot nem tölti
         újra): bezárja és újra kiküldi, így a TV a friss kártyát tölti be."""
+        async with lj.ujrakuldes_zar:                    # egyszerre egy; a lejátszás-indítás megvárja
+            await self._ujrakuld(lj, folytatva)
+
+    async def _ujrakuld(self, lj: CantabileTv, folytatva: bool) -> None:
         folytat = lj.pillanat() if folytatva else None   # ha szól: mit és honnan – az új oldalon onnan megy tovább
         lj.ujratolt = folytat is not None                # közben ne legyen „ki” (a sorozatlejátszó ne lépjen tovább)
+        inditas = lj.inditas
         try:
             try:
                 await self.hass.services.async_call("media_player", "turn_off", {"entity_id": lj.cast}, blocking=True)
@@ -187,8 +202,12 @@ class TvKozpont:
             lj.oldal = None
             await asyncio.sleep(2)
             await self.oldalt_kuld(lj)
-            if folytat:
+            if folytat and lj.inditas == inditas:           # közben nem indult más
                 await lj.folytat(folytat)
+        except BaseException:
+            if folytat and lj.oldal is None:               # nincs oldal a TV-n: ne maradjon „lejátszás”-ban
+                lj.ki()
+            raise
         finally:
             lj.ujratolt = False
 

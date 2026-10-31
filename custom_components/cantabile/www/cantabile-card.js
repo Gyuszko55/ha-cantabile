@@ -550,7 +550,7 @@ const MUFAJ_NEV = [[132, "Pop"], [152, "Rock"], [116, "Rap/Hip Hop"], [113, "Dan
   [129, "Jazz"], [98, "Classical"], [173, "Films/Games"], [464, "Metal"], [169, "Soul & Funk"], [2, "African"], [153, "Blues"], [75, "Brazilian"], [95, "Kids"], [81, "Indian"], [197, "Latin"], [16, "Asian"]];
 const MUFAJ_CSALAD = [[464, /metal/], [116, /\brap\b|hip[ -]?hop|gangsta|\btrap\b/], [144, /reggae|raggae|dance ?hall|\bska\b/], [152, /rock|grunge|punk|surf|psych|new wave|goth/],
   [129, /jazz|swing|bossa|bebop/], [153, /blues/], [165, /\br\s?(&|'?n'?|and)\s?b\b|rnb|rhythm/], [169, /soul|funk/], [85, /alternativ|indie/],
-  [106, /electr|elektro|ambient|downtempo|chill|lounge|industrial|trance|techno|new age|drum|\bdnb\b|jungle|dubstep|breakbeat/], [113, /dance|disco|house|club/],
+  [106, /electr|elektro|ambient|downtempo|chill|lounge|industrial|trance|techno|new age|drum ?(&|n|and) ?bass|drum'?n'?bass|drumstep|\bdnb\b|jungle|dubstep|breakbeat/], [113, /dance|disco|house|club/],
   [98, /classical|klasszikus|opera|komolyzene|baroque|barokk|symphon/], [173, /soundtrack|film|musical|game/], [75, /brasil|brazil|samba/], [197, /latin|salsa|tango|reggaeton/],
   [466, /folk|world|ethnic|nepzene|country/], [95, /gyerek|kids|child/], [2, /afri/], [16, /asia|j-?pop|k-?pop/], [81, /india|bollywood/], [132, /pop|synth|schlager|vocal|easy listening|chanson|slager/]];
 // mentés után a HA újraépíti a kártyát: az eredményüzenet (és a gombja) az új példányon jelenik meg
@@ -2753,8 +2753,10 @@ class CantabileCard extends HTMLElement {
         const vissza = () => { this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); this._frissit(); };
         if (this._hass?.states[uj.entity]?.state === "unavailable") { vissza(); return this._nemElerheto(uj.entity); }
         if (!(await this._partyIndit(uj, pk.cfg))) return vissza();       // a régi szól tovább
-        await this._hass.callWS({ type: "cantabile/party/stop", entity_id: regi.entity }).catch(() => {});
-        await this._hiv("media_player", "media_stop", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
+        if (!(uj.tagok || [uj.entity]).includes(regi.entity)) {             // ugyanaz a hangszóró (Sonos ↔ Multiroom): a szerver már átvitte
+          await this._hass.callWS({ type: "cantabile/party/stop", entity_id: regi.entity }).catch(() => {});
+          await this._hiv("media_player", "media_stop", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
+        }
         this._uzen(T("A PARTY átkerült ide: {h}.", { h: KN(uj) }));
         return;
       }
@@ -2771,6 +2773,7 @@ class CantabileCard extends HTMLElement {
         kezdo = Math.max(0, l.elemek.findIndex((x) => x.id === id));
       } catch (_) { /* az elejéről */ }
       if (!(await this._listaJatszik(pk.lista, pk.cim, kezdo, uj))) return vissza();
+      if ((uj.tagok || [uj.entity]).includes(regi.entity)) return;        // ugyanaz a hangszóró (Sonos ↔ Multiroom): azon szól már
       // a régi hangszórón a sorozatlejátszó is álljon le (különben a stop után a következő számmal folytatná)
       if (regi.mod !== "sonos") await this._hiv("cantabile", "stop_tracks", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
       await this._hiv("media_player", "media_stop", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
@@ -5501,6 +5504,7 @@ class CantabileCard extends HTMLElement {
     // Deezer: a műfaj toplistája (számok, albumok, listák), rádiói és előadói
     hely.dzAdat ||= Promise.all([`/chart/${dz}`, `/genre/${dz}/radios`, `/genre/${dz}/artists`].map((u) => this._dz(u).catch(() => ({}))));
     const [ch, rad, art] = await hely.dzAdat;
+    if (![ch, rad, art].some((x) => Object.keys(x || {}).length)) hely.dzAdat = null;   // mind hibás: legközelebb újra kéri
     if (!friss()) return;
     const tr = ch.tracks?.data || [], kaz = [];
     if (tr.length) kaz.push({ cim: T("{g} – toplista", { g: hely.cim }), alcim: T("{n} szám", { n: tr.length }), forras: "stream", tipus: "deezer", id: tr[0].link, szamok: tr.map((t) => t.link), kep: c.kep });
@@ -7018,8 +7022,9 @@ class CantabileTv extends HTMLElement {
       sr.querySelector(".o").textContent = o; sr.querySelector(".o2").textContent = o;
       sr.querySelector(".d").textContent = d.toLocaleDateString(nyelv, { weekday: "long", month: "long", day: "numeric" }).toUpperCase();
       // a pillanatnyi időjárás az óra előtt: `weather:` a kártyán, különben weather.home, különben az első időjárás-entitás
-      const st = this._h?.states || {}, we = this._c.weather || (st["weather.home"] ? "weather.home" : Object.keys(st).sort().find((k) => k.startsWith("weather.")));
-      const w = we && st[we], fok = Number(w?.attributes?.temperature), ido = sr.querySelector(".ido");
+      const st = this._h?.states || {}, we = typeof this._c.weather === "string" ? this._c.weather
+        : (this._idoEnt && st[this._idoEnt]) ? this._idoEnt : (this._idoEnt = st["weather.home"] ? "weather.home" : Object.keys(st).sort().find((k) => k.startsWith("weather.")));
+      const w = we && st[we], t = w?.attributes?.temperature, fok = t == null || t === "" ? NaN : Number(t), ido = sr.querySelector(".ido");
       ido.hidden = !w || this._c.weather === false || !Number.isFinite(fok);
       if (!ido.hidden) {
         if (ido.dataset.a !== w.state) { ido.dataset.a = w.state; ido.querySelector(".iko").innerHTML = TV_IDO_SVG[w.state] || TV_IDO_SVG.cloudy; }

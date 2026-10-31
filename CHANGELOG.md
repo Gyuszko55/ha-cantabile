@@ -13,6 +13,13 @@
   - Radio wheel: a broken saved list or a list replaced meanwhile no longer leaves the wheel stuck or plays the wrong station; a pending wheel step is cancelled when the card goes away.
   - The result message after a save goes only to the card that was rebuilt with the same speakers and stations.
 
+### Fixed (review)
+- Moving a PARTY or a playlist between a Sonos and the Multiroom group that contains it no longer stops it right after it started there.
+- Cantabile TV: with YAML-mode resources the TV page is no longer resent on every play, and the mirror starts; one resend at a time (a play waits for it, and a newer play is never overwritten by the resumed track); a failed resend leaves the player OFF instead of PLAYING; switching to the mirror no longer restarts the old track; the automatic reload only runs in the daytime (starting the Cast app can wake a TV over HDMI-CEC).
+- TV weather: `weather: true` no longer hides it, and a missing temperature no longer shows as 0°.
+- GENRES: a failed Deezer load on a genre page is retried; *drum* alone (Steel Drum…) no longer counts as Electro, only drum & bass / drumstep.
+- PARTY on Sonos with the hi-res folder: tracks with the same file name in another album (01.flac) no longer end the party.
+
 ## 2.1.0 – 2026-10-30
 
 Cantabile 2.1: the library. EJECT now opens one window organised by what you want to hear – artists, genres, an endless party with guest requests, playlists – across the music folder, Music Assistant (and the services linked in it) and Deezer.

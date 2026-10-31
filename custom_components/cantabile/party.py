@@ -89,6 +89,7 @@ class Party:
         self._tolt = False
         self._tolto: Any = None
         self._sajat: set[str] = set()               # a party által a Sonos-sorba tett számok (az eredeti útjukkal)
+        self._eredeti: dict[str, str] = {}          # a Sonos-sorba tett 48 kHz-es másolat útja → az eredeti út
         self._utolso_kiv: dict[str, Any] | None = None
         self._index: list[tuple[str, str]] | None = None
         self._keres_ido: dict[str, float] = {}
@@ -144,6 +145,8 @@ class Party:
             if jel not in t:
                 return None
             rel = t.split(jel, 1)[1]
+        if rel in self._eredeti:                                # a party tette a sorba: pontosan tudjuk, melyik eredeti
+            return self._eredeti[rel]
         if self.hires and rel.startswith(f"{self.hires}/"):
             # a Sonos 48 kHz-es másolata: az eredeti album azonos nevű száma
             eloado, album, fajl = (rel.split("/", 1)[1].split("/") + ["", ""])[:3]
@@ -176,6 +179,8 @@ class Party:
             rel = self.kovetkezo_rel()
             uj = sonos_valtozat(self.osszes, [rel], self.hires)[0]
             self._sajat.add(rel)
+            if uj != rel:
+                self._eredeti[uj] = rel
             try:
                 await self.kp.zene.hiv("media_player", "play_media", {"entity_id": self.e, "media_content_id": f"{self.nas}/{uj}",
                                                                       "media_content_type": "music", "enqueue": "add"})
