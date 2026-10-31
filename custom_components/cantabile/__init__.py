@@ -45,7 +45,7 @@ from .runtime import Cantabile
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SENSOR]
+PLATFORMS = [Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SELECT, Platform.SENSOR, Platform.SWITCH]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 type CantabileConfigEntry = ConfigEntry[Cantabile]

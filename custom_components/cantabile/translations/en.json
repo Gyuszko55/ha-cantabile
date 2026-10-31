@@ -53,6 +53,22 @@
       "net_station": {
         "name": "Voice-started station"
       }
+    },
+    "select": {
+      "tv_visual": {
+        "name": "TV look",
+        "state": {
+          "vinyl": "Spinning vinyl",
+          "bars": "Equaliser bars",
+          "wave": "Waveform",
+          "both": "Bars and waveform"
+        }
+      }
+    },
+    "switch": {
+      "tv_lyrics": {
+        "name": "TV lyrics"
+      }
     }
   },
   "selector": {

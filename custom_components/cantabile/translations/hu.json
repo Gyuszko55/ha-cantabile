@@ -53,6 +53,22 @@
       "net_station": {
         "name": "Hanggal indított adó"
       }
+    },
+    "select": {
+      "tv_visual": {
+        "name": "TV kinézet",
+        "state": {
+          "vinyl": "Forgó bakelit",
+          "bars": "Equalizer-sávok",
+          "wave": "Hullámforma",
+          "both": "Sávok és hullámforma"
+        }
+      }
+    },
+    "switch": {
+      "tv_lyrics": {
+        "name": "TV dalszöveg"
+      }
     }
   },
   "selector": {

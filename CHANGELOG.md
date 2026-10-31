@@ -49,6 +49,8 @@
 
 - The card's ⚙ settings have a **TV look** section: the look of the Cantabile TV page (spinning vinyl, equaliser bars, waveform, or both) and the running lyrics, written into every `custom:cantabile-tv` card on save; the TV page picks it up by itself.
 
+- New entities for the TV look: `select.cantabile_tv_look` / *TV look* (spinning vinyl, equaliser bars, waveform, bars and waveform) and `switch.cantabile_tv_lyrics` / *TV lyrics* – usable in automations, scripts and by voice. They write the same `custom:cantabile-tv` card settings as the ⚙ panel and follow every change made there.
+
 ### Fixed (review)
 - Moving a PARTY or a playlist between a Sonos and the Multiroom group that contains it no longer stops it right after it started there.
 - Cantabile TV: with YAML-mode resources the TV page is no longer resent on every play, and the mirror starts; one resend at a time (a play waits for it, and a newer play is never overwritten by the resumed track); a failed resend leaves the player OFF instead of PLAYING; switching to the mirror no longer restarts the old track; the automatic reload only runs in the daytime (starting the Cast app can wake a TV over HDMI-CEC).

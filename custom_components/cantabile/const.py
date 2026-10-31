@@ -26,6 +26,8 @@ LLM_API_ID = "cantabile"
 UID_ROUNDS = "rounds"
 UID_SLEEP = "sleep_timer"
 UID_NET = "net_station"
+UID_TV_VISUAL = "tv_visual"
+UID_TV_LYRICS = "tv_lyrics"
 
 SIGNAL_SLEEP = f"{DOMAIN}_sleep_changed"
 SIGNAL_NET = f"{DOMAIN}_net_changed"
