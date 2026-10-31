@@ -927,6 +927,47 @@ def terulet(hass: HomeAssistant, *entity_ids: str | None) -> str | None:
     return None
 
 
+@websocket_api.websocket_command({vol.Required("type"): "cantabile/tv/preview", vol.Required("entity_id"): str})
+@callback
+def ws_preview(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """A kártya TV-ablaka: ugyanazok az adatok, mint a TV-tükörnél (meta, képek, hely, jelszint), a kiválasztott hangszóróról –
+    saját előfizetésen, TV-lejátszó nélkül (a valódi TV-k bejelentkezését nem zavarja)."""
+    from .const import SIGNAL_UPNP
+    from .media_player import CantabileTv
+    from homeassistant.helpers.dispatcher import async_dispatcher_connect
+    from homeassistant.helpers.event import async_track_state_change_event
+
+    zene = hass.data.get(DOMAIN, {}).get("zene")
+    if zene is None or not msg["entity_id"].startswith("media_player."):
+        conn.send_error(msg["id"], "no_speaker", "no_speaker")
+        return
+
+    class Elonezet:
+        """A TV-tükör kódját használja (media_player.CantabileTv), a TV-oldal helyett a kártyának küld."""
+
+        _tukor_frissit = CantabileTv._tukor_frissit
+        _tukor_allas = CantabileTv._tukor_allas
+        _tukor_meta = CantabileTv._tukor_meta
+        _tukor_forras = CantabileTv._tukor_forras
+
+        def __init__(self) -> None:
+            self.hass, self.rt, self.entity_id = hass, zene.rt, f"elonezet_{msg['id']}"
+            self._tukor, self._tukor_kulcs, self._tukor_csend, self._tukor_javit = msg["entity_id"], None, None, None
+
+        def uzen(self, adat: dict[str, Any]) -> bool:
+            conn.send_message(websocket_api.event_message(msg["id"], adat))
+            return True
+
+    e = Elonezet()
+    le = [
+        async_track_state_change_event(hass, [e._tukor], lambda _ev: e._tukor_frissit()),
+        async_dispatcher_connect(hass, SIGNAL_UPNP, lambda ent: e._tukor_frissit() if ent == e._tukor else None),
+    ]
+    conn.subscriptions[msg["id"]] = lambda: [f() for f in le]
+    conn.send_result(msg["id"])
+    e._tukor_frissit(elso=True)
+
+
 @websocket_api.websocket_command({vol.Required("type"): "cantabile/tv/reload", vol.Required("entity_id"): str})
 @websocket_api.require_admin
 @websocket_api.async_response
@@ -959,3 +1000,4 @@ def regisztral(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_report)
     websocket_api.async_register_command(hass, ws_follow)
     websocket_api.async_register_command(hass, ws_reload)
+    websocket_api.async_register_command(hass, ws_preview)

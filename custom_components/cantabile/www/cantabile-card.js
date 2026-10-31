@@ -278,6 +278,8 @@ const EN = {
   "Kinézet": "Look",
   "Forgó bakelit körspektrummal": "Spinning vinyl with circular spectrum",
   "Equalizer-sávok": "Equaliser bars",
+  "TV-ablak: amit a TV mutatna erről a hangszóróról": "TV window: what the TV would show for this speaker",
+  "A TV-ablak hangszóróhoz tartozik – válassz hangszórót.": "The TV window belongs to a speaker – choose a speaker.",
   "A(z) {h} AirPlay-jelet kap a telefonról – ezt a telefonon (AirPlay-ikon) lehet átküldeni a(z) {u} hangszóróra.": "{h} is receiving AirPlay from a phone – send it to {u} from the phone (AirPlay icon).",
   "iPhone / iPad / Mac AirPlay-jele": "AirPlay from an iPhone / iPad / Mac",
   "Csak borító": "Cover only",
@@ -638,6 +640,7 @@ const IKON = {
   stop: '<svg viewBox="0 0 12 14"><path d="M0 1h12v12H0z"/></svg>',
   pause: '<svg viewBox="0 0 12 14"><path d="M0 0h4v14H0zM8 0h4v14H8z"/></svg>',
   eject: '<svg viewBox="0 0 14 14"><path d="M7 0l7 8H0zM0 10h14v4H0z"/></svg>',
+  tv: '<svg viewBox="0 0 24 24"><path d="M3 5.5h18a1 1 0 0 1 1 1v10.5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1zm.8 1.8v8.9h16.4V7.3zM8 20.2h8v1.6H8zM8.6 2.4l3.4 2.6 3.4-2.6.9 1.1L12 6.9 7.7 3.5z"/></svg>',
   info: '<svg viewBox="0 0 24 24"><path d="M12 2.5a9.5 9.5 0 1 0 0 19 9.5 9.5 0 0 0 0-19zm0 1.8a7.7 7.7 0 1 1 0 15.4 7.7 7.7 0 0 1 0-15.4zM11 10.5h2v6.5h-2zm0-3.5h2v2h-2z"/></svg>',
   fogas: '<svg viewBox="0 0 24 24"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>',
 };
@@ -1559,10 +1562,10 @@ class CantabileCard extends HTMLElement {
           -webkit-tap-highlight-color: transparent; }
         .fogas svg { width: 16px; height: 16px; fill: #6d7179; display: block; margin: auto; }
         .fogas:active { background: rgba(0,0,0,.08); }
-        .infog { margin-left: 8px; border: 0; background: none; padding: 2px; width: 22px; height: 22px; cursor: pointer; border-radius: 50%; align-self: center; -webkit-tap-highlight-color: transparent; }
-        .infog svg { width: 16px; height: 16px; fill: #6d7179; display: block; margin: auto; }
-        .infog:active, .infog.be { background: rgba(0,0,0,.08); }
-        .infog + .fogas { margin-left: 2px; }
+        .tvg, .infog { margin-left: 8px; border: 0; background: none; padding: 2px; width: 22px; height: 22px; cursor: pointer; border-radius: 50%; align-self: center; -webkit-tap-highlight-color: transparent; }
+        .tvg svg, .infog svg { width: 16px; height: 16px; fill: #6d7179; display: block; margin: auto; }
+        .tvg:active, .tvg.be, .infog:active, .infog.be { background: rgba(0,0,0,.08); }
+        .infog + .fogas, .tvg + .infog { margin-left: 2px; }
         /* jelút-ablak (ⓘ): a füstüveg üzenetablak nagyobb testvére – forrás → feldolgozás → hangszóró, élőben */
         /* Music Assistant fül: típus-alfülek; QUEUE: a szóló és a következő szám borítóval */
         .maful { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
@@ -1574,6 +1577,10 @@ class CantabileCard extends HTMLElement {
         .masorelem b { display: block; font: 700 calc(13px * var(--bk, 1))/1.25 "Cantabile Sans", Arial, sans-serif; color: #f3e8d4; }
         .masorelem span { display: block; font: 500 calc(11.5px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; color: #cdb995; }
         .jelreteg { position: absolute; left: 0; right: 0; z-index: 61; display: flex; justify-content: center; pointer-events: none; }
+        .tvreteg { position: absolute; left: 0; right: 0; z-index: 62; display: flex; justify-content: center; pointer-events: none; }
+        .tvreteg .uzablak.tvablak { width: min(96%, 760px); padding: 10px 10px 8px; cursor: pointer; }
+        .tvablak cantabile-tv { display: block; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,.08); }
+        .tvablak .tvlab { display: flex; justify-content: space-between; align-items: center; margin-top: 7px; font: 700 calc(8px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .16em; color: #b9c2cc; }
         .jelreteg .uzablak.jelablak { width: min(94%, 680px); cursor: default; padding: 12px 16px 12px; }
         .jsor { display: flex; align-items: stretch; gap: 0; margin: 4px 0 10px; }
         .jdoboz { flex: 1 1 0; min-width: 0; padding: 8px 10px 9px; border-radius: 5px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04);
@@ -1595,8 +1602,8 @@ class CantabileCard extends HTMLElement {
         .jlab .uzgomb { margin-left: auto; }
         :host([keskeny]) .jsor { flex-direction: column; }
         :host([keskeny]) .jnyil { transform: rotate(90deg); margin: 2px auto; }
-        :host([fekete]) .infog svg { fill: #9a9ea5; }
-        :host([fekete]) .infog:active, :host([fekete]) .infog.be { background: rgba(255,255,255,.1); }
+        :host([fekete]) .tvg svg, :host([fekete]) .infog svg { fill: #9a9ea5; }
+        :host([fekete]) .tvg:active, :host([fekete]) .tvg.be, :host([fekete]) .infog:active, :host([fekete]) .infog.be { background: rgba(255,255,255,.1); }
 
         /* beállítások (űrlap) */
         .beall { position: absolute; inset: 6px 12px; z-index: 8; border-radius: 6px; display: flex; flex-direction: column;
@@ -1865,7 +1872,7 @@ class CantabileCard extends HTMLElement {
         :host([keskeny]) .fej .tipus { font-size: calc(17px * var(--bk, 1)); margin-left: 8px; }
         :host([keskeny]) .fej .hszfej { display: none; }
         :host([keskeny]) .fej .fogas { margin-left: auto; }
-        :host([keskeny]) .fej .infog { margin-left: auto; } :host([keskeny]) .fej .infog + .fogas { margin-left: 2px; }
+        :host([keskeny]) .fej .tvg { margin-left: auto; } :host([keskeny]) .fej .tvg + .infog { margin-left: 2px; } :host([keskeny]) .fej .infog + .fogas { margin-left: 2px; }
         :host([keskeny]) .skala { order: 2; flex: none; height: 132px; min-height: 0; }
         :host([keskeny]) .sav { left: 10px; right: 10px; }
         :host([keskeny]) .skala { grid-template-columns: 70px minmax(0, 1fr) 34px; gap: 6px; padding: 6px; }
@@ -2150,7 +2157,7 @@ class CantabileCard extends HTMLElement {
       <ha-card>
         <div class="elo" id="elo">
           <div class="bal">
-            <div class="fej"><span class="marka">${ESC(c.marka || "Cantabile")}</span><span class="tipus">Stereophonic Receiver</span><span class="hszfej"></span><button class="infog" title="${T("Jelút: honnan jön a hang, mi történik vele, hol szól")}">${IKON.info}</button><button class="fogas" title="${T("Beállítások")}">${IKON.fogas}</button></div>
+            <div class="fej"><span class="marka">${ESC(c.marka || "Cantabile")}</span><span class="tipus">Stereophonic Receiver</span><span class="hszfej"></span><button class="tvg" title="${T("TV-ablak: amit a TV mutatna erről a hangszóróról")}">${IKON.tv}</button><button class="infog" title="${T("Jelút: honnan jön a hang, mi történik vele, hol szól")}">${IKON.info}</button><button class="fogas" title="${T("Beállítások")}">${IKON.fogas}</button></div>
             <div class="skala">
               <div class="feny"></div>
               <div class="jelm">${jelmero}<span class="jfel" id="jfel"></span><span class="stereo"><i></i>STEREO</span></div>
@@ -2175,7 +2182,7 @@ class CantabileCard extends HTMLElement {
         </div>
         <div class="elo magno rejt${c.magno?.vu_kijelzo === "fluor" ? " vfdmod" : ""}" id="magno">
           <div class="bal">
-            <div class="fej"><span class="marka">${ESC(c.marka || "Cantabile")}</span><span class="tipus">Stereo Cassette Deck</span><span class="hszfej"></span><button class="infog" title="${T("Jelút: honnan jön a hang, mi történik vele, hol szól")}">${IKON.info}</button><button class="fogas" title="${T("Beállítások")}">${IKON.fogas}</button></div>
+            <div class="fej"><span class="marka">${ESC(c.marka || "Cantabile")}</span><span class="tipus">Stereo Cassette Deck</span><span class="hszfej"></span><button class="tvg" title="${T("TV-ablak: amit a TV mutatna erről a hangszóróról")}">${IKON.tv}</button><button class="infog" title="${T("Jelút: honnan jön a hang, mi történik vele, hol szól")}">${IKON.info}</button><button class="fogas" title="${T("Beállítások")}">${IKON.fogas}</button></div>
             <div class="felso">
               <div class="ablak" id="ablak">${kazetta}<div class="ajto"><i class="krom kb"></i><i class="krom kj"></i><span>CANTABILE</span></div></div>
               <div class="mkij"><div class="vuk">${vu("L")}${vu("R")}${vfd}</div><div class="mfunk">${otGomb}</div></div>
@@ -2241,6 +2248,7 @@ class CantabileCard extends HTMLElement {
     });
     sr.querySelectorAll(".fogas").forEach((b) => b.addEventListener("click", () => this._beallNyit()));
     sr.querySelectorAll(".infog").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); this._jelutE ? this._jelutZar() : this._jelutNyit(); }));
+    sr.querySelectorAll(".tvg").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); this._tvAblakE ? this._tvAblakZar() : this._tvAblakNyit(); }));
     sr.querySelectorAll(".fedfog").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); this._fedelNyit(); }));
     this._fedelKezel(sr.getElementById("fedel"));
     sr.querySelectorAll(".mg").forEach((b) => {
@@ -3194,6 +3202,7 @@ class CantabileCard extends HTMLElement {
       setTimeout(() => this._elenged(ids.filter((e) => !SZOL(this._hass?.states[e]))), 4000);
     }
     this._kezi = null; this._frissit(); this._jelFeliratkozas();
+    if (this._tvAblakE && this._tvAblakE !== this._hangszoro()?.entity) this._tvAblakNyit();   // a TV-ablak az új hangszórót mutatja
   }
 
   _hangol(i) {
@@ -3350,7 +3359,7 @@ class CantabileCard extends HTMLElement {
         if (kartyak.length) pultok.push({ pult: d.url_path, cim: d.title || d.url_path, cfg, kartyak });
       }
       if (this._szerk !== sz || !pultok.length) return;
-      const k = pultok[0].kartyak[0], visual = ["vinyl", "cover", "bars", "wave", "both"].includes(k.visual) ? k.visual : "vinyl";
+      const k = pultok[0].kartyak[0], visual = ["vinyl", "cover", "bars", "wave", "both"].includes(k.visual) ? k.visual : "cover";
       const lyrics = ["vinyl", "cover"].includes(visual) ? k.lyrics !== false : k.lyrics === true;
       this._tvPultok = pultok;
       sz.tv = { visual, lyrics, eredeti: `${visual}|${lyrics}` };
@@ -5928,6 +5937,43 @@ class CantabileCard extends HTMLElement {
 
   // ---- jelút (ⓘ): honnan jön a hang, mi történik vele, hol szól – élőben, a füstüveg ablakban ----
 
+  // ---- TV-ablak: a TV-oldal kicsiben, a kiválasztott hangszóró adataival (cantabile/tv/preview) ----
+  _tvAblakNyit() {
+    const hsz = this._hangszoro(), kartya = this.shadowRoot?.querySelector("ha-card");
+    if (!kartya || !this._hass) return;
+    if (!hsz || hsz.entity === HELYI || this._nincsIntegracio) return this._uzen(T("A TV-ablak hangszóróhoz tartozik – válassz hangszórót."));
+    this._tvAblakZar(true);
+    this._tvAblakE = hsz.entity;
+    this.shadowRoot.querySelectorAll(".tvg").forEach((b) => b.classList.add("be"));
+    const r = document.createElement("div"); r.className = "tvreteg";
+    r.innerHTML = `<div class="uzablak tvablak" role="dialog" aria-label="TV"><div class="tvhely"></div><div class="tvlab"><span>TV · ${ESC(KN(hsz))}</span><span>CLOSE</span></div></div>`;
+    const ab = r.firstElementChild;
+    ab.addEventListener("click", (ev) => { ev.stopPropagation(); this._tvAblakZar(); });
+    const tv = document.createElement("cantabile-tv");
+    // az ablakban a borítós nézet (kicsiben ez a legolvashatóbb), a hangszóró adataival
+    tv.setConfig({ elonezet: hsz.entity, visual: "cover", weather: false });
+    ab.querySelector(".tvhely").appendChild(tv);
+    kartya.appendChild(r);
+    // a 16:9-es kép a kártyába férjen (rádió módban a kártya alacsony): szélesség a kártya szélessége és magassága szerint
+    const kr = kartya.getBoundingClientRect(), fent = Math.max(0, -kr.top), lent = Math.min(kr.height, innerHeight - kr.top);
+    const w = Math.max(240, Math.min(kr.width * 0.96, 760, ((lent - fent) - 46) / 0.5625 + 20));
+    ab.style.width = `${Math.round(w)}px`;
+    r.style.top = `${Math.round(fent + Math.max(6, ((lent - fent) - (w - 20) * 0.5625 - 40) / 2))}px`;
+    tv.hass = this._hass;
+    requestAnimationFrame(() => ab.classList.add("lat"));
+  }
+
+  _tvAblakZar(azonnal = false) {
+    this._tvAblakE = null;
+    const sr = this.shadowRoot;
+    sr?.querySelectorAll(".tvg").forEach((b) => b.classList.remove("be"));
+    const r = sr?.querySelector(".tvreteg"), a = r?.querySelector(".uzablak");
+    if (!r) return;
+    if (azonnal) return r.remove();
+    a.classList.remove("lat"); a.classList.add("zar");
+    setTimeout(() => r.remove(), 600);
+  }
+
   _jelutNyit() {
     this._jelutE = true;
     this.shadowRoot.querySelectorAll(".infog").forEach((b) => b.classList.add("be"));
@@ -7166,9 +7212,10 @@ const ORA_OPC = (h) => {
 };
 
 class CantabileTv extends HTMLElement {
-  // visual: vinyl (forgó bakelit körspektrummal, alapértelmezés) | cover (csak a nagy borító) | bars | wave | both;
-  // lyrics: futó dalszöveg (bakelitnél és borítónál alapból be)
-  setConfig(c) { this._c = { visual: "vinyl", ...(c || {}) }; }
+  // visual: cover (borító, alapértelmezés) | vinyl (forgó bakelit körspektrummal) | bars | wave | both;
+  // lyrics: futó dalszöveg (borítónál és bakelitnél alapból be);
+  // elonezet: <hangszóró> – a kártya TV-ablaka: nem TV-ként jelentkezik be, hanem ennek a hangszórónak az adatait mutatja
+  setConfig(c) { this._c = { visual: "cover", ...(c || {}) }; }
   get _dszBe() { return this._c.lyrics === true || (this._c.lyrics !== false && ["vinyl", "cover"].includes(this._c.visual)); }
 
   set hass(h) {
@@ -7176,8 +7223,10 @@ class CantabileTv extends HTMLElement {
     if (this._kesz) return;
     this._kesz = true;
     // hibakeresés a Cast-vevőn (oda nem látunk be): a hibák és az állapot `cantabile_tv_diag` eseményként jönnek vissza
-    window.addEventListener("error", (e) => this._diag({ hiba: `${e.message} @${e.lineno}:${e.colno}` }));
-    window.addEventListener("unhandledrejection", (e) => this._diag({ hiba: `promise: ${e.reason}` }));
+    if (!this._c.elonezet) {
+      window.addEventListener("error", (e) => this._diag({ hiba: `${e.message} @${e.lineno}:${e.colno}` }));
+      window.addEventListener("unhandledrejection", (e) => this._diag({ hiba: `promise: ${e.reason}` }));
+    }
     BETU(this._abs("/api/cantabile/font/"));
     this._epit();
     this._feliratkozik();
@@ -7216,6 +7265,7 @@ class CantabileTv extends HTMLElement {
   get _teljes() { return location.hostname === "cast.home-assistant.io" || this._c.fullscreen === true; }
 
   _diag(adat) {
+    if (this._c.elonezet) return;                   // a kártya TV-ablaka nem TV: nincs diagnosztika
     try {
       const v = this._v;
       this._h.callWS({ type: "fire_event", event_type: "cantabile_tv_diag", event_data: { ...adat, ures: v ? v.classList.contains("ures2") : null,
@@ -7285,10 +7335,11 @@ class CantabileTv extends HTMLElement {
       .bak canvas.bk { display: block; } .bak canvas.eq { display: none; }
       /* csak borító: nagy borító balra, spektrum nélkül; jobbra az adatok és a dalszöveg */
       .bmod canvas.eq { display: none; }
-      .bmod .tart { left: 64px; top: 112px; height: 470px; gap: 56px; align-items: flex-start; }
-      .bmod .adat { padding-top: 26px; }
-      .bmod .bor { width: 470px; height: 470px; border-radius: 8px; box-shadow: 0 30px 70px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.1); }
-      .bmod .dsz { left: 590px; }
+      .bmod .tart { left: 64px; top: 104px; height: 320px; gap: 48px; align-items: center; }
+      .bmod .bor { width: 320px; height: 320px; border-radius: 8px; box-shadow: 0 26px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.1); }
+      .bmod .dsz { left: 64px; right: 64px; top: 448px; height: 204px; text-align: center; align-items: center; }
+      .bmod .dsz p { max-width: 100%; }
+      .bmod .dsz p.d1 { font-size: 34px; }
       .bak .bor { display: none; }
       .bak .tart { left: 612px; top: 112px; height: 330px; }
       .dsz { position: absolute; left: 612px; right: 64px; top: 452px; height: 196px; display: none; flex-direction: column; justify-content: center; gap: 12px;
@@ -7361,6 +7412,7 @@ class CantabileTv extends HTMLElement {
   // eredményt egyszer visszajelzi (cantabile_tv_diag „ebren”: ok / nincs / hiba). Az oldal elrejtésekor a böngésző
   // elengedi – újra láthatóvá váláskor, ha szól, megint kéri.
   async _ebren(kell) {
+    if (this._c.elonezet) return;                   // a kártya TV-ablaka nem tart ébren képernyőt
     const w = window, jelez = (ertek) => { if (!w._cantabileEbrenJelzett) { w._cantabileEbrenJelzett = true; this._diag({ ebren: ertek }); } };
     if (!w._cantabileEbrenFigyel) {
       w._cantabileEbrenFigyel = true;
@@ -7413,6 +7465,12 @@ class CantabileTv extends HTMLElement {
   _feliratkozik() {
     clearTimeout(this._ujraIdo);
     if (this._leir) return;                          // már fel van iratkozva (ne legyen két előfizetés)
+    if (this._c.elonezet) {
+      // a kártya TV-ablaka: a kiválasztott hangszóró adatai, mint a TV-tükörben (TV-lejátszó nélkül)
+      this._h.connection.subscribeMessage((m) => this._parancs(m), { type: "cantabile/tv/preview", entity_id: this._c.elonezet })
+        .then((u) => { this._leir = u; }, () => { this._ujraIdo = setTimeout(() => this._feliratkozik(), 10000); });
+      return;
+    }
     this._msg = { type: "cantabile/tv/subscribe", features: TV_KEPES };
     if (this._c.tv || this._tv) this._msg.tv = this._c.tv || this._tv;    // a lecserélt példány utódja azonnal átveszi a lejátszót
     this._h.connection.subscribeMessage((m) => this._parancs(m), this._msg)

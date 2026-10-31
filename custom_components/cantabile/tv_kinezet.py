@@ -43,7 +43,7 @@ async def olvas(hass: HomeAssistant) -> tuple[str, bool] | None:
         except Exception:  # noqa: BLE001 – üres / YAML-hibás vezérlőpult
             continue
         if k:
-            v = k[0].get("visual") if k[0].get("visual") in KINEZETEK else "vinyl"
+            v = k[0].get("visual") if k[0].get("visual") in KINEZETEK else "cover"
             return v, (k[0].get("lyrics") is not False) if v in ALAPBOL_DALSZOVEG else k[0].get("lyrics") is True
     return None
 
