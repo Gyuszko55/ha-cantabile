@@ -441,7 +441,7 @@ class TvKozpont:
             return None
         return alap + async_sign_path(self.hass, ut, ALAIRAS)
 
-    async def dlna_video(self, meta: dict[str, Any], fajl: str) -> str | None:
+    async def dlna_video(self, meta: dict[str, Any], fajl: str, kezdet: float = 0) -> str | None:
         """A szám „videóként”: egyetlen álló képkocka (az adatlap) + a zene, MP4-be (a tárba). A Samsung és más DLNA-s TV-k
         így teljes képernyőn mutatják az adatlapot, a saját haladásjelzőjükkel; a fájl tekerhető. Aláírt belső cím, vagy None."""
         if not await ffmpeg_van(self.hass):
@@ -452,11 +452,14 @@ class TvKozpont:
         if not kep:
             return None
         hossz = float(meta.get("duration") or 0)    # a hang hossza: a kép ne nyújtsa meg a videót
+        kezdet = round(kezdet) if 3 < kezdet < hossz - 5 else 0     # hangszóróváltás: innen kezdődik
+        if kezdet:
+            hossz -= kezdet
         try:
             mtime = await self.hass.async_add_executor_job(os.path.getmtime, fajl)
         except OSError:
             return None
-        kulcs = hashlib.sha1(f"{kep}|{fajl}|{mtime}".encode()).hexdigest()[:20]
+        kulcs = hashlib.sha1(f"{kep}|{fajl}|{mtime}{f'|{kezdet}' if kezdet else ''}".encode()).hexdigest()[:20]
         tar = self.hass.config.path(".cache", "cantabile_tv")
         cel = os.path.join(tar, f"video_{kulcs}.mp4")
         if not os.path.exists(cel):
@@ -466,7 +469,7 @@ class TvKozpont:
                     for kodolo in (["-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage", "-pix_fmt", "yuv420p"],
                                    ["-c:v", "mpeg4", "-q:v", "3", "-pix_fmt", "yuv420p"]):
                         p = await asyncio.create_subprocess_exec(
-                            "ffmpeg", "-v", "error", "-y", "-loop", "1", "-framerate", "1", "-i", kep, "-i", fajl,
+                            "ffmpeg", "-v", "error", "-y", "-loop", "1", "-framerate", "1", "-i", kep, *(["-ss", str(kezdet)] if kezdet else []), "-i", fajl,
                             "-map", "0:v", "-map", "1:a", "-vf", "scale=1280:720", *kodolo, "-r", "1", "-g", "10",
                             "-c:a", "aac", "-b:a", "256k", "-shortest", *(["-t", f"{hossz:.2f}"] if hossz else []),
                             "-movflags", "+faststart", ideig,

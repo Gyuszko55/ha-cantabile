@@ -159,7 +159,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CantabileConfigEntry) ->
 
     async def play_tracks(call: ServiceCall) -> None:
         for e in call.data["entity_id"]:
-            rt.play_tracks(e, call.data["tracks"], call.data["start"])
+            rt.play_tracks(e, call.data["tracks"], call.data["start"], call.data.get("position"))
 
     async def stop_tracks(call: ServiceCall) -> None:
         for e in call.data.get("entity_id") or [None]:
@@ -172,7 +172,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: CantabileConfigEntry) ->
     hass.services.async_register(
         DOMAIN, "play_tracks", play_tracks,
         schema=vol.Schema({vol.Required("entity_id"): cv.entity_ids, vol.Required("tracks"): [cv.string],
-                           vol.Optional("start", default=0): vol.Coerce(int)}),
+                           vol.Optional("start", default=0): vol.Coerce(int),
+                           vol.Optional("position"): vol.All(vol.Coerce(float), vol.Range(min=0))}),
     )
     hass.services.async_register(DOMAIN, "stop_tracks", stop_tracks, schema=vol.Schema({vol.Optional("entity_id"): cv.entity_ids}))
     hass.services.async_register(

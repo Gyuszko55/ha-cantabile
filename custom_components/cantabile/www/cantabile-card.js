@@ -3034,6 +3034,17 @@ class CantabileCard extends HTMLElement {
   // a kazetta folytatása az új kimeneten: ugyanattól a számtól, ugyanonnan
   // Igazat ad, ha az új kimenet szól.
   async _kazettaFolytat(f, uj) {
+    const tv = /^media_player\.cantabile_tv_/.test(uj.entity), st = uj.entity === HELYI ? null : this._hass?.states[uj.entity];
+    // a Cantabile TV rögtön a kezdőponttól indul; más hangszóró némán indul, odateker, és csak utána szól – így nem
+    // hallatszik egy pillanatra a szám eleje (a régi közben még szól)
+    if (tv && f.poz > 3) this._kezdPoz = { entity: uj.entity, poz: f.poz, t0: f.t0, ido: Date.now() };
+    const hang = !tv && f.poz > 3 && st && (Number(st.attributes?.supported_features) & 4) && st.attributes?.volume_level > 0 ? st.attributes.volume_level : null;
+    if (hang != null) await this._hiv("media_player", "volume_set", { entity_id: uj.entity, volume_level: 0 }, { csendes: true }).catch(() => {});
+    try { return await this._kazettaFolytatHang(f, uj); }
+    finally { if (hang != null) await this._hiv("media_player", "volume_set", { entity_id: uj.entity, volume_level: hang }, { csendes: true }).catch(() => {}); }
+  }
+
+  async _kazettaFolytatHang(f, uj) {
     await this._betolt(f.kaz, f.kezdo);
     // a tekerés csak akkor hat, ha az új kimenet már ténylegesen az átvitt számot játssza (a Cast / WiiM lassabban tölt be,
     // és előtte még mást is szólhatott)
@@ -3050,7 +3061,8 @@ class CantabileCard extends HTMLElement {
     await new Promise((r) => setTimeout(r, uj.mod === "sonos" || uj.entity === HELYI ? 800 : 2500));
     // ahol a régi épp tart: az átvitel kezdetekor kiolvasott hely + azóta eltelt idő (a régi közben szólt)
     for (let k = 0; k < 3; k++) {
-      const cel = f.poz + (f.t0 ? (Date.now() - f.t0) / 1000 : 0);
+      const cel = f.poz + (f.t0 ? (Date.now() - f.t0) / 1000 : 0), most0 = await this._helye(uj);
+      if (most0 != null && Math.abs(most0 - cel) < 4) break;          // már jó helyen szól (pl. a TV onnan indult)
       await this._hiv("media_player", "media_seek", { entity_id: uj.entity, seek_position: Math.round(cel) }, { csendes: true }).catch(() => {});
       await new Promise((r) => setTimeout(r, 1500));
       const most = await this._helye(uj);
@@ -3510,7 +3522,11 @@ class CantabileCard extends HTMLElement {
   _sorozat(hsz, szamok, kezdo = 0) {
     const sz = this._config.magno?.szkript;
     if (hsz.entity === HELYI || sz) return this._hiv("script", "turn_on", { entity_id: sz || HELYI, variables: { entity_id: hsz.entity, szamok, kezdo } });
-    return this._hiv("cantabile", "play_tracks", { entity_id: hsz.entity, tracks: szamok, start: kezdo });
+    // hangszóróváltás a Cantabile TV-re: a kezdőpont is megy (a TV onnan indítja, a DLNA-s TV-re onnan készül a videó)
+    const kp = this._kezdPoz?.entity === hsz.entity && Date.now() - this._kezdPoz.ido < 20000 ? this._kezdPoz : null;
+    this._kezdPoz = null;
+    return this._hiv("cantabile", "play_tracks", { entity_id: hsz.entity, tracks: szamok, start: kezdo,
+      ...(kp ? { position: Math.round((kp.poz + (kp.t0 ? (Date.now() - kp.t0) / 1000 : 0)) * 10) / 10 } : {}) });
   }
 
   _szkriptLeallit(hsz = this._hangszoro()) {
@@ -7322,7 +7338,8 @@ class CantabileTv extends HTMLElement {
       this._meta = m.meta || {};
       this._cueI = this._meta.cue ? -1 : null;      // az első jelzés már kiírja az „1 / N” sorszámot
       this._mutat(this._meta);
-      a.src = this._abs(m.src);
+      // hangszóróváltás: rögtön onnan szól, ahol a régi tartott (médiatöredék – nincs tekerés, nem hallatszik az eleje)
+      a.src = this._abs(m.src) + (m.start > 1 ? `#t=${Math.round(m.start)}` : "");
       this._allapot = "playing";
       try { if (this._ctx && this._ctx.state !== "running") await this._ctx.resume(); await a.play(); }
       catch (e) { this._allapot = "idle"; this._jelent(String(e)); this._diag({ hiba: `play: ${e}`, src: String(a.src).slice(0, 90) }); }

@@ -89,6 +89,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self._szolt = 0.0                       # mikor szólt utoljára (a váltáskor a tükör csak a szóló TV-ről indul)
         self.oldal_kepes: set[str] = set()      # mit tud a TV-n futó oldal (a régebbi kártyakód nem ismeri a tükröt)
         self._ujrakuldes: asyncio.Task | None = None
+        self._eltolas = 0.0                     # DLNA: a köztes pontról induló videó kezdete (mp)
         self.ujratoltve: str | None = None     # erre a kártyaváltozatra már újraküldtük az oldalt (ne ismételje)
         self.ujratolt = False                  # az oldal újraküldése alatt a lejátszó nem megy „ki”
         self.ujrakuldes_zar = asyncio.Lock()   # egyszerre egy újraküldés; a lejátszás megvárja
@@ -212,7 +213,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         if cue and self.dlna:
             # DLNA: nincs TV-oldal, ami jelentené – a TV lejátszási pozíciójából
             a = self._cel()
-            poz = float(a.get("media_position") or 0)
+            poz = float(a.get("media_position") or 0) + self._eltolas
             if self.hass.states.get(self.cast) and self.hass.states.get(self.cast).state == "playing" and a.get("media_position_updated_at"):
                 poz += (dt_util.utcnow() - a["media_position_updated_at"]).total_seconds()
             self._cue_i = max((i for i, t in enumerate(cue) if poz >= t["start"] - 0.2), default=0)
@@ -272,6 +273,8 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
     def media_position(self) -> float | None:
         if self.dlna:
             poz = self._cel().get("media_position")
+            if poz is not None and self._eltolas:
+                poz = float(poz) + self._eltolas
             if (h := self._cue_hatar()) and poz is not None:
                 return max(0.0, float(poz) - h[0])          # CUE-s albumnál a számon belüli idő
             return poz
@@ -489,20 +492,21 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             await kp.ujrakuld(self, folytatva=False)   # régebbi TV-oldal fut: a friss kártyával indul (az új szám jön)
         cim = await kp.feloldas(media_id, self.entity_id)
         src, fajl = kp.forras(cim)
-        extra = kwargs.get("extra") or {}
+        extra = dict(kwargs.get("extra") or {})
+        kezdet = float(extra.pop("start_position", 0) or 0)      # hangszóróváltás: innen indul (tekerés nélkül)
         meta = await kp.adatok(cim, fajl, extra.get("metadata") or extra, hatter=not self.dlna)
         if self.dlna:
-            await self._dlna_lejatszas(media_id, meta, fajl)
+            await self._dlna_lejatszas(media_id, meta, fajl, kezdet)
             return
         meta = {k: v for k, v in meta.items() if not k.startswith("_")}
         await kp.oldalt_kuld(self)
         self._mcid, self._src, self._meta, self._cue_i = media_id, src, meta, (0 if meta.get("cue") else None)
-        self._hossz, self._poz, self._poz_ido = meta.get("duration") or None, 0.0, dt_util.utcnow()
+        self._hossz, self._poz, self._poz_ido = meta.get("duration") or None, kezdet, dt_util.utcnow()
         self._allapot = MediaPlayerState.PLAYING     # az oldal jelentése felülírja (pl. hiba → idle)
-        self.uzen({"cmd": "play", "src": src, "meta": meta, "t": time.time()})
+        self.uzen({"cmd": "play", "src": src, "meta": meta, "t": time.time(), **({"start": kezdet} if kezdet > 1 else {})})
         self.async_write_ha_state()
 
-    async def _dlna_lejatszas(self, media_id: str, meta: dict[str, Any], fajl: str | None) -> None:
+    async def _dlna_lejatszas(self, media_id: str, meta: dict[str, Any], fajl: str | None, kezdet: float = 0) -> None:
         """DLNA-s TV: zenemappás számnál „videó” (álló adatlap + a zene, tv.py) – így teljes képernyőn látszik; ha az nem
         készül el (vagy webes adó), a zene borítóként kapott adatlappal megy (azt nem minden TV mutatja)."""
         kp = kozpont(self.hass)
@@ -513,15 +517,21 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         if fajl:
             # a videó legfeljebb 15 mp-ig készülhet (egy órás, CUE-lapos albumfájlnál ennél tovább tart): utána a zene
             # borítóval indul, a videó a háttérben elkészül a következő alkalomra
-            kesz = self.hass.async_create_background_task(kp.dlna_video(meta, fajl), f"cantabile_tv_video_{self.entity_id}")
+            # hangszóróváltásnál a videó ott kezdődik, ahol a régi tartott (a DLNA-s TV-k nem mindig tudnak tekerni)
+            kesz = self.hass.async_create_background_task(kp.dlna_video(meta, fajl, kezdet), f"cantabile_tv_video_{self.entity_id}")
             try:
                 video = await asyncio.wait_for(asyncio.shield(kesz), 15)
             except TimeoutError:
                 video = None
+                if kezdet:
+                    kesz.cancel()                     # a köztes pontról induló videó később már nem kell
         elif re.match(r"^https?://", cim := await kp.feloldas(media_id, self.entity_id)):
             video = await kp.dlna_elo(meta, cim)          # webes adó: élő videó
         else:
             video = None
+        hossz = float(meta.get("duration") or 0)
+        # a videó a kezdőponttól indul: a TV ettől számolja az időt (a pozíció és a tekerés ennyivel eltolva)
+        self._eltolas = float(round(kezdet)) if video and fajl and 3 < kezdet < hossz - 5 else 0.0
         if video:
             cel, fajta = video, "video"
         else:
@@ -531,8 +541,19 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         await self.hass.services.async_call("media_player", "play_media", {
             "entity_id": self.cast, "media_content_id": cel, "media_content_type": fajta, "extra": extra}, blocking=True)
         self.async_write_ha_state()
+        if not self._eltolas and kezdet > 3:
+            # nincs köztes pontról induló videó: a TV-t tekerjük oda (ha tudja)
+            self.hass.async_create_background_task(self._dlna_teker(kezdet, time.monotonic()), f"cantabile_tv_teker_{self.entity_id}")
         if video:
             self.hass.async_create_background_task(self._kovetkezot_keszit(), f"cantabile_tv_elokeszit_{self.entity_id}")
+
+    async def _dlna_teker(self, poz: float, t0: float) -> None:
+        from .runtime import var    # noqa: PLC0415
+
+        if await var(self.hass, self.cast, lambda st: bool(st and st.state == "playing"), 20):
+            await asyncio.sleep(1.5)
+            with contextlib.suppress(Exception):
+                await self._cel_hiv("media_seek", seek_position=round(poz + time.monotonic() - t0))
 
     async def _kovetkezot_keszit(self) -> None:
         """Albumnál a következő szám videója a háttérben elkészül, így a számváltásnál nincs várakozás."""
@@ -581,7 +602,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         if self._tukor:
             return
         if self.dlna:
-            await self._cel_hiv("media_seek", seek_position=position)
+            await self._cel_hiv("media_seek", seek_position=max(0.0, position - self._eltolas))
             return
         self.uzen({"cmd": "seek", "position": position})
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import time
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
@@ -152,8 +153,11 @@ class Cantabile:
 
     # ---- sorozatlejátszó (sor nélküli lejátszók) ----
     @callback
-    def play_tracks(self, entity_id: str, tracks: list[str], start: int = 0) -> None:
-        self.play_iter(entity_id, Sorrend(self, entity_id, list(tracks), max(0, int(start))))
+    def play_tracks(self, entity_id: str, tracks: list[str], start: int = 0, position: float | None = None) -> None:
+        s = Sorrend(self, entity_id, list(tracks), max(0, int(start)))
+        if position:
+            s.kezd_poz, s.kezd_ido = float(position), time.monotonic()   # az első szám innen (a Cantabile TV ott indítja)
+        self.play_iter(entity_id, s)
 
     @callback
     def play_iter(self, entity_id: str, sorrend: Any) -> None:
@@ -235,10 +239,12 @@ class Cantabile:
                 if ma_e and (kt := await ma.konyvtari(self.hass, id_)):
                     mit, tipus = kt[0], kt[1]
                     valtozatok |= kt[2]
-                await self.hass.services.async_call(
-                    "media_player", "play_media",
-                    {"entity_id": entity_id, "media_content_id": mit, "media_content_type": tipus}, blocking=True,
-                )
+                adat: dict[str, Any] = {"entity_id": entity_id, "media_content_id": mit, "media_content_type": tipus}
+                # hangszóróváltás: a Cantabile TV az első számot rögtön onnan indítja, ahol a régi tartott (nincs tekerés)
+                if (kp_ := getattr(sorrend, "kezd_poz", None)) and entity_id.startswith("media_player.cantabile_tv_"):
+                    adat["extra"] = {"start_position": round(kp_ + time.monotonic() - sorrend.kezd_ido, 1)}
+                sorrend.kezd_poz = None
+                await self.hass.services.async_call("media_player", "play_media", adat, blocking=True)
                 if not await var(self.hass, entity_id, lambda st: bool(st and st.state == "playing"), 30):
                     return
                 # addig vár, amíg ez a szám szól vagy szünetel. A WiiM a címbe a fájl URL-jét írja; más lejátszó (pl. Music

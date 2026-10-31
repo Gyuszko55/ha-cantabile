@@ -15,6 +15,7 @@ Vendégoldal: `/api/cantabile/party/<token>` (és `/state`, `/search`, `/request
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import random
 import re
@@ -95,6 +96,8 @@ class Party:
         self._index: list[tuple[str, str]] | None = None
         self._keres_ido: dict[str, float] = {}
         self._elso: str | None = None               # átvételkor: a régi helyen épp szóló szám jön elsőnek
+        self.kezd_poz: float | None = None          # …és a Cantabile TV-n innen indul (a sorozatlejátszó adja át)
+        self.kezd_ido = 0.0
         self.aktiv = True
 
     def atvesz(self, regi: Party) -> None:
@@ -371,7 +374,7 @@ def _qr(szoveg: str) -> str | None:
     return segno.make(szoveg, error="m").svg_inline(scale=5, border=2, dark="#15161a", light="#f3ead8", omitsize=True)
 
 
-async def _odateker(p: Party, rel: str, poz: float, t0: float) -> None:
+async def _odateker(p: Party, rel: str, poz: float, t0: float, hang: float | None = None) -> None:
     """Átvett partynál: ha az új helyen már az átvett szám szól, odateker, ahol a régi tartott (a váltás idejével együtt)."""
     from .runtime import var    # noqa: PLC0415
 
@@ -382,13 +385,18 @@ async def _odateker(p: Party, rel: str, poz: float, t0: float) -> None:
             return p._rel(str(st.attributes.get("media_content_id") or "")) == rel  # noqa: SLF001
         return bool(p.most) and p.most.endswith(f"/{rel}")
 
-    if not await var(p.hass, p.e, ez, 45) or not p.aktiv:
-        return
-    await asyncio.sleep(2)
     try:
+        if not await var(p.hass, p.e, ez, 45) or not p.aktiv:
+            return
+        await asyncio.sleep(1 if p.mod == "sonos" else 2)
         await p.hass.services.async_call("media_player", "media_seek", {"entity_id": p.e, "seek_position": round(poz + time.monotonic() - t0)}, blocking=True)
+        await asyncio.sleep(0.8)
     except Exception as err:  # noqa: BLE001 – nem minden lejátszó tud tekerni
         _LOGGER.debug("Cantabile PARTY: a tekerés nem sikerült (%s): %s", p.e, err)
+    finally:
+        if hang is not None:                         # a hangerő vissza (akkor is, ha a tekerés nem sikerült)
+            with contextlib.suppress(Exception):
+                await p.hass.services.async_call("media_player", "volume_set", {"entity_id": p.e, "volume_level": hang}, blocking=True)
 
 
 def regisztral(hass: HomeAssistant) -> None:
@@ -421,6 +429,13 @@ def regisztral(hass: HomeAssistant) -> None:
         e = msg["entity_id"]
         tagok = [e] + [t for t in msg.get("tagok") or [] if t != e]
         p: Party | None = None
+        hang: float | None = None
+
+        async def hang_vissza() -> None:
+            if hang is not None:
+                with contextlib.suppress(Exception):
+                    await hass.services.async_call("media_player", "volume_set", {"entity_id": e, "volume_level": hang}, blocking=True)
+
         try:
             _foglal(conn, tagok)
             nas = msg["mappa"].rstrip("/")
@@ -432,22 +447,33 @@ def regisztral(hass: HomeAssistant) -> None:
             if (regi := kp.partik.get(msg.get("folytat") or "")) is not None:
                 p.atvesz(regi)
             elso = p._elso  # noqa: SLF001
+            poz = float(msg.get("poz") or 0)
+            if elso and poz > 3:
+                if e.startswith("media_player.cantabile_tv_"):
+                    p.kezd_poz, p.kezd_ido = poz, time.monotonic()     # a TV rögtön onnan indítja
+                elif (st := hass.states.get(e)) and isinstance(st.attributes.get("volume_level"), (int, float)) \
+                        and st.attributes["volume_level"] > 0 and int(st.attributes.get("supported_features") or 0) & 4:
+                    # némán indul, odateker, és csak utána szól (nincs „a szám eleje egy pillanatra”)
+                    hang = float(st.attributes["volume_level"])
+                    await hass.services.async_call("media_player", "volume_set", {"entity_id": e, "volume_level": 0}, blocking=True)
             for t in tagok:
                 kp.vege(t)
             kp.partik[e] = p
             await p.indit()
             foglalas.kozpont(hass).foglal(tagok, conn.user.id, conn.user.name or "?", msg["device"])
-            if elso and (msg.get("poz") or 0) > 3:
-                hass.async_create_background_task(_odateker(p, elso, msg["poz"], time.monotonic()), f"cantabile_party_teker_{e}")
+            if elso and poz > 3 and not e.startswith("media_player.cantabile_tv_"):
+                hass.async_create_background_task(_odateker(p, elso, poz, time.monotonic(), hang), f"cantabile_party_teker_{e}")
         except (HomeAssistantError, HibaUzenet) as err:
             if p is not None and kp.partik.get(e) is p:     # csak a most indított partyt, egy másik futóét nem
                 kp.vege(e)
+            await hang_vissza()
             conn.send_error(msg["id"], "party_failed", str(err))
             return
         except Exception as err:  # noqa: BLE001
             if p is not None and kp.partik.get(e) is p:
                 kp.vege(e)
             _LOGGER.exception("Cantabile PARTY: nem indult (%s)", e)
+            await hang_vissza()
             conn.send_error(msg["id"], "party_failed", str(err))
             return
         conn.send_result(msg["id"], p.allapot())
