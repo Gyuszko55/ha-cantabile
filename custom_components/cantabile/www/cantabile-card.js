@@ -274,6 +274,16 @@ const EN = {
   "A(z) {h} hangszórón innen szól: {f}.": "On {h} it plays from: {f}.",
   "{n} szám nincs meg, kimarad.": "{n} tracks weren't found and are skipped.",
   "zenemappa": "music folder",
+  "TV-kinézet": "TV look",
+  "Kinézet": "Look",
+  "Forgó bakelit körspektrummal": "Spinning vinyl with circular spectrum",
+  "Equalizer-sávok": "Equaliser bars",
+  "Hullámforma": "Waveform",
+  "Sávok és hullámforma": "Bars and waveform",
+  "Futó dalszöveg": "Running lyrics",
+  "Látszik": "Shown",
+  "Nem látszik": "Hidden",
+  "A Cantabile TV-oldal kinézete a Cast-os TV-ken (TV-botok, Android TV, Nest Hub) – minden TV-n egyszerre. A DLNA-s TV-n nincs TV-oldal.": "The look of the Cantabile TV page on Cast TVs (TV sticks, Android TV, Nest Hub) – the same on every TV. A DLNA TV has no TV page.",
   "Keresés a Deezeren…": "Search Deezer…",
   "Deezer toplista…": "Deezer charts…",
   "Deezer-lista · {n} szám": "Deezer playlist · {n} tracks",
@@ -3310,6 +3320,28 @@ class CantabileCard extends HTMLElement {
       adok: c.adok.map(({ virt, ...a }) => (virt ? { ...a, frekvencia: "" } : a)), magno: c.magno || {} }));
     this._talalatok = [];
     this._beallRajz();
+    this._tvBeallBetolt();
+  }
+
+  // a TV-oldal kinézete (custom:cantabile-tv kártyák, bármelyik vezérlőpulton): a ⚙ panel „TV-kinézet” része
+  async _tvBeallBetolt() {
+    const sz = this._szerk;
+    try {
+      const lista = await this._hass.callWS({ type: "lovelace/dashboards/list" });
+      const pultok = [];
+      for (const d of lista.filter((x) => x.mode === "storage")) {
+        let cfg; try { cfg = await this._hass.callWS({ type: "lovelace/config", url_path: d.url_path }); } catch (_) { continue; }
+        const kartyak = [], bejar = (x) => { if (Array.isArray(x)) x.forEach(bejar); else if (x && typeof x === "object") { if (x.type === "custom:cantabile-tv") kartyak.push(x); else Object.values(x).forEach(bejar); } };
+        bejar(cfg);
+        if (kartyak.length) pultok.push({ pult: d.url_path, cim: d.title || d.url_path, cfg, kartyak });
+      }
+      if (this._szerk !== sz || !pultok.length) return;
+      const k = pultok[0].kartyak[0], visual = ["vinyl", "bars", "wave", "both"].includes(k.visual) ? k.visual : "vinyl";
+      const lyrics = visual === "vinyl" ? k.lyrics !== false : k.lyrics === true;
+      this._tvPultok = pultok;
+      sz.tv = { visual, lyrics, eredeti: `${visual}|${lyrics}` };
+      this._beallRajz();
+    } catch (_) { /* nincs jogosultság vagy TV-oldal: a rész nem jelenik meg */ }
   }
 
   _beallZar() {
@@ -3370,6 +3402,11 @@ class CantabileCard extends HTMLElement {
             ? `<div class="bfigy">⚠ ${ESC(T("Ez a TV saját lejátszója: csak a hang megy át. A képernyőhöz válaszd a(z) „{n}” lejátszót.", { n: par.nev }))} <button class="bgomb" data-a="tvatall" data-i="${i}">${T("Átállítás")}</button></div>`
             : this._tvJelolt(h.entity) ? `<div class="btipp">${ESC(T("Tipp: ha ennek az eszköznek van képernyője, a Cantabile integráció beállításaiban (TV-lejátszók) felvéve a szám a képernyőn is megjelenik."))}</div>` : ""; return `<div class="bsor hsz2">${be("hangszorok", i, "nev", h.nev, `placeholder="${T("Név")}"`)}${be("hangszorok", i, "rovid", h.rovid, `maxlength="${NEV_MAX}" placeholder="${T("max. 8")}"`)}<select data-l="hangszorok" data-i="${i}" data-m="entity">${opc(h.entity)}</select><select data-l="hangszorok" data-i="${i}" data-m="mod"><option value="sonos" ${h.mod === "sonos" ? "selected" : ""}>Sonos</option><option value="url" ${h.mod !== "sonos" ? "selected" : ""}>${T("Egyéb (sor nélkül, pl. WiiM)")}</option></select><button class="bx" data-a="torol" data-l="hangszorok" data-i="${i}" title="${T("Törlés")}">×</button></div>${figy}`; }).join("")}
         </section>
+        ${sz.tv ? `<section class="bresz"><h3>${T("TV-kinézet")}</h3>
+          <div class="bsor ket"><label>${T("Kinézet")}</label><select data-l="tv" data-i="0" data-m="visual">${[["vinyl", T("Forgó bakelit körspektrummal")], ["bars", T("Equalizer-sávok")], ["wave", T("Hullámforma")], ["both", T("Sávok és hullámforma")]].map(([v, n]) => `<option value="${v}" ${sz.tv.visual === v ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+          <div class="bsor ket"><label>${T("Futó dalszöveg")}</label><select data-l="tv" data-i="0" data-m="lyrics"><option value="1" ${sz.tv.lyrics ? "selected" : ""}>${T("Látszik")}</option><option value="0" ${sz.tv.lyrics ? "" : "selected"}>${T("Nem látszik")}</option></select></div>
+          <p class="bmeg">${T("A Cantabile TV-oldal kinézete a Cast-os TV-ken (TV-botok, Android TV, Nest Hub) – minden TV-n egyszerre. A DLNA-s TV-n nincs TV-oldal.")}</p>
+        </section>` : ""}
         <section class="bresz"><h3>${T("Tape deck")}</h3>
           <div class="bsor ket"><label>${T("Zenemappa")}</label>${be("magno", 0, "nas", sz.magno.nas, 'placeholder="media-source://media_source/local/Music"')}</div>
           <div class="bsor ket"><label>${T("48 kHz-es másolatok mappája")}</label>${be("magno", 0, "hires", sz.magno.hires, `placeholder="${T("(nincs)")}"`)}</div>
@@ -3397,6 +3434,7 @@ class CantabileCard extends HTMLElement {
       if (el.tagName === "SELECT" && (this._tvPar(el.value) || this._tvJelolt(el.value) || el.parentElement.nextElementSibling?.matches?.(".bfigy, .btipp"))) setTimeout(() => this._beallRajz(), 0);
     }
     else if (l === "magno") sz.magno[m] = el.value;
+    else if (l === "tv") sz.tv[m] = m === "lyrics" ? el.value === "1" : el.value;
     else sz[l][Number(i)][m] = el.value;
   }
 
@@ -3501,6 +3539,18 @@ class CantabileCard extends HTMLElement {
         if (!csere(cfg)) { if (pult === itt) throw new Error(T("nem találom a kártyát ezen a vezérlőpulton")); continue; }
         try { await this._hass.callWS({ type: "lovelace/config/save", url_path: pult || null, config: cfg }); mentve.push(pult); }
         catch (e) { if (pult === itt) throw e; hibas.push(pult); }
+      }
+      // TV-kinézet: a custom:cantabile-tv kártyák (a TV-oldal a vezérlőpult frissülésekor magától átveszi)
+      if (sz.tv && `${sz.tv.visual}|${sz.tv.lyrics}` !== sz.tv.eredeti) {
+        for (const p of this._tvPultok || []) {
+          p.kartyak.forEach((k) => {
+            k.visual = sz.tv.visual;
+            if (sz.tv.visual === "vinyl") { if (sz.tv.lyrics) delete k.lyrics; else k.lyrics = false; }
+            else if (sz.tv.lyrics) k.lyrics = true; else delete k.lyrics;
+          });
+          try { await this._hass.callWS({ type: "lovelace/config/save", url_path: p.pult, config: p.cfg }); if (!mentve.includes(p.pult)) mentve.push(p.pult); }
+          catch (e) { hibas.push(p.pult); }
+        }
       }
       this._beallZar();
       const nevek = mentve.map((u) => lista.find((d) => d.url_path === u)?.title || u || T("Áttekintés")).join(", ");
