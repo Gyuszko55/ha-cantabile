@@ -92,6 +92,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self._ujrakuldes: asyncio.Task | None = None
         self._eltolas = 0.0                     # DLNA: a köztes pontról induló videó kezdete (mp)
         self._elo = False                       # DLNA: élő videó szól (nem tekerhető)
+        self._dlna_ido = None                   # DLNA: mikor indult a mostani szám (ha a TV nem jelenti a helyét)
         self.ujratoltve: str | None = None     # erre a kártyaváltozatra már újraküldtük az oldalt (ne ismételje)
         self.ujratolt = False                  # az oldal újraküldése alatt a lejátszó nem megy „ki”
         self.ujrakuldes_zar = asyncio.Lock()   # egyszerre egy újraküldés; a lejátszás megvárja
@@ -265,7 +266,8 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
 
     @property
     def media_duration(self) -> float | None:
-        if self.dlna and self._cel().get("media_duration"):
+        # a köztes pontról induló / élő videó hossza nem a számé: ilyenkor a szám teljes hossza
+        if self.dlna and self._cel().get("media_duration") and not self._eltolas and not self._elo:
             return self._cel()["media_duration"]
         if (h := self._cue_hatar()) and h[1]:
             return round(h[1] - h[0], 1)       # CUE-s albumnál a szám hossza, nem a fájlé
@@ -275,6 +277,8 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
     def media_position(self) -> float | None:
         if self.dlna:
             poz = self._cel().get("media_position")
+            if poz is None and self._dlna_ido is not None and self.state in (MediaPlayerState.PLAYING, MediaPlayerState.PAUSED):
+                return self._eltolas            # a TV nem jelenti: a kezdőpont az indulás idejével (a kártya számol tovább)
             if poz is not None and self._eltolas:
                 poz = float(poz) + self._eltolas
             if (h := self._cue_hatar()) and poz is not None:
@@ -286,7 +290,9 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
 
     @property
     def media_position_updated_at(self):  # noqa: ANN201
-        return self._cel().get("media_position_updated_at") if self.dlna else self._poz_ido
+        if self.dlna:
+            return self._cel().get("media_position_updated_at") or self._dlna_ido
+        return self._poz_ido
 
     @property
     def media_image_url(self) -> str | None:
@@ -538,6 +544,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         # a videó a kezdőponttól indul: a TV ettől számolja az időt (a pozíció és a tekerés ennyivel eltolva)
         self._eltolas = float(round(kezdet)) if video and fajl and 3 < kezdet < hossz - 5 else 0.0
         self._elo = bool(video and "/live/" in str(video)) or bool(video and not fajl)
+        self._dlna_ido = dt_util.utcnow()
         if video:
             cel, fajta = video, "video"
         else:

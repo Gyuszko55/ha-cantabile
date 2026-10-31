@@ -6697,14 +6697,15 @@ class CantabileCard extends HTMLElement {
     const sid = (/[?&]sid=(\d+)/.exec(id) || [])[1];
     // a betöltött kazetta szól-e még – ha közben mást indítottak (hanggal, a Sonos appból, másik eszközről), a kijelzőn
     // a ténylegesen szóló lista / album neve kell, nem a régi kazettáé
-    const nasMost = /\/media\/local\//.test(id) || /\/media\/local\//.test(a.media_title || "");
+    // zenemappás szám: aláírt link (/media/local/…) vagy media-source azonosító (a Cantabile TV így jelenti)
+    const nasMost = /\/media\/local\/|^media-source:\/\/media_source\/local\//.test(id) || /\/media\/local\//.test(a.media_title || "");
     // a hangszóró saját bemenetéről (BT IN, LINE IN) szól: a forrás a bemenet, a betöltött kazetta nem szól
     const bem = megy && hsz && hsz.entity !== HELYI && this._bemenetrol(hsz.entity) ? BEMENET_NEV(a.source) : "";
     const maSor = megy && !bem && this._maSorGomb(hsz);       // a Music Assistant sora szól (nem a betöltött kazetta)
     const kaz = bem || maSor ? null : !kazTarolt || !megy ? kazTarolt
       : kazTarolt.forras === "nas" ? (nasMost && (!kazTarolt.szamok?.length || this._szamIndex(kazTarolt, a) >= 0) ? kazTarolt : null)
       : kazTarolt.forras === "stream" ? (nasMost ? null : kazTarolt) : kazTarolt;
-    const nas = kaz?.forras === "nas" || /\/media\/local\//.test(id) || /\/media\/local\//.test(a.media_title || "");
+    const nas = kaz?.forras === "nas" || nasMost;
     const atm = kaz?.atmeneti || /\.cantabile_atmeneti\//.test(`${id} ${a.media_title || ""}`);
     const am = this._atmenetiAll;
     const forras = this._kazForras = bem ? bem : maSor ? "MA" : atm && (megy || kaz) ? (am && am.kesz < am.db ? `TEMP ↑${am.kesz}/${am.db}` : "TEMP") : megy ? (nas ? "NAS" : SZOLGALTATO[sid] ? SZOLGALTATO[sid].split(" ")[0].toUpperCase() : kaz?.forras === "stream" ? (SZOLG_NEV[kaz.tipus] || "STREAM") : kaz?.forras === "tel" ? "PHONE" : "") : (kaz ? (kaz.forras === "nas" ? "NAS" : kaz.forras === "tel" ? "PHONE" : "STREAM") : "");
@@ -6741,6 +6742,8 @@ class CantabileCard extends HTMLElement {
       cim = !URLSZERU(a.media_title) && a.media_title && !fajlszeru ? a.media_title : FAJLNEV(a.media_title || id);
       eloado = a.media_artist || kaz?.alcim || "";
       album = a.media_album_name || kaz?.cim || "";
+      // „Előadó - Album” alakú albumnév (régi tagek): az előadó a sorban már ott van
+      if (eloado && album) album = album.replace(new RegExp(`^\\s*${eloado.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+-\\s+`, "i"), "").replace(/\s{2,}/g, " ");
       if (!a.media_artist && cim.includes(" – ")) [eloado, cim] = cim.split(" – ", 2);
     } else if (kaz) { cim = kaz.cim; eloado = kaz.alcim || ""; album = ""; }
     const f = this._formatum;
