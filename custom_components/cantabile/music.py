@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from urllib.parse import quote
 import logging
 import math
 import os
@@ -35,7 +36,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 
 from . import foglalas
-from .const import szoveg
+from .const import DOMAIN, szoveg
 from .library import ELOTAG, _bejar, media_ut
 from .runtime import Cantabile
 
@@ -178,6 +179,7 @@ async def osszes_hangszoro(hass: HomeAssistant) -> set[str]:
     talalt: set[str] = set()
     adok: set[str] = set()
     nevek: dict[str, str] = {}
+    adonevek: dict[str, str] = {}
 
     def bejar(o: Any) -> None:
         if isinstance(o, dict):
@@ -190,6 +192,8 @@ async def osszes_hangszoro(hass: HomeAssistant) -> set[str]:
                 for a in o.get("stations") or o.get("adok") or []:
                     if isinstance(a, dict) and a.get("url"):
                         adok.add(cim(a["url"]))
+                        if n := a.get("name") or a.get("nev"):
+                            adonevek.setdefault(cim(a["url"]).rstrip("/"), str(n))
             for v in o.values():
                 bejar(v)
         elif isinstance(o, list):
@@ -201,8 +205,35 @@ async def osszes_hangszoro(hass: HomeAssistant) -> set[str]:
             bejar(await d.async_load(False))
         except Exception:  # noqa: BLE001 – üres vagy YAML-hibás vezérlőpult
             continue
-    _hangszoro_tar.update(ido=time.monotonic(), h=talalt, a=adok, n=nevek)
+    _hangszoro_tar.update(ido=time.monotonic(), h=talalt, a=adok, n=nevek, an=adonevek)
     return talalt
+
+
+async def ado_nev(hass: HomeAssistant, url: str) -> str | None:
+    """Az adó neve a kártyák adólistáiból (a cím sémája – https, x-rincon-mp3radio – nem számít), különben a Radio
+    Browserből a cím alapján."""
+    await osszes_hangszoro(hass)
+    c = cim(url).rstrip("/")
+    if n := (_hangszoro_tar.get("an") or {}).get(c):
+        return n
+    if c in _adonev_tar:
+        return _adonev_tar[c]
+    nev = None
+    z = hass.data.get(DOMAIN, {}).get("zene")
+    if z is not None:
+        for semma in ("https://", "http://"):
+            with contextlib.suppress(Exception):
+                l = await z.rb(f"/json/stations/byurl?url={quote(semma + c, safe='')}")
+                if isinstance(l, list) and l and (n := str(l[0].get("name") or "").strip()):
+                    nev = n
+                    break
+    if len(_adonev_tar) > 300:
+        _adonev_tar.clear()
+    _adonev_tar[c] = nev
+    return nev
+
+
+_adonev_tar: dict[str, str | None] = {}
 
 
 async def hangszoro_nev(hass: HomeAssistant, entity_id: str) -> str | None:

@@ -47,7 +47,7 @@ const EN = {
   "RÁDIÓ": "RADIO",
   "TAPE": "TAPE",
   "Beállítások": "Settings",
-  "Hangolás: húzd oldalra vagy görgess": "Tuning: drag sideways or scroll",
+  "Hangolás: húzd oldalra / fel-le, vagy görgess": "Tuning: drag sideways or up / down, or scroll",
   "Még nincs adó a gombokon – a NET gombbal keress, és a „+ gombra” teszi ide.": "No preset stations yet – find one with NET and “+ preset” puts it here.",
   "Internetes rádióadók (Radio Browser)": "Internet radio stations (Radio Browser)",
   "Adj meg legalább egy hangszórót (speakers).": "Add at least one speaker (speakers).",
@@ -2146,7 +2146,7 @@ class CantabileCard extends HTMLElement {
                 <div class="sav"><div class="vonal"></div>${jelek}${adojel}<div class="mutato" id="mutato" style="left:${this._poz(c.adok[0]?.frekvencia ?? this._savKozep())}%"></div></div>
                 <div class="kiir"><span id="ado"></span><span id="cim"></span></div>
               </div>
-              <div class="giro" id="giro" title="${T("Hangolás: húzd oldalra vagy görgess")}"><div class="kerek" id="kerek"></div><small>TUNING</small></div>
+              <div class="giro" id="giro" title="${T("Hangolás: húzd oldalra / fel-le, vagy görgess")}"><div class="kerek" id="kerek"></div><small>TUNING</small></div>
             </div>
             <div class="gombsor adosor">${gombok}</div>
           </div>
@@ -3211,19 +3211,23 @@ class CantabileCard extends HTMLElement {
   // (NET- vagy gombos) adótól indulva; a kijelző mutatja, megállás / elengedés után az az adó szól
   _giroKezel(giro) {
     const kerek = giro.querySelector("#kerek");
-    let x0 = null, id = null, poz = 0, gyujt = 0;
+    let x0 = null, y0 = null, id = null, poz = 0, gyujt = 0;
     const lep = (dx, fog) => {
       poz += dx; kerek.style.backgroundPositionX = `${poz.toFixed(1)}px`;
       gyujt += dx;
       while (Math.abs(gyujt) >= fog) { const d = Math.sign(gyujt); gyujt -= d * fog; this._netGiroLep(d); }
     };
     giro.addEventListener("pointerdown", (e) => {
-      e.stopPropagation(); id = e.pointerId; giro.setPointerCapture(id); x0 = e.clientX; gyujt = 0;
+      e.stopPropagation(); id = e.pointerId; x0 = e.clientX; y0 = e.clientY; gyujt = 0;
+      try { giro.setPointerCapture(id); } catch (_) { /* nincs elfogható érintés – a húzás így is működik a keréken */ }
       clearTimeout(this._netGiroIdo);
     });
     giro.addEventListener("pointermove", (e) => {
       if (x0 == null || e.pointerId !== id) return;
-      const dx = e.clientX - x0; x0 = e.clientX; lep(dx, 40);
+      const dx = e.clientX - x0, dy = e.clientY - y0; x0 = e.clientX; y0 = e.clientY;
+      // oldalra és fel-le húzva is forog (telefonon a kerék keskeny: ott a függőleges húzás a természetes): a nagyobb
+      // elmozdulás számít – jobbra / lefelé előre, balra / felfelé vissza
+      lep(Math.abs(dx) >= Math.abs(dy) ? dx : dy, 40);
     });
     const fel = (e) => { if (x0 == null || e.pointerId !== id) return; x0 = null; this._netGiroVege(); };
     giro.addEventListener("pointerup", fel); giro.addEventListener("pointercancel", fel);

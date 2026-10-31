@@ -489,6 +489,8 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             "kind": "stream" if radio else "track", "station": a.get("media_channel") if radio else None}
         if not fajl and a.get("entity_picture"):
             extra["cover"] = a["entity_picture"]
+        if radio and re.search(r"://|^[\w.-]+\.[a-z]{2,}(/|:|$)", str(extra.get("title") or ""), re.I):
+            extra["title"] = None                   # a hangszóró a stream címét adja címként: az adó neve kell helyette
         try:
             meta = await kp.adatok(mcid, fajl, extra)
         except Exception:  # noqa: BLE001 – a kép nélküli adatlap is jobb a semminél

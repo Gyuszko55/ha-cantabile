@@ -37,6 +37,9 @@
 
 - Cantabile TV mirror survives a Home Assistant restart: which TV mirrors which speaker is stored; when the TV page signs in again, the mirror continues (waiting up to 3 minutes for the speaker to play again). A dropped connection keeps the mirror; it is forgotten only when it really ends (the TV plays, you switch to the TV, 10 minutes of silence, another area).
 
+- Radio: the Gyro tuning wheel also turns with an up / down drag (on a phone the wheel is narrow and upright, so a sideways drag was the only way and it seemed dead); a failed pointer capture no longer blocks it.
+- Cantabile TV mirror of a radio station shows the station's name instead of the stream address: looked up in the stations of every Cantabile card (whatever the address scheme, e.g. Sonos' x-rincon-mp3radio://), otherwise in Radio Browser by the stream address; a stream address reported as the title is dropped.
+
 ### Fixed (review)
 - Moving a PARTY or a playlist between a Sonos and the Multiroom group that contains it no longer stops it right after it started there.
 - Cantabile TV: with YAML-mode resources the TV page is no longer resent on every play, and the mirror starts; one resend at a time (a play waits for it, and a newer play is never overwritten by the resumed track); a failed resend leaves the player OFF instead of PLAYING; switching to the mirror no longer restarts the old track; the automatic reload only runs in the daytime (starting the Cast app can wake a TV over HDMI-CEC).

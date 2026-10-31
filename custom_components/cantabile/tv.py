@@ -391,13 +391,11 @@ class TvKozpont:
         return []
 
     async def _adonev(self, url: str) -> str:
-        from .music import HibaUzenet, kartya
-        with contextlib.suppress(HibaUzenet, Exception):
-            c = await kartya(self.hass)
-            for a in c.get("adok", []):
-                if str(a.get("url", "")).rstrip("/") == url.rstrip("/"):
-                    return a.get("nev") or ""
-        return urlsplit(url).hostname or ""
+        from .music import ado_nev
+        with contextlib.suppress(Exception):
+            if n := await ado_nev(self.hass, url):
+                return n
+        return urlsplit(re.sub(r"^[a-z0-9+.-]+://", "http://", url, flags=re.I)).hostname or ""
 
     async def _deezer_kep(self, fajta: str, q: str) -> str | None:
         kulcs = f"{fajta}:{q.lower()}"
