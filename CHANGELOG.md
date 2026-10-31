@@ -17,6 +17,8 @@
 
 - **Switching speakers keeps the exact position.** The new speaker starts first, the card waits until it really plays the same track, seeks to where the old one is *now* (the seconds spent switching are added), checks the position and retries if needed – and only then stops the old one. If the new speaker doesn't start, the old one keeps playing and the card says so.
 
+- **EJECT with nothing playing inserts an empty tape:** the loaded tape is taken out and the old queues are cleared – on the selected speaker even when paused, on the others only when they neither play nor pause (and aren't someone else's): the Sonos queue, Cantabile's track list, the Music Assistant queue. Then the library opens as before.
+
 ### Fixed (review)
 - Moving a PARTY or a playlist between a Sonos and the Multiroom group that contains it no longer stops it right after it started there.
 - Cantabile TV: with YAML-mode resources the TV page is no longer resent on every play, and the mirror starts; one resend at a time (a play waits for it, and a newer play is never overwritten by the resumed track); a failed resend leaves the player OFF instead of PLAYING; switching to the mirror no longer restarts the old track; the automatic reload only runs in the daytime (starting the Cast app can wake a TV over HDMI-CEC).

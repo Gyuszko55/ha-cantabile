@@ -3489,13 +3489,45 @@ class CantabileCard extends HTMLElement {
     return true;
   }
 
+  // EJECT lejátszás nélkül: üres kazetta kerül be, és a hangszórók régi sorai törlődnek (Sonos-sor, a sorozatlejátszó
+  // listája, az MA sora). A kiválasztott hangszórón a szünetelt is; a többin csak ami nem szól és nem szünetel, és nem
+  // más felhasználóé.
+  async _kiurit() {
+    TAR.ir("tablet-magno-kazetta", "null");
+    this._szunetAtvitel = null; this._atvitel = null; this._atmenetiAll = null;
+    const valasztott = this._hangszoro(), hivasok = [];
+    const egyedi = new Map(this._kimenetek.filter((h) => !h.tagok).map((h) => [h.entity, h]));
+    for (const h of egyedi.values()) {
+      const sajat = h === valasztott;
+      if (h.entity === HELYI) {
+        if (sajat || !SZOL(this._allapot(h))) hivasok.push(this._hiv("media_player", "media_stop", { entity_id: HELYI }, { csendes: true }));
+        continue;
+      }
+      for (const e of [h.entity, h.ma].filter(Boolean)) {
+        const st = this._hass?.states[e];
+        if (!st || st.state === "unavailable" || SZOL(st) || (SZUNETEL(st) && !sajat) || this._foglaloIds([e])) continue;
+        const f = Number(st.attributes?.supported_features) || 0;
+        hivasok.push((async () => {
+          if (!this._maLejatszo(e) && h.mod !== "sonos" && !this._nincsIntegracio) await this._hiv("cantabile", "stop_tracks", { entity_id: e }, { csendes: true }).catch(() => {});
+          if (SZUNETEL(st)) await this._hiv("media_player", "media_stop", { entity_id: e }, { csendes: true }).catch(() => {});
+          if (f & 8192) await this._hiv("media_player", "clear_playlist", { entity_id: e }, { csendes: true }).catch(() => {});
+        })());
+      }
+    }
+    await Promise.all(hivasok);
+    this._frissit();
+  }
+
   async _magnoGomb(k) {
     const hsz = this._hangszoro(), h = this._hass;
     if (!h || !hsz) return;
     const s = this._allapot(hsz), a = s?.attributes || {}, kaz = this._kazetta();
     const szkriptes = hsz.mod !== "sonos" && kaz?.forras === "nas";
     const e = { entity_id: hsz.entity };
-    if (k === "eject") return this._polcNyit();
+    if (k === "eject") {
+      if (!SZOL(s)) await this._kiurit();          // nem szól: üres kazetta, és minden hangszóró régi sora törlődik
+      return this._polcNyit();
+    }
     if (k === "stop" || k === "pause") this._inditasJel = null;     // a felhasználó leállította: az indításfigyelő ne szóljon
     // a hangszóró saját bemenetéről (BT IN, LINE IN) szól: a STOP szünet – a WiiM a stopot nem adja tovább a telefonnak, az pár
     // másodperc múlva újraindulna; a szünetet igen, és a PLAY onnan folytatja
