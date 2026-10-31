@@ -7349,6 +7349,9 @@ class CantabileTv extends HTMLElement {
       .csipek { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 10px; }
       .csipek span { font: 400 11px/1 Michroma, "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; padding: 7px 10px 6px; border-radius: 3px; color: #ffd08a;
         border: 1px solid rgba(255,176,32,.45); background: rgba(20,16,10,.45); }
+      /* időzített (karaoke-szerűen kiemelt) dalszöveg: mikrofonos jelzés */
+      .csipek span.kar { display: inline-flex; align-items: center; gap: 6px; color: #1a1206; background: linear-gradient(180deg, #ffd27a, #f0a530); border-color: #ffc45a; }
+      .csipek span.kar svg { width: 12px; height: 12px; fill: currentColor; }
       canvas { position: absolute; left: 64px; bottom: 70px; width: 1152px; height: 170px; }
       .hal { position: absolute; left: 64px; right: 64px; bottom: 30px; display: flex; align-items: center; gap: 18px; font: 400 14px/1 Michroma, "Cantabile Sans", Arial, sans-serif; letter-spacing: .06em; color: #e7dcc6; }
       .sav { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,.14); position: relative; }
@@ -7777,9 +7780,15 @@ class CantabileTv extends HTMLElement {
   }
 
   // ---- futó dalszöveg (LRCLIB, a cantabile/lyrics parancson át) ----
+  // a szám adatai között: KARAOKE (időzített szöveg, a szóló sor kiemelve)
+  _karJel() {
+    const cs = this.shadowRoot.querySelector(".csipek");
+    if (cs && this._dsz?.szinkron && !cs.querySelector(".kar")) cs.insertAdjacentHTML("beforeend", `<span class="kar"><svg viewBox="0 0 24 24"><path d="M12 2a3.5 3.5 0 0 0-3.5 3.5v6a3.5 3.5 0 0 0 7 0v-6A3.5 3.5 0 0 0 12 2zm-6.5 9.5a1 1 0 0 1 2 0 4.5 4.5 0 0 0 9 0 1 1 0 0 1 2 0 6.5 6.5 0 0 1-5.5 6.42V20h3a1 1 0 0 1 0 2H8a1 1 0 0 1 0-2h3v-2.08A6.5 6.5 0 0 1 5.5 11.5z"/></svg>KARAOKE</span>`);
+  }
+
   async _dszKer(m, radio) {
     const sr = this.shadowRoot, d = sr.querySelector(".dsz"), kulcs = `${m.artist}|${m.title}`;
-    if (this._dszKulcs === kulcs) return;
+    if (this._dszKulcs === kulcs) return this._karJel();       // ugyanaz a szám (az adatok újrarajzolva): a jelzés maradjon
     this._dszKulcs = kulcs; this._dsz = null; this._dszI = -2;
     clearTimeout(this._dszUjra);
     d.classList.remove("van", "uz");
@@ -7798,7 +7807,10 @@ class CantabileTv extends HTMLElement {
     if (this._dszKulcs !== kulcs) return;
     if (!v?.found) return uzen(T("Ehhez a számhoz nem találtam dalszöveget (LRCLIB, lyrics.ovh)"));
     if (v.instrumental) return uzen(T("Instrumentális szám – nincs dalszöveg"));
-    if (v.synced?.length) this._dsz = { szinkron: true, sorok: v.synced.filter((x) => x[1]) };
+    if (v.synced?.length) {
+      this._dsz = { szinkron: true, sorok: v.synced.filter((x) => x[1]) };
+      this._karJel();
+    }
     else if (v.plain) this._dsz = { szinkron: false, sorok: v.plain.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).map((x) => [0, x]) };
     if (this._dsz?.sorok.length) d.classList.add("van");
     else uzen(T("Ehhez a számhoz nem találtam dalszöveget (LRCLIB, lyrics.ovh)"));

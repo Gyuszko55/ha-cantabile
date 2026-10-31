@@ -3,6 +3,7 @@
 ## Unreleased
 
 - The REPEAT button shows the number of rounds to the right of its icon, not on top of it.
+- Cantabile TV: when the lyrics are timed (the line playing is highlighted karaoke-style), a 🎤 KARAOKE tag shows among the track details.
 - BT (playback in the browser): the volume knob follows a logarithmic curve over 50 dB, like a hi-fi volume control – the browser's own volume is linear, so it used to jump at the bottom and hardly change at the top. Sonos and WiiM keep using their own curve.
 
 ## 2.2.0 – 2026-10-31
