@@ -7095,7 +7095,9 @@ const ORA_OPC = (h) => {
 };
 
 class CantabileTv extends HTMLElement {
-  setConfig(c) { this._c = { visual: "both", ...(c || {}) }; }
+  // visual: vinyl (forgó bakelit körspektrummal, alapértelmezés) | bars | wave | both; lyrics: futó dalszöveg (bakelitnél alapból be)
+  setConfig(c) { this._c = { visual: "vinyl", ...(c || {}) }; }
+  get _dszBe() { return this._c.lyrics === true || (this._c.lyrics !== false && this._c.visual === "vinyl"); }
 
   set hass(h) {
     this._h = h;
@@ -7205,7 +7207,22 @@ class CantabileTv extends HTMLElement {
       .elo2 .sav { display: none; } .elo2 .vege { display: none; }
       .eloj { display: none; color: #ff6a4d; letter-spacing: .3em; } .elo2 .eloj { display: inline; animation: pis 2s ease-in-out infinite; }
       .szun .cimke i { animation: none; opacity: .35; }
-      .ures2 .tart, .ures2 .hal, .ures2 canvas { opacity: 0; }
+      .ures2 .tart, .ures2 .hal, .ures2 canvas, .ures2 .dsz { opacity: 0; }
+      /* bakelit mód: balra a forgó lemez körspektrummal, jobbra fent az adatok, alatta a futó dalszöveg */
+      canvas.bk { display: none; left: 18px; top: 82px; bottom: auto; width: 560px; height: 560px; }
+      .bak canvas.bk { display: block; } .bak canvas.eq { display: none; }
+      .bak .bor { display: none; }
+      .bak .tart { left: 612px; top: 112px; height: 330px; }
+      .dsz { position: absolute; left: 612px; right: 64px; top: 452px; height: 196px; display: none; flex-direction: column; justify-content: center; gap: 12px;
+        transition: opacity .6s ease; pointer-events: none; }
+      .dsz.van { display: flex; }
+      .dsz p { margin: 0; font: 500 23px/1.28 "Exo 2", "Cantabile Sans", Arial, sans-serif; color: rgba(243,234,216,.36); white-space: nowrap; overflow: hidden;
+        text-overflow: ellipsis; transition: color .4s ease, opacity .4s ease; }
+      .dsz p.d1 { font-size: 33px; font-weight: 600; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+        color: transparent; background: linear-gradient(90deg, #ffc65a var(--k, 0%), rgba(255,250,240,.94) var(--k, 0%)); -webkit-background-clip: text; background-clip: text; }
+      .dsz.lep p { animation: dszlep .45s ease; }
+      @keyframes dszlep { from { transform: translateY(26px); opacity: .2; } to { transform: none; opacity: 1; } }
+      .dsz .d2 { color: rgba(243,234,216,.5); }
       .var { position: absolute; left: 0; right: 0; top: 250px; text-align: center; opacity: 0; transition: opacity .8s; pointer-events: none; }
       .ures2 .var { opacity: 1; }
       .var b { display: block; font: 400 110px/1 Michroma, "Cantabile Sans", Arial, sans-serif; letter-spacing: .04em; color: #f3ead8; }
@@ -7217,18 +7234,23 @@ class CantabileTv extends HTMLElement {
       <div class="var"><b class="o2"></b><small>CANTABILE · READY</small></div>
       <div class="tart"><div class="bor ures"><div class="lem">${TV_SVG_LEMEZ}</div></div>
         <div class="adat"><div class="cimke"><i></i><span class="ck">NOW PLAYING</span></div><div class="cim"></div><div class="elo"></div><div class="alb"></div><div class="csipek"></div></div></div>
-      <canvas></canvas>
+      <canvas class="eq"></canvas><canvas class="bk"></canvas>
+      <div class="dsz"><p class="d0"></p><p class="d1"></p><p class="d2"></p></div>
       <div class="hal"><span class="most">0:00</span><div class="sav"><div class="tel"></div><div class="gomb"></div></div><span class="vege">0:00</span><span class="eloj">● LIVE</span></div>
     </div>`;
     this.toggleAttribute("teljes", this._teljes);
     this._v = sr.querySelector(".v");
-    this._cv = sr.querySelector("canvas");
+    this._cv = sr.querySelector("canvas.eq");
+    this._bk = sr.querySelector("canvas.bk");
+    this._v.classList.toggle("bak", this._c.visual === "vinyl");
     const meret = () => {
       const w = this._teljes ? innerWidth : this.clientWidth, hh = this._teljes ? innerHeight : this.clientWidth * 0.5625;
       const s = Math.min(w / 1280, hh / 720) || 1;
       this._v.style.transform = `translate(${(w - 1280 * s) / 2}px, ${(hh - 720 * s) / 2}px) scale(${s})`;
       const dpr = Math.min(1.5, (window.devicePixelRatio || 1) * s);
       this._cv.width = Math.round(1152 * dpr); this._cv.height = Math.round(170 * dpr);
+      const bdpr = Math.min(1.25, dpr);              // a bakelit nagyobb felület: a TV-boton kímélőbb felbontással
+      this._bk.width = this._bk.height = Math.round(560 * bdpr); this._lemezTex = null;
     };
     meret();
     window.addEventListener("resize", meret);
@@ -7444,6 +7466,8 @@ class CantabileTv extends HTMLElement {
       const csip = [m.source ? `▶ ${m.source}` : "", m.codec, khz, m.kbps ? `${m.kbps} kbps` : "", m.track ? `TRACK ${m.track}` : "", m.genre ? String(m.genre).split(" / ")[0] : "", radio ? "INTERNET RADIO" : ""].filter(Boolean);
       sr.querySelector(".csipek").innerHTML = csip.map((x) => `<span>${ESC(String(x).toUpperCase())}</span>`).join("");
       const bor = sr.querySelector(".bor"), kep = m.cover || (radio ? m.image : "") || "";
+      this._cimkeKep(kep);
+      this._dszKer(m, radio);
       bor.classList.toggle("ures", !kep);
       bor.style.backgroundImage = kep ? `url("${this._abs(kep)}")` : "";
       // háttér: a szerver által gyűjtött képek (NAS-mappa, TheAudioDB), az előadó képe, végül a borító – 30 mp-enként váltva
@@ -7486,6 +7510,141 @@ class CantabileTv extends HTMLElement {
     this._hatterMutat(l[this._hatterI]);
   }
 
+  // ---- forgó bakelit körspektrummal ----
+  // a borító a lemez címkéje (kör alakban); ha nincs, borostyán címke
+  _cimkeKep(url) {
+    if (!url) { this._cimke = null; return; }
+    const src = this._abs(url);
+    if (this._cimke?.src === src) return;
+    const k = new Image();
+    k.onload = () => { this._cimke = k; };
+    k.onerror = () => { this._cimke = null; };
+    k.src = src;
+  }
+
+  // a lemez barázdái egyszer, előre megrajzolva (a forgatás csak ezt a képet forgatja)
+  _lemezTextura(R) {
+    if (this._lemezTex?.R === R) return this._lemezTex.c;
+    const c = document.createElement("canvas"); c.width = c.height = Math.ceil(2 * R);
+    const g = c.getContext("2d"), m = R;
+    const alap = g.createRadialGradient(m, m, R * 0.36, m, m, R);
+    alap.addColorStop(0, "#141416"); alap.addColorStop(0.97, "#0c0c0e"); alap.addColorStop(1, "#030304");
+    g.fillStyle = alap; g.beginPath(); g.arc(m, m, R, 0, Math.PI * 2); g.fill();
+    for (let r = R * 0.39; r < R * 0.965; r += Math.max(1.2, R / 170)) {
+      const sav = Math.sin(r * 0.37) * 0.5 + 0.5;          // a számok közti sima sávok halványabbak
+      g.strokeStyle = `rgba(255,255,255,${(0.025 + 0.05 * Math.random() * sav).toFixed(3)})`; g.lineWidth = 0.6;
+      g.beginPath(); g.arc(m, m, r, 0, Math.PI * 2); g.stroke();
+    }
+    g.strokeStyle = "rgba(255,255,255,.12)"; g.lineWidth = 1.2; g.beginPath(); g.arc(m, m, R * 0.375, 0, Math.PI * 2); g.stroke();
+    g.strokeStyle = "rgba(0,0,0,.9)"; g.lineWidth = 2; g.beginPath(); g.arc(m, m, R - 1, 0, Math.PI * 2); g.stroke();
+    this._lemezTex = { R, c };
+    return c;
+  }
+
+  _bakelit(simit) {
+    const c = this._bk, g = c.getContext("2d"), W = c.width, s = W / 560, cx = W / 2, cy = W / 2, R = 196 * s;
+    const most = performance.now() / 1000, dt = Math.min(0.1, most - (this._bakIdo || most)); this._bakIdo = most;
+    // 33⅓ fordulat/perc; szünetnél a lemez másfél másodperc alatt megáll, indításkor felpörög
+    const cel = this._allapot === "playing" ? (2 * Math.PI * 33.333) / 60 : 0;
+    this._seb = (this._seb || 0) + (cel - (this._seb || 0)) * Math.min(1, dt * 2.2);
+    this._szog = ((this._szog || 0) + this._seb * dt) % (2 * Math.PI);
+    const N = simit.length, basszus = (simit[0] + simit[1] + simit[2] + simit[3] + simit[4]) / 5;
+    g.clearRect(0, 0, W, W);
+    // körspektrum a lemez körül: a mély hangok fent és lent középen, a magasak oldalt (tükrözve, szimmetrikus)
+    const M = 128, belso = R + 8 * s, vast = ((2 * Math.PI * belso) / M) * 0.5;
+    g.save(); g.translate(cx, cy);
+    g.lineCap = "round"; g.lineWidth = vast; g.shadowColor = "rgba(255,160,40,.6)"; g.shadowBlur = 10 * s;
+    for (let i = 0; i < M; i++) {
+      const fel = i % (M / 2), j = fel < M / 4 ? fel : M / 2 - 1 - fel, v = simit[Math.min(N - 1, Math.floor((j / (M / 4)) * N * 0.85))];
+      const hossz = 3 * s + v * 64 * s, sz = -Math.PI / 2 + (i / M) * 2 * Math.PI, cs = Math.cos(sz), sn = Math.sin(sz);
+      const f = Math.min(1, v * 1.3);
+      g.strokeStyle = `rgb(255,${Math.round(150 + 80 * f)},${Math.round(40 + 120 * f * f)})`;
+      g.globalAlpha = 0.35 + 0.65 * Math.min(1, v * 1.6);
+      g.beginPath(); g.moveTo(cs * belso, sn * belso); g.lineTo(cs * (belso + hossz), sn * (belso + hossz)); g.stroke();
+    }
+    g.restore(); g.globalAlpha = 1; g.shadowBlur = 0;
+    // a lemez (a basszusra finoman lüktet), rajta a címke a borítóval
+    const k = 1 + basszus * 0.022;
+    g.save(); g.translate(cx, cy); g.scale(k, k);
+    g.shadowColor = "rgba(0,0,0,.7)"; g.shadowBlur = 30 * s; g.fillStyle = "#000"; g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.fill(); g.shadowBlur = 0;
+    g.rotate(this._szog);
+    g.drawImage(this._lemezTextura(R), -R, -R, 2 * R, 2 * R);
+    const L = R * 0.36;
+    g.save(); g.beginPath(); g.arc(0, 0, L, 0, Math.PI * 2); g.clip();
+    if (this._cimke) {
+      const kw = this._cimke.naturalWidth || 1, kh = this._cimke.naturalHeight || 1, t = Math.max((2 * L) / kw, (2 * L) / kh);
+      g.drawImage(this._cimke, (-kw * t) / 2, (-kh * t) / 2, kw * t, kh * t);
+    } else {
+      const cg = g.createRadialGradient(0, 0, 0, 0, 0, L); cg.addColorStop(0, "#e6a640"); cg.addColorStop(1, "#8d4f12");
+      g.fillStyle = cg; g.fillRect(-L, -L, 2 * L, 2 * L);
+      g.fillStyle = "rgba(255,240,210,.8)"; g.font = `${Math.round(17 * s)}px "Great Vibes", cursive`; g.textAlign = "center"; g.fillText("Cantabile", 0, -L * 0.35);
+    }
+    g.restore();
+    g.fillStyle = "#1a1a1c"; g.beginPath(); g.arc(0, 0, 6 * s, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#9a9a9e"; g.beginPath(); g.arc(0, 0, 2.6 * s, 0, Math.PI * 2); g.fill();
+    g.restore();
+    // a fény tükröződése a lemezen (nem forog vele: ettől látszik forgónak)
+    g.save(); g.translate(cx, cy); g.beginPath(); g.arc(0, 0, R * k, 0, Math.PI * 2); g.arc(0, 0, L * k, 0, Math.PI * 2, true); g.clip();
+    const fr = g.createLinearGradient(-R, -R, R, R);
+    fr.addColorStop(0.3, "rgba(255,255,255,0)"); fr.addColorStop(0.46, "rgba(255,255,255,.07)"); fr.addColorStop(0.5, "rgba(255,255,255,.13)");
+    fr.addColorStop(0.54, "rgba(255,255,255,.07)"); fr.addColorStop(0.7, "rgba(255,255,255,0)");
+    g.fillStyle = fr; g.fillRect(-R, -R, 2 * R, 2 * R); g.restore();
+    // hangkar: a szám haladásával a lemez széléről a címke felé
+    const p = this._hossz ? Math.max(0, Math.min(1, (this._most || 0) / this._hossz)) : 0;
+    const px = cx + R * 1.02, py = cy - R * 1.02, kar = R * 1.12;
+    // a kar szöge: 0,95 = a lemez széle, 0,45 = a címke mellett; álló lemeznél a lemez mellett pihen (1,3)
+    const fok = this._allapot === "playing" || p > 0 ? 0.95 - p * 0.5 : 1.3;
+    this._karFok = this._karFok == null ? fok : this._karFok + (fok - this._karFok) * Math.min(1, dt * 3);
+    const hx = px - Math.sin(this._karFok + 0.55) * kar, hy = py + Math.cos(this._karFok + 0.55) * kar;
+    g.save(); g.lineCap = "round"; g.shadowColor = "rgba(0,0,0,.7)"; g.shadowBlur = 12 * s;
+    g.strokeStyle = "#c9ccd1"; g.lineWidth = 7 * s; g.beginPath(); g.moveTo(px, py); g.lineTo(hx, hy); g.stroke();
+    g.strokeStyle = "#7d8187"; g.lineWidth = 2 * s; g.beginPath(); g.moveTo(px, py); g.lineTo(hx, hy); g.stroke();
+    g.fillStyle = "#2b2c30"; g.beginPath(); g.arc(px, py, 17 * s, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#c9ccd1"; g.beginPath(); g.arc(px, py, 8 * s, 0, Math.PI * 2); g.fill();
+    g.translate(hx, hy); g.rotate(this._karFok + 0.55 + Math.PI / 2); g.fillStyle = "#e8e9ec"; g.fillRect(-6 * s, -11 * s, 26 * s, 22 * s);
+    g.restore();
+  }
+
+  // ---- futó dalszöveg (LRCLIB, a cantabile/lyrics parancson át) ----
+  async _dszKer(m, radio) {
+    const sr = this.shadowRoot, d = sr.querySelector(".dsz"), kulcs = `${m.artist}|${m.title}`;
+    if (this._dszKulcs === kulcs) return;
+    this._dszKulcs = kulcs; this._dsz = null; this._dszI = -2;
+    d.classList.remove("van");
+    if (!this._dszBe || radio || !m.artist || !m.title || !this._h) return;
+    let v = null;
+    try { v = await this._h.callWS({ type: "cantabile/lyrics", artist: String(m.artist), title: String(m.title), album: m.album || null, duration: m.duration || null }); }
+    catch (e) { return; }
+    if (this._dszKulcs !== kulcs || !v?.found || v.instrumental) return;
+    if (v.synced?.length) this._dsz = { szinkron: true, sorok: v.synced.filter((x) => x[1]) };
+    else if (v.plain) this._dsz = { szinkron: false, sorok: v.plain.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).map((x) => [0, x]) };
+    if (this._dsz?.sorok.length) d.classList.add("van");
+  }
+
+  _dszLep() {
+    const z = this._dsz;
+    if (!z) return;
+    const sr = this.shadowRoot, t = this._tukor, a = this._a;
+    // a most-idő képkockánként (a _halad fél másodpercenként frissít – a karaoke-csík ennél simább legyen)
+    let most = this._most || 0;
+    if (this._allapot === "playing") most = t ? t.poz + (Date.now() - t.at) / 1000 : (a ? a.currentTime - (this._cueKovet()?.kezd || 0) : most);
+    const l = z.sorok, n = l.length;
+    let i, k = 0;
+    if (z.szinkron) {
+      i = -1; for (let j = 0; j < n; j++) { if (l[j][0] <= most + 0.15) i = j; else break; }
+      if (i >= 0) { const kov = i + 1 < n ? l[i + 1][0] : l[i][0] + 5; k = Math.max(0, Math.min(1, (most - l[i][0]) / Math.max(0.5, kov - l[i][0]))); }
+    } else {
+      i = this._hossz ? Math.min(n - 1, Math.floor((most / this._hossz) * n)) : 0;
+    }
+    if (i !== this._dszI) {
+      this._dszI = i;
+      const d = sr.querySelector(".dsz"), sor = (j) => (j >= 0 && j < n ? l[j][1] : "");
+      d.querySelector(".d0").textContent = sor(i - 1); d.querySelector(".d1").textContent = i < 0 ? "♪" : sor(i); d.querySelector(".d2").textContent = sor(i + 1);
+      d.classList.remove("lep"); void d.offsetWidth; d.classList.add("lep");
+    }
+    sr.querySelector(".dsz .d1").style.setProperty("--k", `${z.szinkron ? (k * 100).toFixed(1) : 0}%`);
+  }
+
   _halad() {
     const a = this._a, sr = this.shadowRoot, t = this._tukor;
     if ((!a && !t) || !sr) return;
@@ -7494,6 +7653,7 @@ class CantabileTv extends HTMLElement {
     let hossz, most;
     if (t) { hossz = t.hossz; most = t.poz + (this._allapot === "playing" ? (Date.now() - t.at) / 1000 : 0); if (hossz) most = Math.min(most, hossz); }
     else { hossz = cue ? cue.hossz : isFinite(a.duration) && a.duration > 0 ? a.duration : 0; most = a.currentTime - (cue ? cue.kezd : 0); }
+    this._most = most; this._hossz = hossz;
     sr.querySelector(".most").textContent = ido(most);
     sr.querySelector(".vege").textContent = hossz ? ido(hossz) : "";
     const p = hossz ? Math.min(100, (most / hossz) * 100) : 0;
@@ -7522,9 +7682,10 @@ class CantabileTv extends HTMLElement {
         }
       } else if (!this._an || this._allapot !== "playing") {
         for (let i = 0; i < N; i++) { simit[i] *= 0.9; csucs[i] *= 0.95; }
-        // csendben, a sávok lecsengése után a kép nem változik: nem rajzol újra (kíméli a TV-botot)
-        // (a méret is a kulcsban: átméretezéskor a vászon kiürül, akkor újra kell rajzolni)
-        const csend = csucs.every((v) => v < 0.002) ? `${W}x${H}` : "";
+        // csendben, a sávok lecsengése (és a lemez megállása) után a kép nem változik: nem rajzol újra (kíméli a TV-botot)
+        // (a méret és a címkekép is a kulcsban: átméretezéskor / új borítónál újra kell rajzolni)
+        const bak = this._c.visual === "vinyl";
+        const csend = csucs.every((v) => v < 0.002) && !(bak && (this._seb || 0) > 0.0005) ? `${W}x${H}|${bak ? this._bk.width + (this._cimke?.src || "") + Math.round((this._most || 0) / 5) : ""}` : "";
         if (csend && nyugszik === csend) return;
         nyugszik = csend;
         g.clearRect(0, 0, W, H);
@@ -7542,6 +7703,8 @@ class CantabileTv extends HTMLElement {
         }
       }
       const vis = this._c.visual, rw = W / N, bw = rw * 0.62;
+      if (this._dszBe) this._dszLep();
+      if (vis === "vinyl") { this._bakelit(simit); return; }
       if (vis !== "wave") {
         for (let i = 0; i < N; i++) {
           const x = i * rw + (rw - bw) / 2, h = Math.max(2, simit[i] * alap);

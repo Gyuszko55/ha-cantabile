@@ -45,6 +45,8 @@
 
 - The music folder skips sub-folders marked with a `.nomedia` file (Kodi's convention, e.g. an archive of the original files): they don't appear in the library, the party, the search or the NAS tab.
 
+- **Cantabile TV: spinning vinyl with a circular spectrum and running lyrics.** The new default look (`visual: vinyl`) shows a turning record on the left – the cover is its label, a circular spectrum pulses around it (the bass makes the record breathe), and the tonearm moves in as the track plays; the record spins up and slows down with play and pause. Under the track details the lyrics run along (LRCLIB): the previous, the current (large, filling up karaoke-style) and the next line; without timed lyrics the lines follow the track's progress. `lyrics: false` hides them; `visual: bars` / `wave` / `both` brings back the equaliser.
+
 ### Fixed (review)
 - Moving a PARTY or a playlist between a Sonos and the Multiroom group that contains it no longer stops it right after it started there.
 - Cantabile TV: with YAML-mode resources the TV page is no longer resent on every play, and the mirror starts; one resend at a time (a play waits for it, and a newer play is never overwritten by the resumed track); a failed resend leaves the player OFF instead of PLAYING; switching to the mirror no longer restarts the old track; the automatic reload only runs in the daytime (starting the Cast app can wake a TV over HDMI-CEC).
