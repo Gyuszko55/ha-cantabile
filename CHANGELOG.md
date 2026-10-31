@@ -1,9 +1,59 @@
 # Changelog
 
-## Unreleased
+## 2.2.0 – 2026-10-31
 
+Cantabile 2.2: one button per speaker, switching speakers without a gap from the exact position, the same track from
+another source when a speaker can't play the original, a new TV page with the cover (or a spinning vinyl) and running
+lyrics – also in a small window on the card – and the music folder in track-number order.
+
+### Speakers and playback
+- **One button per speaker.** A speaker and its Music Assistant player (e.g. *Sonos 1* and *Sonos MA*, the same device) are one position on the speaker selector. Music Assistant content plays on the Music Assistant player behind the button, everything else (music folder, radio, Deezer) on the speaker's own player, so a music-folder track no longer ends up in a Music Assistant queue. Existing configurations are merged automatically; a Music Assistant player without a paired speaker keeps its own button.
+- **Switching speakers keeps the exact position.** The new speaker starts first, the card waits until it really plays the same track, seeks to where the old one is *now* (the seconds spent switching are added), checks the position and retries if needed – and only then stops the old one. If the new speaker doesn't start, the old one keeps playing and the card says so.
+- **EJECT with nothing playing inserts an empty tape:** the loaded tape is taken out and the old queues are cleared – on the selected speaker even when paused, on the others only when they neither play nor pause (and aren't someone else's): the Sonos queue, Cantabile's track list, the Music Assistant queue. Then the library opens as before.
+- **Source substitution: the same track from another source** when the chosen speaker can't play the original (new `helyettesit.py`, websocket `cantabile/substitute`):
+  - Deezer on a speaker that isn't a Sonos: through the Deezer linked in Music Assistant on the Music Assistant player behind the button, otherwise from the music folder;
+  - a Deezer queue playing on Sonos can now be moved to such a speaker too, from the same track and position;
+  - a Music Assistant track on a button without a Music Assistant player: on Sonos from Sonos' own Deezer (when it is a Deezer track in Music Assistant), otherwise from the music folder – also when switching speakers mid-track.
+  - The music folder is searched by artist (any folder level) and title (without track number, artist and album prefixes); a studio version is preferred to a live one. The card says where it plays from and how many tracks were not found.
+- **Moving a PARTY to another speaker continues the same track from the same position** (instead of starting a new random track); the guest requests, the history and the guest link (QR code) move along. `cantabile/party/start` takes `folytat` (the old speaker) and `poz`.
+- **Seamless speaker switching:** the new speaker starts muted, seeks to the position and only then gets its volume back, while the old one is still playing – no more moment of the track's beginning. Cantabile TV starts right at the position instead of seeking: the Cast TV page plays from there (media fragment), and a DLNA TV gets a still video that starts at the position (DLNA TVs often can't seek); the TV's progress is shown with the offset. Also for a PARTY. `cantabile.play_tracks` takes `position`.
+- **Precise WiiM state from UPnP:** the gapless player already asks the WiiM (DLNA renderer) every second which file plays and where; this is now shared, so the TV mirror, the VU meter and switching speakers use the exact track, position and length – the WiiM's Home Assistant entity can keep the previous track's length and position after a gapless change. The TV mirror and the VU follow a gapless track change immediately. `cantabile/tracks` also returns `position` and `duration`.
+- **AirPlay as a source:** when a phone sends AirPlay to a Sonos or WiiM, the tape shows AIRPLAY with the title and artist from the phone, STOP pauses (the phone stops too), the signal path says AirPlay, and the TV mirror shows e.g. “▶ SONOS 1 · AIRPLAY”. Switching speakers doesn't try to move it – the card says to pick the other speaker in the phone's AirPlay menu; starting other music takes over without switching inputs.
+
+### Cantabile TV
 - **Cantabile TV: the current weather before the clock** – a line icon (sun, clouds, rain, snow, fog, storm…) and the temperature, top right of the TV page, refreshed with the clock. Set `weather: weather.xxx` on the `custom:cantabile-tv` card; without it `weather.home` or the first weather entity is used, `weather: false` hides it.
 - **Cantabile TV reloads itself after an update.** The TV page tells the server which card version it runs; when it is older than the dashboard's current one, the server sends the page again – right away if the TV is idle, otherwise at the next start (a playing track is never cut). When the page is sent again while something plays (e.g. with the new admin command `cantabile/tv/reload`), it continues from the same position, and the sequence player doesn't skip to the next track meanwhile.
+- DLNA TVs: switching to a DLNA TV mid-track now starts a live still-video stream right at the position (it starts in about two seconds, no waiting for encoding); a DLNA TV that can't seek no longer shows an error – the seek is skipped quietly, and the card's background calls (like the seek after switching) never pop up Home Assistant's error toast.
+- Cantabile TV on DLNA TVs: the track position, the full track length and so the VU meter are right also when the TV doesn't report its position or plays a video that starts mid-track; the card recognises a music-folder track reported as a media-source id (track counter and tape name instead of “–/–” and the album name), and an album tag like “Artist - Album” is shown without the artist.
+- Cantabile TV mirror of a music-folder track: the file's own tags are used (a WiiM reports the file name as the title, e.g. “Cher - Dark Lady.Mp3”); when the speaker reports a stale length or position (gapless playback on a WiiM keeps the previous track's), the file's length and the time since the track change are shown, pauses excluded; the speaker's card name is looked up on every Cantabile card, not only the first one (“TECHNICS · NAS” instead of the device name).
+- Cantabile TV mirror survives a Home Assistant restart: which TV mirrors which speaker is stored; when the TV page signs in again, the mirror continues (waiting up to 3 minutes for the speaker to play again). A dropped connection keeps the mirror; it is forgotten only when it really ends (the TV plays, you switch to the TV, 10 minutes of silence, another area).
+- Cantabile TV mirror of a radio station shows the station's name instead of the stream address: looked up in the stations of every Cantabile card (whatever the address scheme, e.g. Sonos' x-rincon-mp3radio://), otherwise in Radio Browser by the stream address; a stream address reported as the title is dropped.
+- **Cantabile TV: spinning vinyl with a circular spectrum and running lyrics.** The look `visual: vinyl` shows a turning record on the left – the cover is its label, a circular spectrum pulses around it (the bass makes the record breathe), and the tonearm moves in as the track plays; the record spins up and slows down with play and pause. Under the track details the lyrics run along (LRCLIB): the previous, the current (large, filling up karaoke-style) and the next line; without timed lyrics the lines follow the track's progress. `lyrics: false` hides them; `visual: bars` / `wave` / `both` brings back the equaliser.
+- The card's ⚙ settings have a **TV look** section: the look of the Cantabile TV page (spinning vinyl, equaliser bars, waveform, or both) and the running lyrics, written into every `custom:cantabile-tv` card on save; the TV page picks it up by itself.
+- TV look **cover** (`visual: cover`) – see below.
+- New entities for the TV look: `select.cantabile_tv_look` / *TV look* (cover, spinning vinyl, equaliser bars, waveform, bars and waveform) and `switch.cantabile_tv_lyrics` / *TV lyrics* – usable in automations, scripts and by voice. They write the same `custom:cantabile-tv` card settings as the ⚙ panel and follow every change made there.
+- **TV window on the card:** a TV button before ⓘ opens, over the deck, a small copy of the Cantabile TV page for the selected speaker – cover, track details, background pictures, progress and running lyrics, the same data as the TV mirror (new subscription `cantabile/tv/preview`, which doesn't sign in as a TV). It follows a speaker change; a tap closes it.
+- The **cover look is the new default** of the TV page (`visual: cover`) and got a new layout: a smaller cover with the details beside it, and the lyrics across the full width at the bottom, centred, so long lines wrap onto two lines.
+- TV window: it sits above the button row (never covers the buttons), shows the weather like the TVs (the `weather:` of the TV card), and closes by itself 5 seconds after the music stops (end of album, STOP).
+- Cantabile TV: with YAML-mode resources the TV page is no longer resent on every play, and the mirror starts; one resend at a time (a play waits for it, and a newer play is never overwritten by the resumed track); a failed resend leaves the player OFF instead of PLAYING; switching to the mirror no longer restarts the old track; the automatic reload only runs in the daytime (starting the Cast app can wake a TV over HDMI-CEC).
+- TV weather: `weather: true` no longer hides it, and a missing temperature no longer shows as 0°.
+- Cantabile TV on DLNA TVs: when the still video of a long file (e.g. a one-hour album with a CUE sheet) isn't ready within 15 s, the music starts right away with the cover, and the video is finished in the background for the next time.
+- Cantabile TV on DLNA TVs: no still video is made from files longer than 20 minutes (e.g. a whole album with a CUE sheet) – they play with the cover right away instead of encoding for minutes in the background.
+- Cantabile TV mirror: a TV only shows a speaker that is in the same area (when both have one), so the living-room TV doesn't show what plays in the bedroom.
+- **Lyrics fallback:** when LRCLIB is down or doesn't have the track, the lyrics come from lyrics.ovh (plain, untimed text) automatically. A service outage is now reported as such (it used to look like “no lyrics” and was cached).
+- When there are no lyrics, the TV page shows the reason in a scrolling line: the services are unavailable (retried after two minutes), no lyrics found, instrumental track, or unknown artist / title.
+
+### Music folder and Music Assistant
+- **Track order from the tags:** within an album the tracks play (and are listed) by their disc and track number tags, so a music folder whose file names carry only the title (e.g. organised by beets) plays in the right order; without track numbers the file name decides, as before. The tags are read once per file and kept (`.cache/cantabile_sorszam.json`); new websocket command `cantabile/album_order`.
+- The 48 kHz Sonos copies are also found for multi-disc albums (`<hires>/<artist>/<album> [48kHz]/CD<n>/<file>`).
+- The music folder skips sub-folders marked with a `.nomedia` file (Kodi's convention, e.g. an archive of the original files): they don't appear in the library, the party, the search or the NAS tab.
+- Music Assistant players: a music-folder track now plays as the same track of the Music Assistant library (its real title and cover, not the file name as an encoded link); an album in one file (with a CUE sheet) plays as the whole library album. When nothing matches, the file is played as before.
+- Switching from a Music Assistant player that plays a music-folder file to a speaker that isn't a Music Assistant player (e.g. Sonos 1 from Sonos MA) lets Cantabile take over from the same track and position, instead of handing the queue back to the same Music Assistant player.
+
+### Radio
+- Radio: the Gyro tuning wheel also turns with an up / down drag (on a phone the wheel is narrow and upright, so a sideways drag was the only way and it seemed dead); a failed pointer capture no longer blocks it.
+
+### Fixes
 - Fixes from a full review:
   - PARTY: a failed start (busy speaker, missing music folder) no longer ends someone else's running party; on WiiM / Cast a party is no longer ended by a status check right after start or skip; skipping on a gapless player no longer drops a guest request; reloading the integration while a party runs works; on Sonos the party ends when anything it didn't queue starts playing (e.g. an album from the same music folder); the queue top-up stops with the party.
   - Guest page: odd tokens give 404 instead of a server error; the search uses a prepared index and a light rate limit (the page retries by itself); besides 3 requests per guest, one address can hold at most 6; only the party's owner (or an admin) can switch guests on / off.
@@ -12,67 +62,9 @@
   - GENRES: “Hip-Hop”, “R'n'B” and drum & bass styles find their family; a genre page loads its Deezer data once.
   - Radio wheel: a broken saved list or a list replaced meanwhile no longer leaves the wheel stuck or plays the wrong station; a pending wheel step is cancelled when the card goes away.
   - The result message after a save goes only to the card that was rebuilt with the same speakers and stations.
-
-- **One button per speaker.** A speaker and its Music Assistant player (e.g. *Sonos 1* and *Sonos MA*, the same device) are one position on the speaker selector. Music Assistant content plays on the Music Assistant player behind the button, everything else (music folder, radio, Deezer) on the speaker's own player, so a music-folder track no longer ends up in a Music Assistant queue. Existing configurations are merged automatically; a Music Assistant player without a paired speaker keeps its own button.
-
-- **Switching speakers keeps the exact position.** The new speaker starts first, the card waits until it really plays the same track, seeks to where the old one is *now* (the seconds spent switching are added), checks the position and retries if needed – and only then stops the old one. If the new speaker doesn't start, the old one keeps playing and the card says so.
-
-- **EJECT with nothing playing inserts an empty tape:** the loaded tape is taken out and the old queues are cleared – on the selected speaker even when paused, on the others only when they neither play nor pause (and aren't someone else's): the Sonos queue, Cantabile's track list, the Music Assistant queue. Then the library opens as before.
-
-- **Source substitution: the same track from another source** when the chosen speaker can't play the original (new `helyettesit.py`, websocket `cantabile/substitute`):
-  - Deezer on a speaker that isn't a Sonos: through the Deezer linked in Music Assistant on the Music Assistant player behind the button, otherwise from the music folder;
-  - a Deezer queue playing on Sonos can now be moved to such a speaker too, from the same track and position;
-  - a Music Assistant track on a button without a Music Assistant player: on Sonos from Sonos' own Deezer (when it is a Deezer track in Music Assistant), otherwise from the music folder – also when switching speakers mid-track.
-  - The music folder is searched by artist (any folder level) and title (without track number, artist and album prefixes); a studio version is preferred to a live one. The card says where it plays from and how many tracks were not found.
-
-- **Moving a PARTY to another speaker continues the same track from the same position** (instead of starting a new random track); the guest requests, the history and the guest link (QR code) move along. `cantabile/party/start` takes `folytat` (the old speaker) and `poz`.
-
-- **Seamless speaker switching:** the new speaker starts muted, seeks to the position and only then gets its volume back, while the old one is still playing – no more moment of the track's beginning. Cantabile TV starts right at the position instead of seeking: the Cast TV page plays from there (media fragment), and a DLNA TV gets a still video that starts at the position (DLNA TVs often can't seek); the TV's progress is shown with the offset. Also for a PARTY. `cantabile.play_tracks` takes `position`.
-
-- DLNA TVs: switching to a DLNA TV mid-track now starts a live still-video stream right at the position (it starts in about two seconds, no waiting for encoding); a DLNA TV that can't seek no longer shows an error – the seek is skipped quietly, and the card's background calls (like the seek after switching) never pop up Home Assistant's error toast.
-
-- Cantabile TV on DLNA TVs: the track position, the full track length and so the VU meter are right also when the TV doesn't report its position or plays a video that starts mid-track; the card recognises a music-folder track reported as a media-source id (track counter and tape name instead of “–/–” and the album name), and an album tag like “Artist - Album” is shown without the artist.
-
-- Cantabile TV mirror of a music-folder track: the file's own tags are used (a WiiM reports the file name as the title, e.g. “Cher - Dark Lady.Mp3”); when the speaker reports a stale length or position (gapless playback on a WiiM keeps the previous track's), the file's length and the time since the track change are shown, pauses excluded; the speaker's card name is looked up on every Cantabile card, not only the first one (“TECHNICS · NAS” instead of the device name).
-
-- Cantabile TV mirror survives a Home Assistant restart: which TV mirrors which speaker is stored; when the TV page signs in again, the mirror continues (waiting up to 3 minutes for the speaker to play again). A dropped connection keeps the mirror; it is forgotten only when it really ends (the TV plays, you switch to the TV, 10 minutes of silence, another area).
-
-- Radio: the Gyro tuning wheel also turns with an up / down drag (on a phone the wheel is narrow and upright, so a sideways drag was the only way and it seemed dead); a failed pointer capture no longer blocks it.
-- Cantabile TV mirror of a radio station shows the station's name instead of the stream address: looked up in the stations of every Cantabile card (whatever the address scheme, e.g. Sonos' x-rincon-mp3radio://), otherwise in Radio Browser by the stream address; a stream address reported as the title is dropped.
-
-- **Track order from the tags:** within an album the tracks play (and are listed) by their disc and track number tags, so a music folder whose file names carry only the title (e.g. organised by beets) plays in the right order; without track numbers the file name decides, as before. The tags are read once per file and kept (`.cache/cantabile_sorszam.json`); new websocket command `cantabile/album_order`.
-- The 48 kHz Sonos copies are also found for multi-disc albums (`<hires>/<artist>/<album> [48kHz]/CD<n>/<file>`).
-
-- The music folder skips sub-folders marked with a `.nomedia` file (Kodi's convention, e.g. an archive of the original files): they don't appear in the library, the party, the search or the NAS tab.
-
-- **Cantabile TV: spinning vinyl with a circular spectrum and running lyrics.** The new default look (`visual: vinyl`) shows a turning record on the left – the cover is its label, a circular spectrum pulses around it (the bass makes the record breathe), and the tonearm moves in as the track plays; the record spins up and slows down with play and pause. Under the track details the lyrics run along (LRCLIB): the previous, the current (large, filling up karaoke-style) and the next line; without timed lyrics the lines follow the track's progress. `lyrics: false` hides them; `visual: bars` / `wave` / `both` brings back the equaliser.
-
-- The card's ⚙ settings have a **TV look** section: the look of the Cantabile TV page (spinning vinyl, equaliser bars, waveform, or both) and the running lyrics, written into every `custom:cantabile-tv` card on save; the TV page picks it up by itself.
-
-- TV look **Cover only** (`visual: cover`): a large cover on the left without any spectrum, the track details and the running lyrics on the right.
-- New entities for the TV look: `select.cantabile_tv_look` / *TV look* (spinning vinyl, equaliser bars, waveform, bars and waveform) and `switch.cantabile_tv_lyrics` / *TV lyrics* – usable in automations, scripts and by voice. They write the same `custom:cantabile-tv` card settings as the ⚙ panel and follow every change made there.
-
-- **Precise WiiM state from UPnP:** the gapless player already asks the WiiM (DLNA renderer) every second which file plays and where; this is now shared, so the TV mirror, the VU meter and switching speakers use the exact track, position and length – the WiiM's Home Assistant entity can keep the previous track's length and position after a gapless change. The TV mirror and the VU follow a gapless track change immediately. `cantabile/tracks` also returns `position` and `duration`.
-- **AirPlay as a source:** when a phone sends AirPlay to a Sonos or WiiM, the tape shows AIRPLAY with the title and artist from the phone, STOP pauses (the phone stops too), the signal path says AirPlay, and the TV mirror shows e.g. “▶ SONOS 1 · AIRPLAY”. Switching speakers doesn't try to move it – the card says to pick the other speaker in the phone's AirPlay menu; starting other music takes over without switching inputs.
-
-- **TV window on the card:** a TV button before ⓘ opens, over the deck, a small copy of the Cantabile TV page for the selected speaker – cover, track details, background pictures, progress and running lyrics, the same data as the TV mirror (new subscription `cantabile/tv/preview`, which doesn't sign in as a TV). It follows a speaker change; a tap closes it.
-- The **cover look is the new default** of the TV page (`visual: cover`) and got a new layout: a smaller cover with the details beside it, and the lyrics across the full width at the bottom, centred, so long lines wrap onto two lines.
-
-- **Lyrics fallback:** when LRCLIB is down or doesn't have the track, the lyrics come from lyrics.ovh (plain, untimed text) automatically. A service outage is now reported as such (it used to look like “no lyrics” and was cached).
-- When there are no lyrics, the TV page shows the reason in a scrolling line: the services are unavailable (retried after two minutes), no lyrics found, instrumental track, or unknown artist / title.
-- TV window: it sits above the button row (never covers the buttons), shows the weather like the TVs (the `weather:` of the TV card), and closes by itself 5 seconds after the music stops (end of album, STOP).
-
-### Fixed (review)
 - Moving a PARTY or a playlist between a Sonos and the Multiroom group that contains it no longer stops it right after it started there.
-- Cantabile TV: with YAML-mode resources the TV page is no longer resent on every play, and the mirror starts; one resend at a time (a play waits for it, and a newer play is never overwritten by the resumed track); a failed resend leaves the player OFF instead of PLAYING; switching to the mirror no longer restarts the old track; the automatic reload only runs in the daytime (starting the Cast app can wake a TV over HDMI-CEC).
-- TV weather: `weather: true` no longer hides it, and a missing temperature no longer shows as 0°.
 - GENRES: a failed Deezer load on a genre page is retried; *drum* alone (Steel Drum…) no longer counts as Electro, only drum & bass / drumstep.
 - PARTY on Sonos with the hi-res folder: tracks with the same file name in another album (01.flac) no longer end the party.
-- Music Assistant players: a music-folder track now plays as the same track of the Music Assistant library (its real title and cover, not the file name as an encoded link); an album in one file (with a CUE sheet) plays as the whole library album. When nothing matches, the file is played as before.
-- Switching from a Music Assistant player that plays a music-folder file to a speaker that isn't a Music Assistant player (e.g. Sonos 1 from Sonos MA) lets Cantabile take over from the same track and position, instead of handing the queue back to the same Music Assistant player.
-- Cantabile TV on DLNA TVs: when the still video of a long file (e.g. a one-hour album with a CUE sheet) isn't ready within 15 s, the music starts right away with the cover, and the video is finished in the background for the next time.
-- Cantabile TV on DLNA TVs: no still video is made from files longer than 20 minutes (e.g. a whole album with a CUE sheet) – they play with the cover right away instead of encoding for minutes in the background.
-- Cantabile TV mirror: a TV only shows a speaker that is in the same area (when both have one), so the living-room TV doesn't show what plays in the bedroom.
 
 ## 2.1.0 – 2026-10-30
 
