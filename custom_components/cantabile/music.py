@@ -298,8 +298,7 @@ def nas_lista(hass: HomeAssistant, nas: str) -> dict[str, Any]:
         albumok.setdefault(mappa, []).append(f)
     for k in list(albumok):
         albumok[k] = [f for f in albumok[k] if ".." not in f]
-    for v in albumok.values():
-        v.sort(key=lambda x: termeszetes(x.rpartition("/")[2]))
+    # a sorrend a bejárásé (library.rendez: sorszám-címke, különben fájlnév)
     eredmeny = {"albumok": albumok}
     _nas_tar[gyoker] = (time.monotonic(), eredmeny)
     return eredmeny
@@ -308,11 +307,13 @@ def nas_lista(hass: HomeAssistant, nas: str) -> dict[str, Any]:
 def sonos_valtozat(albumok: dict[str, list[str]], szamok: list[str], hires: str | None) -> list[str]:
     """A 48 kHz-es másolat (<hires>/<előadó>/<album …>), ha van – a Sonos legfeljebb 48 kHz-et dekódol."""
     resz = szamok[0].split("/") if szamok else []
-    if not hires or len(resz) != 3 or resz[0] == hires:
+    # <előadó>/<album>/<fájl>, vagy többlemezes albumnál <előadó>/<album>/CD<n>/<fájl>
+    cd = len(resz) == 4 and re.fullmatch(r"CD\d+", resz[2], re.I)
+    if not hires or not (len(resz) == 3 or cd) or resz[0] == hires:
         return szamok
     eloado, album = resz[0], resz[1]
     for j in dict.fromkeys((album.replace("[24Bit-192kHz]", "[24Bit-48kHz]"), f"{album} [48kHz]")):
-        van = {x.rpartition("/")[2]: x for x in albumok.get(f"{hires}/{eloado}/{j}", [])}
+        van = {x.rpartition("/")[2]: x for x in albumok.get(f"{hires}/{eloado}/{j}" + (f"/{resz[2]}" if cd else ""), [])}
         if van:
             return [van.get(x.rpartition("/")[2], x) for x in szamok]
     return szamok

@@ -3888,7 +3888,21 @@ class CantabileCard extends HTMLElement {
     return this._hass.callWS({ type: "media_source/browse_media", media_content_id: id });
   }
 
+  // a médiaböngésző elemei a lejátszás sorrendjében (a szerver sorszám-címke szerinti sorrendje)
+  async _sorrendben(id, elemek) {
+    if (elemek.length < 2 || this._nincsIntegracio || !/^media-source:\/\/media_source\//.test(id)) return elemek;
+    try {
+      const v = await this._hass.callWS({ type: "cantabile/album_order", mappa: id }), hely = new Map((v?.szamok || []).map((x, i) => [x, i]));
+      return [...elemek].sort((x, y) => (hely.get(x.media_content_id) ?? 1e9) - (hely.get(y.media_content_id) ?? 1e9));
+    } catch (_) { return elemek; }
+  }
+
   async _albumSzamok(id) {
+    // a lejátszás sorrendje a szervertől (a sorszám-címke szerint; a rendezett könyvtárban a fájlnévben nincs sorszám)
+    if (!this._nincsIntegracio && /^media-source:\/\/media_source\//.test(id)) {
+      try { const v = await this._hass.callWS({ type: "cantabile/album_order", mappa: id }); if (v?.szamok?.length) return v.szamok.slice(0, 80); }
+      catch (_) { /* régebbi integráció: a böngésző sorrendje */ }
+    }
     const r = await this._bongesz(id);
     return (r.children || []).filter(ZENE)
       .sort((x, y) => x.title.localeCompare(y.title, NYELV(), { numeric: true })).slice(0, 80).map((x) => x.media_content_id);
@@ -5119,7 +5133,8 @@ class CantabileCard extends HTMLElement {
       const r = await this._bongesz(hol.id);
       if (allapot !== kulcs(this._polc)) return;
       const mappak = (r.children || []).filter((x) => x.can_expand && !(!pl.ut.length && [this._telMappa(), this._config.magno?.hires].includes(x.title))).sort((x, y) => x.title.localeCompare(y.title, NYELV(), { numeric: true }));
-      const szamok = (r.children || []).filter(ZENE);
+      const szamok = await this._sorrendben(hol.id, (r.children || []).filter(ZENE));
+      if (allapot !== kulcs(this._polc)) return;
       if (!pl.ut.length) {
         // előadók betűrenddel, bal oldalt betű-ugró
         const betu = (t) => { const b = t.normalize("NFD").replace(/[̀-ͯ]/g, "").charAt(0).toUpperCase(); return /[A-Z]/.test(b) ? b : "#"; };
