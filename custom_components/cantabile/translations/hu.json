@@ -59,6 +59,7 @@
         "name": "TV kinézet",
         "state": {
           "vinyl": "Forgó bakelit",
+          "cover": "Csak borító",
           "bars": "Equalizer-sávok",
           "wave": "Hullámforma",
           "both": "Sávok és hullámforma"

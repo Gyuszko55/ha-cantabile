@@ -59,6 +59,7 @@
         "name": "TV look",
         "state": {
           "vinyl": "Spinning vinyl",
+          "cover": "Cover only",
           "bars": "Equaliser bars",
           "wave": "Waveform",
           "both": "Bars and waveform"

@@ -278,6 +278,7 @@ const EN = {
   "Kinézet": "Look",
   "Forgó bakelit körspektrummal": "Spinning vinyl with circular spectrum",
   "Equalizer-sávok": "Equaliser bars",
+  "Csak borító": "Cover only",
   "Hullámforma": "Waveform",
   "Sávok és hullámforma": "Bars and waveform",
   "Futó dalszöveg": "Running lyrics",
@@ -3336,8 +3337,8 @@ class CantabileCard extends HTMLElement {
         if (kartyak.length) pultok.push({ pult: d.url_path, cim: d.title || d.url_path, cfg, kartyak });
       }
       if (this._szerk !== sz || !pultok.length) return;
-      const k = pultok[0].kartyak[0], visual = ["vinyl", "bars", "wave", "both"].includes(k.visual) ? k.visual : "vinyl";
-      const lyrics = visual === "vinyl" ? k.lyrics !== false : k.lyrics === true;
+      const k = pultok[0].kartyak[0], visual = ["vinyl", "cover", "bars", "wave", "both"].includes(k.visual) ? k.visual : "vinyl";
+      const lyrics = ["vinyl", "cover"].includes(visual) ? k.lyrics !== false : k.lyrics === true;
       this._tvPultok = pultok;
       sz.tv = { visual, lyrics, eredeti: `${visual}|${lyrics}` };
       this._beallRajz();
@@ -3403,7 +3404,7 @@ class CantabileCard extends HTMLElement {
             : this._tvJelolt(h.entity) ? `<div class="btipp">${ESC(T("Tipp: ha ennek az eszköznek van képernyője, a Cantabile integráció beállításaiban (TV-lejátszók) felvéve a szám a képernyőn is megjelenik."))}</div>` : ""; return `<div class="bsor hsz2">${be("hangszorok", i, "nev", h.nev, `placeholder="${T("Név")}"`)}${be("hangszorok", i, "rovid", h.rovid, `maxlength="${NEV_MAX}" placeholder="${T("max. 8")}"`)}<select data-l="hangszorok" data-i="${i}" data-m="entity">${opc(h.entity)}</select><select data-l="hangszorok" data-i="${i}" data-m="mod"><option value="sonos" ${h.mod === "sonos" ? "selected" : ""}>Sonos</option><option value="url" ${h.mod !== "sonos" ? "selected" : ""}>${T("Egyéb (sor nélkül, pl. WiiM)")}</option></select><button class="bx" data-a="torol" data-l="hangszorok" data-i="${i}" title="${T("Törlés")}">×</button></div>${figy}`; }).join("")}
         </section>
         ${sz.tv ? `<section class="bresz"><h3>${T("TV-kinézet")}</h3>
-          <div class="bsor ket"><label>${T("Kinézet")}</label><select data-l="tv" data-i="0" data-m="visual">${[["vinyl", T("Forgó bakelit körspektrummal")], ["bars", T("Equalizer-sávok")], ["wave", T("Hullámforma")], ["both", T("Sávok és hullámforma")]].map(([v, n]) => `<option value="${v}" ${sz.tv.visual === v ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+          <div class="bsor ket"><label>${T("Kinézet")}</label><select data-l="tv" data-i="0" data-m="visual">${[["vinyl", T("Forgó bakelit körspektrummal")], ["cover", T("Csak borító")], ["bars", T("Equalizer-sávok")], ["wave", T("Hullámforma")], ["both", T("Sávok és hullámforma")]].map(([v, n]) => `<option value="${v}" ${sz.tv.visual === v ? "selected" : ""}>${n}</option>`).join("")}</select></div>
           <div class="bsor ket"><label>${T("Futó dalszöveg")}</label><select data-l="tv" data-i="0" data-m="lyrics"><option value="1" ${sz.tv.lyrics ? "selected" : ""}>${T("Látszik")}</option><option value="0" ${sz.tv.lyrics ? "" : "selected"}>${T("Nem látszik")}</option></select></div>
           <p class="bmeg">${T("A Cantabile TV-oldal kinézete a Cast-os TV-ken (TV-botok, Android TV, Nest Hub) – minden TV-n egyszerre. A DLNA-s TV-n nincs TV-oldal.")}</p>
         </section>` : ""}
@@ -3545,7 +3546,7 @@ class CantabileCard extends HTMLElement {
         for (const p of this._tvPultok || []) {
           p.kartyak.forEach((k) => {
             k.visual = sz.tv.visual;
-            if (sz.tv.visual === "vinyl") { if (sz.tv.lyrics) delete k.lyrics; else k.lyrics = false; }
+            if (["vinyl", "cover"].includes(sz.tv.visual)) { if (sz.tv.lyrics) delete k.lyrics; else k.lyrics = false; }
             else if (sz.tv.lyrics) k.lyrics = true; else delete k.lyrics;
           });
           try { await this._hass.callWS({ type: "lovelace/config/save", url_path: p.pult, config: p.cfg }); if (!mentve.includes(p.pult)) mentve.push(p.pult); }
@@ -7145,9 +7146,10 @@ const ORA_OPC = (h) => {
 };
 
 class CantabileTv extends HTMLElement {
-  // visual: vinyl (forgó bakelit körspektrummal, alapértelmezés) | bars | wave | both; lyrics: futó dalszöveg (bakelitnél alapból be)
+  // visual: vinyl (forgó bakelit körspektrummal, alapértelmezés) | cover (csak a nagy borító) | bars | wave | both;
+  // lyrics: futó dalszöveg (bakelitnél és borítónál alapból be)
   setConfig(c) { this._c = { visual: "vinyl", ...(c || {}) }; }
-  get _dszBe() { return this._c.lyrics === true || (this._c.lyrics !== false && this._c.visual === "vinyl"); }
+  get _dszBe() { return this._c.lyrics === true || (this._c.lyrics !== false && ["vinyl", "cover"].includes(this._c.visual)); }
 
   set hass(h) {
     this._h = h;
@@ -7261,6 +7263,12 @@ class CantabileTv extends HTMLElement {
       /* bakelit mód: balra a forgó lemez körspektrummal, jobbra fent az adatok, alatta a futó dalszöveg */
       canvas.bk { display: none; left: 18px; top: 82px; bottom: auto; width: 560px; height: 560px; }
       .bak canvas.bk { display: block; } .bak canvas.eq { display: none; }
+      /* csak borító: nagy borító balra, spektrum nélkül; jobbra az adatok és a dalszöveg */
+      .bmod canvas.eq { display: none; }
+      .bmod .tart { left: 64px; top: 112px; height: 470px; gap: 56px; align-items: flex-start; }
+      .bmod .adat { padding-top: 26px; }
+      .bmod .bor { width: 470px; height: 470px; border-radius: 8px; box-shadow: 0 30px 70px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.1); }
+      .bmod .dsz { left: 590px; }
       .bak .bor { display: none; }
       .bak .tart { left: 612px; top: 112px; height: 330px; }
       .dsz { position: absolute; left: 612px; right: 64px; top: 452px; height: 196px; display: none; flex-direction: column; justify-content: center; gap: 12px;
@@ -7293,6 +7301,7 @@ class CantabileTv extends HTMLElement {
     this._cv = sr.querySelector("canvas.eq");
     this._bk = sr.querySelector("canvas.bk");
     this._v.classList.toggle("bak", this._c.visual === "vinyl");
+    this._v.classList.toggle("bmod", this._c.visual === "cover");
     const meret = () => {
       const w = this._teljes ? innerWidth : this.clientWidth, hh = this._teljes ? innerHeight : this.clientWidth * 0.5625;
       const s = Math.min(w / 1280, hh / 720) || 1;
@@ -7755,6 +7764,7 @@ class CantabileTv extends HTMLElement {
       const vis = this._c.visual, rw = W / N, bw = rw * 0.62;
       if (this._dszBe) this._dszLep();
       if (vis === "vinyl") { this._bakelit(simit); return; }
+      if (vis === "cover") return;                    // csak borító: nincs spektrum
       if (vis !== "wave") {
         for (let i = 0; i < N; i++) {
           const x = i * rw + (rw - bw) / 2, h = Math.max(2, simit[i] * alap);

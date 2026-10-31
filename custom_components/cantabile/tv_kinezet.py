@@ -9,7 +9,8 @@ from typing import Any
 
 from homeassistant.core import Event, HomeAssistant, callback
 
-KINEZETEK = ["vinyl", "bars", "wave", "both"]
+KINEZETEK = ["vinyl", "cover", "bars", "wave", "both"]
+ALAPBOL_DALSZOVEG = ("vinyl", "cover")     # ezeknél a dalszöveg alapból látszik
 EVENT = "lovelace_updated"
 
 
@@ -43,7 +44,7 @@ async def olvas(hass: HomeAssistant) -> tuple[str, bool] | None:
             continue
         if k:
             v = k[0].get("visual") if k[0].get("visual") in KINEZETEK else "vinyl"
-            return v, (k[0].get("lyrics") is not False) if v == "vinyl" else k[0].get("lyrics") is True
+            return v, (k[0].get("lyrics") is not False) if v in ALAPBOL_DALSZOVEG else k[0].get("lyrics") is True
     return None
 
 
@@ -65,7 +66,7 @@ async def ir(hass: HomeAssistant, visual: str | None = None, lyrics: bool | None
             continue
         for x in k:
             x["visual"] = v
-            if v == "vinyl":
+            if v in ALAPBOL_DALSZOVEG:
                 if d:
                     x.pop("lyrics", None)
                 else:

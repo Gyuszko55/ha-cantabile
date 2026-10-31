@@ -49,6 +49,7 @@
 
 - The card's ⚙ settings have a **TV look** section: the look of the Cantabile TV page (spinning vinyl, equaliser bars, waveform, or both) and the running lyrics, written into every `custom:cantabile-tv` card on save; the TV page picks it up by itself.
 
+- TV look **Cover only** (`visual: cover`): a large cover on the left without any spectrum, the track details and the running lyrics on the right.
 - New entities for the TV look: `select.cantabile_tv_look` / *TV look* (spinning vinyl, equaliser bars, waveform, bars and waveform) and `switch.cantabile_tv_lyrics` / *TV lyrics* – usable in automations, scripts and by voice. They write the same `custom:cantabile-tv` card settings as the ⚙ panel and follow every change made there.
 
 ### Fixed (review)
