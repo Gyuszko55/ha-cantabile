@@ -3,6 +3,8 @@
 ## Unreleased
 
 - The REPEAT button shows the number of rounds to the right of its icon, not on top of it.
+- **Lyrics are kept next to the music:** found lyrics are saved as an `.lrc` file beside the track (the standard lyrics file other players read too), and read from there first – without internet, even when the lyrics services are down. Timed lyrics replace plain ones, never the other way round.
+- **Timed lyrics for the whole music folder:** whenever LRCLIB is reachable, a background job goes through the music folder at a gentle pace (one track every 2 seconds) and saves the timed lyrics it finds; tracks without lyrics are asked again after 30 days (`.cache/cantabile_dalszoveg.json`; status: `cantabile/lyrics/collect_status`).
 - Cantabile TV: when the lyrics are timed (the line playing is highlighted karaoke-style), a 🎤 KARAOKE tag shows among the track details.
 - BT (playback in the browser): the volume knob follows a logarithmic curve over 50 dB, like a hi-fi volume control – the browser's own volume is linear, so it used to jump at the bottom and hardly change at the top. Sonos and WiiM keep using their own curve.
 

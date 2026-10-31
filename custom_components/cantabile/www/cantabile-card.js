@@ -4027,7 +4027,7 @@ class CantabileCard extends HTMLElement {
     if (!this._dalOra) this._dalOra = setInterval(() => this._dalLep(), 300);
     let v;
     try {
-      v = await this._hass.callWS({ type: "cantabile/lyrics", artist: d.artist, title: d.title, album: d.album || null, duration: d.duration || null });
+      v = await this._hass.callWS({ type: "cantabile/lyrics", artist: d.artist, title: d.title, album: d.album || null, duration: d.duration || null, ...(d.media_id ? { media_id: d.media_id } : {}) });
     } catch (e) {
       if (this._dal?.kulcs === kulcs) this._dalRajz(T(e?.code === "unknown_command" ? "A Cantabile integráció nincs telepítve." : "A dalszöveg-szolgáltatás nem érhető el."));
       return;
@@ -6924,7 +6924,7 @@ class CantabileCard extends HTMLElement {
     if (kcimHtml !== this._kcimHtml) { this._kcimHtml = kcimHtml; sr.getElementById("kcim").innerHTML = kcimHtml; this._gorgo(sr.getElementById("kcim")); }
     if (ksorHtml !== this._ksorHtml) { this._ksorHtml = ksorHtml; sr.getElementById("ksor").innerHTML = ksorHtml; this._gorgo(sr.querySelector("#ksor .kea")); }
     sr.getElementById("sav").setAttribute("fill", cim ? SZIN(kaz?.cim || album || cim) : "#888");
-    this._kazDal = megy && cim && eloado ? { artist: eloado, title: cim, album: album || null, duration: Number(a.media_duration) || null } : null;
+    this._kazDal = megy && cim && eloado ? { artist: eloado, title: cim, album: album || null, duration: Number(a.media_duration) || null, media_id: a.media_content_id || null } : null;
     sr.getElementById("kcim").classList.toggle("dalos", !!this._kazDal);
     // formátum-sor: MP3 | 44.1kHz | 16bit | 320kbps + SQ/HQ jel + szív (Sonos-kedvenc)
     let form = "";
@@ -7797,7 +7797,7 @@ class CantabileTv extends HTMLElement {
     const uzen = (t) => { d.querySelector(".dszuz span").textContent = `♪  ${t}  ♪`; d.classList.add("van", "uz"); };
     if (!m.artist || !m.title) return uzen(T("Ismeretlen előadó vagy cím – nem lehet dalszöveget keresni"));
     let v = null;
-    try { v = await this._h.callWS({ type: "cantabile/lyrics", artist: String(m.artist), title: String(m.title), album: m.album || null, duration: m.duration || null }); }
+    try { v = await this._h.callWS({ type: "cantabile/lyrics", artist: String(m.artist), title: String(m.title), album: m.album || null, duration: m.duration || null, ...(m.lrc_id ? { media_id: m.lrc_id } : {}) }); }
     catch (e) {
       if (this._dszKulcs !== kulcs) return;
       uzen(T("A dalszöveg-szolgáltatások (LRCLIB, lyrics.ovh) most nem érhetők el – két perc múlva újra próbálom"));

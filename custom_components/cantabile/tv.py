@@ -299,6 +299,7 @@ class TvKozpont:
         meta: dict[str, Any] = {k: v for k, v in (extra or {}).items() if v not in (None, "")}
         if fajl:
             meta = {**await self._cimkek(fajl), **meta}
+            meta["lrc_id"] = mcid          # a dalszöveghez: a zenefájl melletti .lrc (olvasás / mentés)
             if cue := await self.hass.async_add_executor_job(_cue, fajl):
                 # egyetlen fájlos album CUE-lappal: a számok listája (a TV-oldal az időből tudja, melyik szól)
                 meta["cue"] = cue["tracks"]
