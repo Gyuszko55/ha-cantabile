@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 2.3.0 – 2026-10-31
+
+Cantabile 2.3: lyrics kept next to the music as `.lrc` files, a background job collecting timed lyrics for the whole music folder, a KARAOKE tag on the TV, and a logarithmic volume curve for browser playback.
 
 - The REPEAT button shows the number of rounds to the right of its icon, not on top of it.
 - **Lyrics are kept next to the music:** found lyrics are saved as an `.lrc` file beside the track (the standard lyrics file other players read too), and read from there first – without internet, even when the lyrics services are down. Timed lyrics replace plain ones, never the other way round.
