@@ -132,15 +132,17 @@ def _eredmeny(adat: dict[str, Any] | None) -> dict[str, Any]:
 
 
 async def _ker(sess: aiohttp.ClientSession, ut: str, param: dict[str, Any]) -> Any:
-    for proba in range(3):          # az LRCLIB néha átmeneti 503-at ad – kétszer újra
-        async with sess.get(f"{API}/{ut}", params=param, headers={"User-Agent": UA}, timeout=aiohttp.ClientTimeout(total=10)) as v:
-            if v.status == 404:
-                return None
-            if v.status >= 500 and proba < 2:
-                await asyncio.sleep(1 + proba)
-                continue
-            v.raise_for_status()                 # tartós 5xx: hiba (nem „nincs dalszöveg”)
-            return await v.json()
+    for proba in range(3):          # az LRCLIB néha átmeneti 503-at / időtúllépést ad – kétszer újra
+        try:
+            async with sess.get(f"{API}/{ut}", params=param, headers={"User-Agent": UA}, timeout=aiohttp.ClientTimeout(total=10)) as v:
+                if v.status == 404:
+                    return None
+                v.raise_for_status()             # tartós 5xx: hiba (nem „nincs dalszöveg”)
+                return await v.json()
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            if proba == 2 or (isinstance(err, aiohttp.ClientResponseError) and err.status < 500):
+                raise
+            await asyncio.sleep(1 + proba)
     return None
 
 
@@ -228,6 +230,8 @@ async def keres(hass: HomeAssistant, eloado: str, cim: str, album: str | None, h
 
 UJRA_NAP = 30            # a nem talált / csak sima szövegű számot ennyi nap múlva kérdezi újra
 KOZ = 2.0                # mp két szám között (az LRCLIB kímélése)
+VARAKOZAS = (10, 30, 60, 60)   # mp: LRCLIB-hiba után ennyit vár, mielőtt ugyanazt a számot újra kéri
+HIBA_MAX = 5             # ennyi egymás utáni hiba után az LRCLIB-et leállnak veszi (30 perc múlva folytatja)
 
 
 def _cimkek(ut: str) -> dict[str, Any]:
@@ -272,11 +276,10 @@ class Gyujto:
 
     async def _lrclib_el(self) -> bool:
         try:
-            async with async_get_clientsession(self.hass).get(f"{API}/get", params={"artist_name": "Queen", "track_name": "Bohemian Rhapsody"},
-                                                              headers={"User-Agent": UA}, timeout=aiohttp.ClientTimeout(total=10)) as v:
-                return v.status in (200, 404)
-        except (aiohttp.ClientError, asyncio.TimeoutError):
+            await _ker(async_get_clientsession(self.hass), "get", {"artist_name": "Queen", "track_name": "Bohemian Rhapsody"})
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
             return False
+        return True
 
     async def fut(self) -> None:
         await asyncio.sleep(300)                     # az indulás után ne terheljen
@@ -322,13 +325,20 @@ class Gyujto:
             if not c.get("eloado") or not c.get("cim"):
                 self.allapot[f] = {"e": "cimke", "t": time.time()}
             else:
-                try:
-                    e = await keres(self.hass, c["eloado"], c["cim"], c.get("album"), c.get("hossz"), csak_lrclib=True,
-                                    lrc_fajl=os.path.splitext(ut)[0] + ".lrc")
-                except (aiohttp.ClientError, asyncio.TimeoutError):
-                    await self.hass.async_add_executor_job(self._ment)
-                    self.statusz["lrclib"] = False
-                    return False                     # az LRCLIB közben leállt: később folytatja
+                hiba = 0
+                while True:
+                    try:
+                        e = await keres(self.hass, c["eloado"], c["cim"], c.get("album"), c.get("hossz"), csak_lrclib=True,
+                                        lrc_fajl=os.path.splitext(ut)[0] + ".lrc")
+                        break
+                    except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+                        hiba += 1
+                        if hiba >= HIBA_MAX:
+                            _LOGGER.debug("Cantabile: az LRCLIB %d hiba után leállt (%s), 30 perc múlva folytatom", hiba, err)
+                            await self.hass.async_add_executor_job(self._ment)
+                            self.statusz["lrclib"] = False
+                            return False             # az LRCLIB tartósan nem válaszol: később folytatja
+                        await asyncio.sleep(VARAKOZAS[hiba - 1])   # átmeneti hiba: kis szünet, aztán ugyanez a szám újra
                 eredm = "szinkron" if e.get("synced") else "sima" if e.get("found") and e.get("plain") else "nincs"
                 self.allapot[f] = {"e": eredm, "t": time.time()}
                 self.statusz[eredm] += 1

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Lyrics: a passing LRCLIB error (503, timeout) no longer stops the music-folder lyrics collector for half an hour – it waits 10 / 30 / 60 seconds and asks for the same track again, and pauses only after 5 failures in a row. Lyrics shown while playing are asked again after a timeout too, not only after a 503.
+
 ## 2.3.0 – 2026-10-31
 
 Cantabile 2.3: lyrics kept next to the music as `.lrc` files, a background job collecting timed lyrics for the whole music folder, a KARAOKE tag on the TV, and a logarithmic volume curve for browser playback.
