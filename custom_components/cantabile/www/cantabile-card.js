@@ -6022,13 +6022,17 @@ class CantabileCard extends HTMLElement {
     const t = this._tvTk = { o, api: false, zar: null };
     tv.setAttribute("tk", "");
     o.appendChild(tv);
+    const hang = this._tkHangero(o);
     document.body.appendChild(o);
     o.addEventListener("click", (ev) => { ev.stopPropagation(); this._tvTeljesKi(); });
-    const billentyu = (ev) => { if (ev.key === "Escape") this._tvTeljesKi(); };
+    const billentyu = (ev) => {
+      if (ev.key === "Escape") this._tvTeljesKi();
+      else if (ev.key === "ArrowUp" || ev.key === "ArrowDown") { ev.preventDefault(); hang.lep(ev.key === "ArrowUp" ? 0.02 : -0.02); }
+    };
     const valt = () => { if (t.api && !(document.fullscreenElement || document.webkitFullscreenElement)) this._tvTeljesKi(); };
     document.addEventListener("keydown", billentyu);
     document.addEventListener("fullscreenchange", valt); document.addEventListener("webkitfullscreenchange", valt);
-    t.le = () => { document.removeEventListener("keydown", billentyu); document.removeEventListener("fullscreenchange", valt); document.removeEventListener("webkitfullscreenchange", valt); };
+    t.le = () => { hang.le(); document.removeEventListener("keydown", billentyu); document.removeEventListener("fullscreenchange", valt); document.removeEventListener("webkitfullscreenchange", valt); };
     try {
       const f = o.requestFullscreen || o.webkitRequestFullscreen;
       if (f) { await f.call(o, { navigationUI: "hide" }); t.api = true; }
@@ -6037,6 +6041,68 @@ class CantabileCard extends HTMLElement {
     if (t.api && matchMedia("(pointer: coarse)").matches) screen.orientation?.lock?.("landscape").catch(() => {});
     try { if ("wakeLock" in navigator) t.zar = await navigator.wakeLock.request("screen"); } catch (e) { t.zar = null; }
     if (this._tvTk !== t) t.zar?.release().catch(() => {});
+  }
+
+  // teljes képernyőn a bal szélen előbújó, lineáris hangerő-csúszka (mint a videólejátszókban): a bal sávra koppintva vagy
+  // egérrel odaérve megjelenik; függőleges húzás a bal sávban relatívan, a csúszkán közvetlenül állít; görgő / ↑↓ ±2%;
+  // 2,5 mp tétlenség után elbújik. A bal sávra koppintás nem lép vissza az ablakba.
+  _tkHangero(o) {
+    const st = document.createElement("style");
+    st.textContent = `
+      .ctk-zona { position: absolute; left: 0; top: 0; bottom: 0; width: 18%; z-index: 2; touch-action: none; cursor: default; }
+      .ctk-hang { position: absolute; left: 28px; top: 50%; z-index: 3; width: 62px; height: min(62vh, 440px); padding: 16px 0 14px; box-sizing: border-box;
+        display: flex; flex-direction: column; align-items: center; gap: 12px; border-radius: 14px; background: rgba(10,10,12,.72);
+        box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 10px 30px rgba(0,0,0,.5); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+        opacity: 0; transform: translate(-16px, -50%); transition: opacity .25s ease, transform .3s ease; pointer-events: none; touch-action: none; cursor: default;
+        font: 600 12px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .14em; color: #f3ead8; }
+      .ctk-hang.lat { opacity: 1; transform: translate(0, -50%); pointer-events: auto; }
+      .ctk-hang b { font: 700 20px/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: 0; color: #ffc65a; font-variant-numeric: tabular-nums; }
+      .ctk-hang small { font-size: 9px; color: rgba(243,234,216,.6); }
+      .ctk-sav { position: relative; flex: 1; width: 8px; border-radius: 4px; background: rgba(255,255,255,.14); cursor: ns-resize; }
+      .ctk-sav::before { content: ""; position: absolute; left: -22px; right: -22px; top: -8px; bottom: -8px; }
+      .ctk-tel { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 4px; background: linear-gradient(to top, #e8962f, #ffc65a); }
+      .ctk-gomb { position: absolute; left: 50%; width: 22px; height: 22px; margin: 0 0 -11px -11px; border-radius: 50%; background: #f3ead8;
+        box-shadow: 0 2px 8px rgba(0,0,0,.6); }`;
+    const z = document.createElement("div"); z.className = "ctk-zona";
+    const p = document.createElement("div"); p.className = "ctk-hang";
+    p.innerHTML = `<b>0</b><div class="ctk-sav"><div class="ctk-tel"></div><div class="ctk-gomb"></div></div><small>VOLUME</small>`;
+    o.append(st, z, p);
+    const sav = p.querySelector(".ctk-sav"), tel = p.querySelector(".ctk-tel"), gomb = p.querySelector(".ctk-gomb"), szam = p.querySelector("b");
+    let rejt = null, huz = null;
+    const rajz = (v) => { const x = Math.round((v ?? 0) * 100); tel.style.height = `${x}%`; gomb.style.bottom = `${x}%`; szam.textContent = x; };
+    const mutat = () => { p.classList.add("lat"); clearTimeout(rejt); rejt = setTimeout(() => { if (!huz) p.classList.remove("lat"); }, 2500); };
+    const allit = (v) => { v = Math.max(0, Math.min(1, v)); this._hangeroKuld(v); rajz(v); mutat(); };
+    const lep = (d) => allit((this._hangero ?? 0) + d);
+    const savbol = (y) => { const r = sav.getBoundingClientRect(); return 1 - (y - r.top) / r.height; };
+    const le = (ev) => {
+      ev.stopPropagation();
+      huz = { id: ev.pointerId, y: ev.clientY, v: this._hangero ?? 0, savon: sav.contains(ev.target) || ev.target === sav, mozdult: false };
+      ev.currentTarget.setPointerCapture?.(ev.pointerId);
+      mutat(); rajz(this._hangero);
+      if (huz.savon) allit(savbol(ev.clientY));
+    };
+    const mozog = (ev) => {
+      if (!huz || ev.pointerId !== huz.id) return;
+      ev.stopPropagation();
+      if (!huz.mozdult && Math.abs(ev.clientY - huz.y) < 4) return;
+      huz.mozdult = true;
+      if (huz.savon) allit(savbol(ev.clientY));
+      else allit(huz.v + (huz.y - ev.clientY) / (sav.getBoundingClientRect().height || 300));    // a bal sávban: relatív húzás
+    };
+    const fel = (ev) => { if (huz && ev.pointerId === huz.id) { huz = null; mutat(); } };
+    for (const el of [z, p]) {
+      el.addEventListener("pointerdown", le); el.addEventListener("pointermove", mozog);
+      el.addEventListener("pointerup", fel); el.addEventListener("pointercancel", fel);
+      el.addEventListener("click", (ev) => ev.stopPropagation());           // a bal sáv / csúszka nem léptet vissza az ablakba
+    }
+    // egérrel a bal szélre érve előbújik; görgővel bárhol állítható
+    const eger = (ev) => { if (ev.pointerType === "mouse" && !huz && ev.clientX < innerWidth * 0.18) { rajz(this._hangero); mutat(); } };
+    o.addEventListener("pointermove", eger);
+    o.addEventListener("wheel", (ev) => { ev.preventDefault(); lep((ev.deltaY || -ev.deltaX) < 0 ? 0.02 : -0.02); }, { passive: false });
+    // a hangszóró saját hangerő-változása (pl. másik készülékről) is látszik
+    const fris = setInterval(() => { if (!huz && p.classList.contains("lat")) rajz(this._hangero); }, 1000);
+    rajz(this._hangero);
+    return { lep, le: () => { clearInterval(fris); clearTimeout(rejt); } };
   }
 
   _tvTeljesKi(ablakIs = false) {
@@ -6722,18 +6788,22 @@ class CantabileCard extends HTMLElement {
   // ---- hangerő ----
 
   // hangerő: húzás a gomb körül (−135°…+135° = 0…100%), görgő ±2%; legfeljebb 300 ms-onként hívja a szolgáltatást
+  // a hangerő küldése (a gomb és a teljes képernyős csúszka is ezt használja): azonnal rajzol, legfeljebb 300 ms-onként küld
+  _hangeroKuld(v) {
+    v = Math.max(0, Math.min(1, v));
+    this._hangero = v; this._rajzHangero(v);
+    this._kuldendo = v;
+    if (this._kuldIdo) return;
+    this._kuldIdo = setTimeout(() => {
+      this._kuldIdo = null;
+      const hsz = this._hangszoro();
+      if (this._hass && hsz && this._kuldendo != null) this._hiv("media_player", "volume_set", { entity_id: hsz.tagok || hsz.entity, volume_level: Math.round(this._kuldendo * 100) / 100 });
+      this._kuldendo = null;
+    }, 300);
+  }
+
   _gombKezel(gomb) {
-    const kuld = (v) => {
-      this._hangero = v; this._rajzHangero(v);
-      this._kuldendo = v;
-      if (this._kuldIdo) return;
-      this._kuldIdo = setTimeout(() => {
-        this._kuldIdo = null;
-        const hsz = this._hangszoro();
-        if (this._hass && hsz && this._kuldendo != null) this._hiv("media_player", "volume_set", { entity_id: hsz.tagok || hsz.entity, volume_level: Math.round(this._kuldendo * 100) / 100 });
-        this._kuldendo = null;
-      }, 300);
-    };
+    const kuld = (v) => this._hangeroKuld(v);
     const szog = (e) => {
       const r = gomb.getBoundingClientRect();
       let a = (Math.atan2(e.clientX - (r.left + r.width / 2), (r.top + r.height / 2) - e.clientY) * 180) / Math.PI;
