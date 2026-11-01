@@ -102,14 +102,22 @@ class Folytato:
         def atnez(_most: Any) -> None:
             self.hass.async_create_task(self._atnez())
 
+        inditas: list[Any] = []
+
         @callback
         def indul(_: Any = None) -> None:
+            # a lefutott egyszeri figyelő kikerül a leiratkozandók közül (különben újratöltéskor a HA hibát naplóz)
+            for le in inditas:
+                if le in self._le:
+                    self._le.remove(le)
+            inditas.clear()
             self._le.append(async_call_later(self.hass, VARAKOZAS, atnez))
 
         if self.hass.state is CoreState.running:
             indul()
         else:
-            self._le.append(self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, indul))
+            inditas.append(self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, indul))
+            self._le.extend(inditas)
 
     @callback
     def stop(self) -> None:
