@@ -124,7 +124,7 @@ class Figyelo:
         if self._leiratkozas is None:
             le1 = async_track_state_change_event(self.hass, [self.entity_id], self._valtozott)
             # hézagmentes WiiM-lejátszásnál a számváltást a HA-entitás nem mindig jelzi: a Cantabile UPnP-állapota igen
-            le2 = async_dispatcher_connect(self.hass, SIGNAL_UPNP, lambda e: self._ujraertekel() if e == self.entity_id else None)
+            le2 = async_dispatcher_connect(self.hass, SIGNAL_UPNP, callback(lambda e: self._ujraertekel() if e == self.entity_id else None))
             self._leiratkozas = lambda: (le1(), le2())
             self._ujraertekel()
         hallgato({"allapot": self._allapot, "formatum": self._formatum})

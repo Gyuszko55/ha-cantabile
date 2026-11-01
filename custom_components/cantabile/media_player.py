@@ -403,7 +403,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             async_track_state_change_event(self.hass, [cel], self._tukor_valtozott),
             async_track_time_interval(self.hass, self._tukor_ellenoriz, timedelta(seconds=60)),
             # WiiM hézagmentes lejátszásnál a pontos állapot (számváltás, hely) a Cantabile UPnP-lekérdezéséből jön
-            async_dispatcher_connect(self.hass, SIGNAL_UPNP, lambda e: self._tukor_frissit() if e == self._tukor else None),
+            async_dispatcher_connect(self.hass, SIGNAL_UPNP, callback(lambda e: self._tukor_frissit() if e == self._tukor else None)),
         ]
         self._tukor_frissit(elso=True)
         kozpont(self.hass).tukor_ment(self.entity_id, cel)

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Fix: the TV window on the card didn't follow track changes.** Its listeners ran outside Home Assistant's event loop, so a new track's details (title, cover, length, lyrics) never arrived – the window kept showing what played when it was opened, also after switching speakers, until it was closed and opened again. The same fix applies to the TV mirror's and the VU meter's reaction to the WiiM's precise (UPnP) track changes.
 - Lyrics: a passing LRCLIB error (503, timeout) no longer stops the music-folder lyrics collector for half an hour – it waits 10 / 30 / 60 seconds and asks for the same track again, and pauses only after 5 failures in a row. Lyrics shown while playing are asked again after a timeout too, not only after a 503.
 - Lyrics: LRCLIB's rate limit (429 “too many requests”) is respected. Cantabile waits as long as LRCLIB asks (`Retry-After`, at least a minute) and doesn't ask LRCLIB at all meanwhile – lyrics shown while playing come from lyrics.ovh then. Requests are at least 1 second apart; the collector takes 5 seconds between tracks, slows down after each 429 (up to 30 seconds) and speeds up again gradually; its current pace is `szunet` in `cantabile/lyrics/collect_status`.
 

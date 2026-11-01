@@ -961,8 +961,9 @@ def ws_preview(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: d
 
     e = Elonezet()
     le = [
-        async_track_state_change_event(hass, [e._tukor], lambda _ev: e._tukor_frissit()),
-        async_dispatcher_connect(hass, SIGNAL_UPNP, lambda ent: e._tukor_frissit() if ent == e._tukor else None),
+        # callback: az eseményhurokban fusson (a sima lambdát a HA szálon futtatná, onnan a számváltás adatai nem indulnak el)
+        async_track_state_change_event(hass, [e._tukor], callback(lambda _ev: e._tukor_frissit())),
+        async_dispatcher_connect(hass, SIGNAL_UPNP, callback(lambda ent: e._tukor_frissit() if ent == e._tukor else None)),
     ]
     conn.subscriptions[msg["id"]] = lambda: [f() for f in le]
     conn.send_result(msg["id"])
