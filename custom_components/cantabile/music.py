@@ -349,6 +349,29 @@ async def deezer(hass: HomeAssistant, ut: str) -> Any:
     return v
 
 
+async def rb_kerdez(hass: HomeAssistant, ut: str) -> Any:
+    """Radio Browser-kérés (JSON) a tükörszerverek közül az első válaszolóról – a kártya-motor és a beállítás-varázsló
+    közös kliense. Hiba esetén HibaUzenet("rb_down")."""
+    sess = async_get_clientsession(hass)
+    hiba: Exception | None = None
+    global _rb_ido
+    if time.monotonic() - _rb_ido > (86400 if _rb_lista else 600):     # naponta frissíti (hiba után 10 perc múlva)
+        _rb_ido = time.monotonic()
+        with contextlib.suppress(Exception):
+            async with asyncio.timeout(5), sess.get("https://all.api.radio-browser.info/json/servers",
+                                                    headers={"User-Agent": "Cantabile/1.0 (Home Assistant)"}) as r:
+                uj = list(dict.fromkeys([f"https://{x['name']}" for x in await r.json()] + RB_ALAP))
+                _rb_lista[:] = uj
+    for sz in _rb_lista or RB_ALAP:
+        try:
+            async with asyncio.timeout(8), sess.get(f"{sz}{ut}", headers={"User-Agent": "Cantabile/1.0 (Home Assistant)"}) as r:
+                r.raise_for_status()
+                return await r.json()
+        except Exception as e:  # noqa: BLE001 – a következő tükrözött szerver
+            hiba = e
+    raise HibaUzenet("rb_down", hiba=hiba)
+
+
 class Zene:
     def __init__(self, hass: HomeAssistant, rt: Cantabile) -> None:
         self.hass = hass
@@ -477,24 +500,7 @@ class Zene:
         return ("szam", lista, kezdo, f"{mappa.split('/')[0]} – {cim_}", mas[:3])
 
     async def rb(self, ut: str) -> Any:
-        sess = async_get_clientsession(self.hass)
-        hiba: Exception | None = None
-        global _rb_ido
-        if time.monotonic() - _rb_ido > (86400 if _rb_lista else 600):     # naponta frissíti (hiba után 10 perc múlva)
-            _rb_ido = time.monotonic()
-            with contextlib.suppress(Exception):
-                async with asyncio.timeout(5), sess.get("https://all.api.radio-browser.info/json/servers",
-                                                        headers={"User-Agent": "Cantabile/1.0 (Home Assistant)"}) as r:
-                    uj = list(dict.fromkeys([f"https://{x['name']}" for x in await r.json()] + RB_ALAP))
-                    _rb_lista[:] = uj
-        for sz in _rb_lista or RB_ALAP:
-            try:
-                async with asyncio.timeout(8), sess.get(f"{sz}{ut}", headers={"User-Agent": "Cantabile/1.0 (Home Assistant)"}) as r:
-                    r.raise_for_status()
-                    return await r.json()
-            except Exception as e:  # noqa: BLE001 – a következő tükrözött szerver
-                hiba = e
-        raise HibaUzenet("rb_down", hiba=hiba)
+        return await rb_kerdez(self.hass, ut)
 
     async def radio_talalat(self, c: dict[str, Any], mit: str, csak_gomb: bool, sonos: bool = False) -> dict[str, Any] | None:
         q = re.sub(r"\b(radio|radiot|radiora|adot|ado|fm|station)\b", " ", norm(mit)).strip() or norm(mit)

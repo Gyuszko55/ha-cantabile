@@ -3,40 +3,260 @@
     "abort": {
       "single_instance_allowed": "Cantabile is already set up."
     },
+    "error": {
+      "too_many_stations": "At most 12 stations fit on the preset buttons – untick some.",
+      "folder_invalid": "The music folder must be a media-source path (media-source://…).",
+      "hires_not_found": "There's no such subfolder in the music folder."
+    },
     "step": {
       "user": {
-        "title": "Cantabile",
-        "description": "Adds the Cantabile radio & cassette deck card (custom:cantabile-card) and the services it needs. Speakers, stations and the music folder are set on the card itself (⚙).",
+        "title": "Cantabile setup",
+        "description": "Cantabile brings a retro hi-fi radio and cassette deck card to your dashboard. This wizard sets it up in a few steps:\n\n1. **Speakers** – which of your media players the card plays on, and the default one.\n2. **Music library** *(optional)* – your own music folder, e.g. a NAS share.\n3. **Radio stations** *(optional)* – the most popular stations of your country on the preset buttons.\n4. **TV** *(optional)* – TVs that show the track on screen (Cantabile TV).\n5. **Voice** – starting music by voice through an AI conversation agent.\n6. **Dashboard** – where the card goes: a new *Music* dashboard in the sidebar, an existing dashboard, or nowhere for now.\n\nNothing is lost if you skip a step: everything can be changed later on the card (⚙) or under **Configure → Setup wizard**."
+      },
+      "speakers": {
+        "title": "Speakers",
+        "description": "Found {count} media players ({groups}). Tick the ones Cantabile should play on – speakers are ticked already, TVs and media servers aren't. The **default speaker** comes first on the card's speaker selector.\n\nNames longer than 8 characters get a short name on the card; you can change it later on the card under ⚙ → Speakers.",
+        "data": {
+          "speakers": "Speakers on the card",
+          "default_speaker": "Default speaker"
+        },
+        "data_description": {
+          "speakers": "Grouped by integration: Sonos, WiiM, LinkPlay, Google Cast, DLNA, Music Assistant, Squeezebox, other.",
+          "default_speaker": "First on the selector; voice commands without a speaker name use it too."
+        }
+      },
+      "speakers_none": {
+        "title": "No speakers yet",
+        "description": "Home Assistant has no media players yet, so there's nothing to play on. Add your speakers' integration first: [Settings → Devices & services]({integrations_url}) → **Add integration** → e.g. *Sonos*, *WiiM*, *LinkPlay*, *Google Cast*, *DLNA Digital Media Renderer*, *Music Assistant* or *Squeezebox*.\n\nYou can continue now and add the speakers later – on the card (⚙ → Speakers) or with **Configure → Setup wizard → Speakers**."
+      },
+      "library": {
+        "title": "Music library (optional)",
+        "description": "Cantabile plays your own music from a folder in Home Assistant's media (the NAS tab: artist → album → tracks). Folders with music:\n\n{found}\n\nPick one (or type a media-source path), or **leave it empty to skip**.\n\n**Music on a NAS?** Add it first: [Settings → System → Storage]({storage_url}) → **Add network storage**, usage *Media*. It then appears in [Media]({media_url}) under *My media* – run this step again afterwards (Configure → Setup wizard → Music library).",
+        "data": {
+          "media_folder": "Music folder",
+          "hires_folder": "Folder of 48 kHz copies (optional)",
+          "upload_folder": "Uploads folder"
+        },
+        "data_description": {
+          "media_folder": "A media-source path, e.g. media-source://media_source/local/Music. Layout: artist / album / tracks.",
+          "hires_folder": "Sonos plays at most 48 kHz: a subfolder of the music folder with 48 kHz copies of hi-res albums (folder / artist / album). Leave empty if you have none.",
+          "upload_folder": "PHONE uploads are kept here, inside the music folder (needs write access)."
+        }
+      },
+      "radio": {
+        "title": "Radio stations (optional)",
+        "description": "The most popular stations in your country ({country}), from Radio Browser. The ticked ones go on the radio's preset buttons – at most {max}. Untick all to leave the buttons empty; the NET button finds thousands more any time, and ⚙ on the card adds or changes stations.",
+        "data": {
+          "stations": "Preset stations"
+        },
+        "data_description": {
+          "stations": "Most popular first. MP3 / AAC streams are the safest on Sonos."
+        }
+      },
+      "radio_offline": {
+        "title": "Radio stations (optional)",
+        "description": "Radio Browser can't be reached right now (no internet?). Skip this step – the preset buttons stay empty, and you can fill them later on the card: tap an empty **+** button or **NET**, or use ⚙ → Stations."
+      },
+      "tv": {
+        "title": "TV (optional)",
+        "description": "Cantabile TV turns a TV into a speaker that shows the track on screen. A **Google Cast** device with a screen (Chromecast / Google TV, Android TV, Nest Hub) gets the live TV page, a **DLNA TV** a still track card. Only devices that clearly are TVs are ticked.\n\nRequirements:\n- {https_mark} **https address** for the Cast TV page (Home Assistant Cloud or your own external URL with a certificate): {https_url}\n- {internal_mark} **Internal URL** for DLNA TVs: {internal_url}\n- {ffmpeg_mark} **ffmpeg** (VU signal, DLNA track card; included in Home Assistant OS and the container)\n\nIf something is missing the TV still gets the music – fix it in [Settings → System → Network]({network_url}), no need to run the wizard again. For a Cast TV a hidden *Cantabile TV* dashboard is created (the page the TV loads); the TV players are added to the card by themselves.",
+        "data": {
+          "tv_players": "TV players (Cantabile TV)"
+        },
+        "data_description": {
+          "tv_players": "Each becomes a “TV · …” speaker on the card."
+        }
+      },
+      "tv_none": {
+        "title": "TV (optional)",
+        "description": "No Google Cast or DLNA TV found – nothing to do here. To use a TV later, add it with the *Google Cast* or *DLNA Digital Media Renderer* integration ([Settings → Devices & services]({integrations_url})), then pick it under **Configure → Setup wizard → TV**.\n\nRequirements on this Home Assistant:\n- {https_mark} **https address** for the Cast TV page (Home Assistant Cloud or your own external URL with a certificate): {https_url}\n- {internal_mark} **Internal URL** for DLNA TVs: {internal_url}\n- {ffmpeg_mark} **ffmpeg** (VU signal, DLNA track card; included in Home Assistant OS and the container)"
+      },
+      "voice": {
+        "title": "Voice control",
+        "description": "With an AI (LLM) conversation agent you can say *“Play Queen in the living room”* or *“Put on Radio Paradise”*. Conversation agents found:\n\n{agents}\n\nHome Assistant doesn't let one integration change another one's options, so turn Cantabile on in the agent yourself:\n1. Open [Settings → Devices & services]({integrations_url}) and select the agent's integration (e.g. *Google Gemini*, *OpenAI*, *Anthropic*, *Ollama*).\n2. Click **Configure** (⚙) next to the agent.\n3. Under **Control Home Assistant**, tick **Cantabile** next to *Assist*.\n4. Submit, then try it in Assist.",
         "data": {
           "llm_api": "Assist tool (LLM API)"
         },
         "data_description": {
-          "llm_api": "Lets LLM-based conversation agents (Gemini, OpenAI, Claude…) start music and radio. Turn on “Cantabile” in the agent's options as well."
+          "llm_api": "Offers the Cantabile tool to LLM conversation agents. Turn it off if you don't use voice control."
         }
+      },
+      "dashboard": {
+        "title": "Dashboard",
+        "description": "Where should the Cantabile card go? It comes filled in with the speakers, stations and music folder chosen in the previous steps. Your dashboards are listed under [Settings → Dashboards]({dashboards_url}).",
+        "data": {
+          "placement": "Place the card"
+        }
+      },
+      "dashboard_none": {
+        "title": "Dashboard",
+        "description": "The card needs at least one speaker, so it isn't placed now. Add your speakers' integration ([Settings → Devices & services]({integrations_url})), then run **Configure → Setup wizard → Speakers** and **Dashboard** – or add the card yourself later (Edit dashboard → Add card → Cantabile)."
+      },
+      "dashboard_new": {
+        "title": "New dashboard",
+        "description": "A new dashboard with the card across the full width, shown in the sidebar for quick access.",
+        "data": {
+          "title": "Title in the sidebar",
+          "icon": "Icon"
+        }
+      },
+      "dashboard_existing": {
+        "title": "Existing dashboard",
+        "description": "Pick the dashboard and view. The card is added at the end of the view (in a sections view as a new section). Dashboards kept in YAML are listed too – for those you get the card snippet to paste yourself.",
+        "data": {
+          "view": "Dashboard › view"
+        }
+      },
+      "dashboard_yaml": {
+        "title": "YAML dashboard",
+        "description": "This dashboard is managed in YAML, so Cantabile doesn't change it. Paste this card into the view yourself:\n\n{yaml}"
+      },
+      "summary": {
+        "title": "Summary",
+        "description": "- **Speakers** (★ default): {speakers}\n- **Music folder** (· 48 kHz copies · ⬆ uploads): {library}\n- **Radio stations:** {radio}\n- **TV players:** {tv}\n- **Assist tool** (voice): {voice}\n- **Dashboard:** {dashboard}\n- **Existing Cantabile cards:** {cards}\n\n✅ set up · ⏭️ skipped (can be set later) · – not changed · ⚠️ needs attention. New TV players appear on the card as “TV · …” speakers by themselves.\n\n**Changing things later:** speakers, stations, music folder and the look on the card's ⚙ button (*Save* writes into every Cantabile card); TV players, announcements, Spotify / Tidal keys and the Assist tool under [Settings → Devices & services]({integrations_url}) → Cantabile → **Configure** – where this wizard can be run again, also step by step."
       }
     }
   },
   "options": {
+    "error": {
+      "too_many_stations": "At most 12 stations fit on the preset buttons – untick some.",
+      "folder_invalid": "The music folder must be a media-source path (media-source://…).",
+      "hires_not_found": "There's no such subfolder in the music folder."
+    },
     "step": {
       "init": {
+        "title": "Cantabile",
+        "menu_options": {
+          "settings": "Settings – Assist tool, announcements, TV players, keys",
+          "wizard": "Setup wizard – speakers, music library, radio, TV, voice, dashboard"
+        }
+      },
+      "wizard": {
+        "title": "Setup wizard",
+        "description": "Run it through from the start, or pick a single step. Your choices are written to the cards and saved with **Save and finish**.",
+        "menu_options": {
+          "welcome": "Run the whole wizard",
+          "speakers": "Speakers",
+          "library": "Music library",
+          "radio": "Radio stations",
+          "tv": "TV",
+          "voice": "Voice control",
+          "dashboard": "Dashboard (add the card)",
+          "summary": "Save and finish"
+        }
+      },
+      "settings": {
+        "title": "Cantabile",
+        "menu_options": {
+          "settings": "Settings – Assist tool, announcements, TV players, keys",
+          "wizard": "Setup wizard – speakers, music library, radio, TV, voice, dashboard"
+        }
+      },
+      "welcome": {
+        "title": "Cantabile setup",
+        "description": "Cantabile brings a retro hi-fi radio and cassette deck card to your dashboard. This wizard sets it up in a few steps:\n\n1. **Speakers** – which of your media players the card plays on, and the default one.\n2. **Music library** *(optional)* – your own music folder, e.g. a NAS share.\n3. **Radio stations** *(optional)* – the most popular stations of your country on the preset buttons.\n4. **TV** *(optional)* – TVs that show the track on screen (Cantabile TV).\n5. **Voice** – starting music by voice through an AI conversation agent.\n6. **Dashboard** – where the card goes: a new *Music* dashboard in the sidebar, an existing dashboard, or nowhere for now.\n\nNothing is lost if you skip a step: everything can be changed later on the card (⚙) or under **Configure → Setup wizard**."
+      },
+      "speakers": {
+        "title": "Speakers",
+        "description": "Found {count} media players ({groups}). Tick the ones Cantabile should play on – speakers are ticked already, TVs and media servers aren't. The **default speaker** comes first on the card's speaker selector.\n\nNames longer than 8 characters get a short name on the card; you can change it later on the card under ⚙ → Speakers.",
         "data": {
-          "llm_api": "Assist tool (LLM API)",
-          "duck_sources": "Announcers (duck music while they speak)",
-          "duck_level": "Music volume during announcements",
-          "spotify_client_id": "Spotify client ID (experimental)",
-          "spotify_client_secret": "Spotify client secret",
-          "tidal_client_id": "Tidal client ID (experimental)",
-          "tidal_client_secret": "Tidal client secret",
+          "speakers": "Speakers on the card",
+          "default_speaker": "Default speaker"
+        },
+        "data_description": {
+          "speakers": "Grouped by integration: Sonos, WiiM, LinkPlay, Google Cast, DLNA, Music Assistant, Squeezebox, other.",
+          "default_speaker": "First on the selector; voice commands without a speaker name use it too."
+        }
+      },
+      "speakers_none": {
+        "title": "No speakers yet",
+        "description": "Home Assistant has no media players yet, so there's nothing to play on. Add your speakers' integration first: [Settings → Devices & services]({integrations_url}) → **Add integration** → e.g. *Sonos*, *WiiM*, *LinkPlay*, *Google Cast*, *DLNA Digital Media Renderer*, *Music Assistant* or *Squeezebox*.\n\nYou can continue now and add the speakers later – on the card (⚙ → Speakers) or with **Configure → Setup wizard → Speakers**."
+      },
+      "library": {
+        "title": "Music library (optional)",
+        "description": "Cantabile plays your own music from a folder in Home Assistant's media (the NAS tab: artist → album → tracks). Folders with music:\n\n{found}\n\nPick one (or type a media-source path), or **leave it empty to skip**.\n\n**Music on a NAS?** Add it first: [Settings → System → Storage]({storage_url}) → **Add network storage**, usage *Media*. It then appears in [Media]({media_url}) under *My media* – run this step again afterwards (Configure → Setup wizard → Music library).",
+        "data": {
+          "media_folder": "Music folder",
+          "hires_folder": "Folder of 48 kHz copies (optional)",
+          "upload_folder": "Uploads folder"
+        },
+        "data_description": {
+          "media_folder": "A media-source path, e.g. media-source://media_source/local/Music. Layout: artist / album / tracks.",
+          "hires_folder": "Sonos plays at most 48 kHz: a subfolder of the music folder with 48 kHz copies of hi-res albums (folder / artist / album). Leave empty if you have none.",
+          "upload_folder": "PHONE uploads are kept here, inside the music folder (needs write access)."
+        }
+      },
+      "radio": {
+        "title": "Radio stations (optional)",
+        "description": "The most popular stations in your country ({country}), from Radio Browser. The ticked ones go on the radio's preset buttons – at most {max}. Untick all to leave the buttons empty; the NET button finds thousands more any time, and ⚙ on the card adds or changes stations.",
+        "data": {
+          "stations": "Preset stations"
+        },
+        "data_description": {
+          "stations": "Most popular first. MP3 / AAC streams are the safest on Sonos."
+        }
+      },
+      "radio_offline": {
+        "title": "Radio stations (optional)",
+        "description": "Radio Browser can't be reached right now (no internet?). Skip this step – the preset buttons stay empty, and you can fill them later on the card: tap an empty **+** button or **NET**, or use ⚙ → Stations."
+      },
+      "tv": {
+        "title": "TV (optional)",
+        "description": "Cantabile TV turns a TV into a speaker that shows the track on screen. A **Google Cast** device with a screen (Chromecast / Google TV, Android TV, Nest Hub) gets the live TV page, a **DLNA TV** a still track card. Only devices that clearly are TVs are ticked.\n\nRequirements:\n- {https_mark} **https address** for the Cast TV page (Home Assistant Cloud or your own external URL with a certificate): {https_url}\n- {internal_mark} **Internal URL** for DLNA TVs: {internal_url}\n- {ffmpeg_mark} **ffmpeg** (VU signal, DLNA track card; included in Home Assistant OS and the container)\n\nIf something is missing the TV still gets the music – fix it in [Settings → System → Network]({network_url}), no need to run the wizard again. For a Cast TV a hidden *Cantabile TV* dashboard is created (the page the TV loads); the TV players are added to the card by themselves.",
+        "data": {
           "tv_players": "TV players (Cantabile TV)"
         },
         "data_description": {
-          "llm_api": "Lets LLM-based conversation agents start music and radio. Turn on “Cantabile” in the agent's options as well.",
-          "duck_sources": "Assist satellites (e.g. Voice PE: while listening, thinking or answering) and media players (while they say a TTS message). The playing Sonos / WiiM speakers are turned down meanwhile.",
-          "duck_level": "Percentage of the original volume; 0 = muted.",
-          "spotify_client_id": "From developer.spotify.com → Dashboard → Create app. Enables catalogue search on the SPOTIFY tab. Not needed if the Home Assistant Spotify integration is set up (that also shows your own playlists). Playback: on Sonos with Spotify linked in the Sonos app, or on Spotify Connect speakers via the Spotify integration (Premium).",
-          "tidal_client_id": "From developer.tidal.com → Dashboard → Create app. Enables catalogue search on the TIDAL tab; playback on Sonos with Tidal linked in the Sonos app.",
-          "tv_players": "TVs that become Cantabile speakers with the track on screen. Cast devices (e.g. a TV stick) get the full TV page – equalizer / waveform, artist image, track details and progress (needs the “cantabile-tv” dashboard with a “tv” view holding the Cantabile TV card, see README). DLNA TVs (DLNA Digital Media Renderer integration) show a still track card: cover, artist image and details."
+          "tv_players": "Each becomes a “TV · …” speaker on the card."
         }
+      },
+      "tv_none": {
+        "title": "TV (optional)",
+        "description": "No Google Cast or DLNA TV found – nothing to do here. To use a TV later, add it with the *Google Cast* or *DLNA Digital Media Renderer* integration ([Settings → Devices & services]({integrations_url})), then pick it under **Configure → Setup wizard → TV**.\n\nRequirements on this Home Assistant:\n- {https_mark} **https address** for the Cast TV page (Home Assistant Cloud or your own external URL with a certificate): {https_url}\n- {internal_mark} **Internal URL** for DLNA TVs: {internal_url}\n- {ffmpeg_mark} **ffmpeg** (VU signal, DLNA track card; included in Home Assistant OS and the container)"
+      },
+      "voice": {
+        "title": "Voice control",
+        "description": "With an AI (LLM) conversation agent you can say *“Play Queen in the living room”* or *“Put on Radio Paradise”*. Conversation agents found:\n\n{agents}\n\nHome Assistant doesn't let one integration change another one's options, so turn Cantabile on in the agent yourself:\n1. Open [Settings → Devices & services]({integrations_url}) and select the agent's integration (e.g. *Google Gemini*, *OpenAI*, *Anthropic*, *Ollama*).\n2. Click **Configure** (⚙) next to the agent.\n3. Under **Control Home Assistant**, tick **Cantabile** next to *Assist*.\n4. Submit, then try it in Assist.",
+        "data": {
+          "llm_api": "Assist tool (LLM API)"
+        },
+        "data_description": {
+          "llm_api": "Offers the Cantabile tool to LLM conversation agents. Turn it off if you don't use voice control."
+        }
+      },
+      "dashboard": {
+        "title": "Dashboard",
+        "description": "Where should the Cantabile card go? It comes filled in with the speakers, stations and music folder chosen in the previous steps. Your dashboards are listed under [Settings → Dashboards]({dashboards_url}).",
+        "data": {
+          "placement": "Place the card"
+        }
+      },
+      "dashboard_none": {
+        "title": "Dashboard",
+        "description": "The card needs at least one speaker, so it isn't placed now. Add your speakers' integration ([Settings → Devices & services]({integrations_url})), then run **Configure → Setup wizard → Speakers** and **Dashboard** – or add the card yourself later (Edit dashboard → Add card → Cantabile)."
+      },
+      "dashboard_new": {
+        "title": "New dashboard",
+        "description": "A new dashboard with the card across the full width, shown in the sidebar for quick access.",
+        "data": {
+          "title": "Title in the sidebar",
+          "icon": "Icon"
+        }
+      },
+      "dashboard_existing": {
+        "title": "Existing dashboard",
+        "description": "Pick the dashboard and view. The card is added at the end of the view (in a sections view as a new section). Dashboards kept in YAML are listed too – for those you get the card snippet to paste yourself.",
+        "data": {
+          "view": "Dashboard › view"
+        }
+      },
+      "dashboard_yaml": {
+        "title": "YAML dashboard",
+        "description": "This dashboard is managed in YAML, so Cantabile doesn't change it. Paste this card into the view yourself:\n\n{yaml}"
+      },
+      "summary": {
+        "title": "Summary",
+        "description": "- **Speakers** (★ default): {speakers}\n- **Music folder** (· 48 kHz copies · ⬆ uploads): {library}\n- **Radio stations:** {radio}\n- **TV players:** {tv}\n- **Assist tool** (voice): {voice}\n- **Dashboard:** {dashboard}\n- **Existing Cantabile cards:** {cards}\n\n✅ set up · ⏭️ skipped (can be set later) · – not changed · ⚠️ needs attention. New TV players appear on the card as “TV · …” speakers by themselves.\n\n**Changing things later:** speakers, stations, music folder and the look on the card's ⚙ button (*Save* writes into every Cantabile card); TV players, announcements, Spotify / Tidal keys and the Assist tool under [Settings → Devices & services]({integrations_url}) → Cantabile → **Configure** – where this wizard can be run again, also step by step."
       }
     }
   },
@@ -90,6 +310,13 @@
         "deezer": "Deezer",
         "spotify": "Spotify (experimental)",
         "tidal": "Tidal (experimental)"
+      }
+    },
+    "placement": {
+      "options": {
+        "new": "On a new “Music” dashboard in the sidebar (quick access)",
+        "existing": "On an existing dashboard",
+        "skip": "Nowhere for now – I'll add it myself (Edit dashboard → Add card → Cantabile)"
       }
     }
   },

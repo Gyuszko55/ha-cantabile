@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.6.0b1 – 2026-11-01
+
+Cantabile 2.6 (beta): a setup wizard – adding the integration now walks through speakers, music library, radio stations, TV, voice and the dashboard, and puts a ready-filled card on a new sidebar dashboard; the wizard can be run again later, also step by step.
+
+- **Setup wizard** when adding the integration (English and Hungarian), every step after the welcome skippable:
+  - **Speakers:** the media players grouped by integration (Sonos, WiiM, LinkPlay, Google Cast, DLNA DMR, Music Assistant, Squeezebox, others) with their names; speakers are ticked, TVs, Cast groups, media servers, players that can't play media and the DLNA twin of a speaker that already has its own integration are not. The *default speaker* comes first on the card. Names longer than 8 characters get a short card name (a word shared by all names, like “Sonos” or “Speaker”, is left out). Without any media player the step says which integration to add first.
+  - **Music library:** the media-source folders that hold audio files (network storage added under *Settings → System → Storage* included), counted in the background with a time limit so a slow NAS doesn't hold it up; the most likely music folder, a 48 kHz copies folder (“48”, “Hi-Res”) and the uploads folder are suggested; a how-to for adding network storage.
+  - **Radio stations:** the 30 most popular stations of Home Assistant's country from Radio Browser (through the same client as the card engine), the top six ticked, at most 12; a frequency in the name (“Klubrádió 95,3”) places the station on the dial; long names get a short button label. Without internet the step explains how to fill the buttons later.
+  - **TV:** Cast devices with a screen and DLNA TVs (only clear TVs are ticked), with a plain check of the requirements – https address / Home Assistant Cloud for the Cast TV page, internal URL for DLNA, ffmpeg. For a Cast TV the hidden `cantabile-tv` dashboard is created; once the integration is loaded, the new “TV · …” players are added to the card's speakers.
+  - **Voice:** the conversation agents found, the *Assist tool* option, and numbered steps for turning Cantabile on in the agent's options.
+  - **Dashboard:** a new storage-mode dashboard in the sidebar (default *Music* / *Zene*, `mdi:radio`, created through Home Assistant's dashboards collection) with the card in a panel view, or the card appended to a view of an existing dashboard (a new section in a sections view), or nothing. YAML dashboards get the card snippet to paste. The card is written in the README's English keys, filled with the choices above.
+  - **Summary:** what was set up, skipped or needs attention, and where to change things later.
+- **Configure** now opens a menu: *Settings* (the previous options form, unchanged) and **Setup wizard** – the whole wizard from the start or any single step; *Save and finish* writes the speakers, stations and music folder into the existing Cantabile cards like the card's ⚙ *Save* (every card set up like the first one, in its own Hungarian or English keys; per-speaker settings such as names, short names, `spotify_device` and station frequencies are kept), and a new card placed by the wizard is a copy of the first card.
+- Upgrading doesn't start the wizard and changes no card or option; existing config entries keep working as they are.
+- The Radio Browser client is a module-level function (`music.rb_kerdez`) shared by the card engine and the wizard.
+- Fix: reloading the integration (e.g. after saving the options) after Home Assistant had started logged “Unable to remove unknown job listener” from the Sonos queue restorer.
+- Tests: `tests/` (pytest, without a running Home Assistant) for the wizard's discovery, the card writing and the flow steps.
+
 ## 2.5.0 – 2026-11-01
 
 Cantabile 2.5: the TV window goes full screen on tablets and notebooks, with a video-player-style volume slider on the left edge.

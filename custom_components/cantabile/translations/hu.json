@@ -3,40 +3,260 @@
     "abort": {
       "single_instance_allowed": "A Cantabile már be van állítva."
     },
+    "error": {
+      "too_many_stations": "Legfeljebb 12 adó fér az adógombokra – vegyél ki néhányat.",
+      "folder_invalid": "A zenemappa media-source út legyen (media-source://…).",
+      "hires_not_found": "Nincs ilyen almappa a zenemappában."
+    },
     "step": {
       "user": {
-        "title": "Cantabile",
-        "description": "Hozzáadja a Cantabile rádió- és tape deck-kártyát (custom:cantabile-card) és a hozzá kellő szolgáltatásokat. A hangszórókat, az adókat és a zenemappát magán a kártyán állítod be (⚙).",
+        "title": "Cantabile beállítása",
+        "description": "A Cantabile egy régi hi-fi rádió és kazettás magnó kártyát hoz a vezérlőpultra. A varázsló néhány lépésben beállítja:\n\n1. **Hangszórók** – mely lejátszóidon szóljon a kártya, és melyik legyen az alapértelmezett.\n2. **Zenetár** *(nem kötelező)* – a saját zenemappád, pl. egy NAS megosztása.\n3. **Rádióadók** *(nem kötelező)* – az országod legnépszerűbb adói az adógombokon.\n4. **TV** *(nem kötelező)* – TV-k, amelyek a képernyőn mutatják a számot (Cantabile TV).\n5. **Hangvezérlés** – zeneindítás hanggal, MI-s beszélgetőügynökkel.\n6. **Vezérlőpult** – hová kerüljön a kártya: új *Zene* vezérlőpultra az oldalsávban, egy meglévőre, vagy egyelőre sehová.\n\nHa kihagysz egy lépést, semmi sem vész el: minden később is módosítható a kártyán (⚙) vagy a **Konfigurálás → Beállítás varázsló** alatt."
+      },
+      "speakers": {
+        "title": "Hangszórók",
+        "description": "{count} médialejátszót találtam ({groups}). Pipáld ki, melyeken szóljon a Cantabile – a hangszórók már ki vannak pipálva, a TV-k és a médiaszerverek nem. Az **alapértelmezett hangszóró** áll elsőként a kártya hangszóróválasztóján.\n\nA 8 karakternél hosszabb nevek rövid nevet kapnak a kártyán; később a kártyán, a ⚙ → Hangszórók alatt átírhatod.",
+        "data": {
+          "speakers": "Hangszórók a kártyán",
+          "default_speaker": "Alapértelmezett hangszóró"
+        },
+        "data_description": {
+          "speakers": "Integrációnként: Sonos, WiiM, LinkPlay, Google Cast, DLNA, Music Assistant, Squeezebox, egyéb.",
+          "default_speaker": "Elsőként áll a választón; a hangszóró megnevezése nélküli hangparancsok is ezt használják."
+        }
+      },
+      "speakers_none": {
+        "title": "Még nincs hangszóró",
+        "description": "A Home Assistantban még nincs médialejátszó, így nincs min szólnia. Előbb vedd fel a hangszóróid integrációját: [Beállítások → Eszközök és szolgáltatások]({integrations_url}) → **Integráció hozzáadása** → pl. *Sonos*, *WiiM*, *LinkPlay*, *Google Cast*, *DLNA Digital Media Renderer*, *Music Assistant* vagy *Squeezebox*.\n\nMost továbbléphetsz, a hangszórókat később is felveheted – a kártyán (⚙ → Hangszórók) vagy a **Konfigurálás → Beállítás varázsló → Hangszórók** alatt."
+      },
+      "library": {
+        "title": "Zenetár (nem kötelező)",
+        "description": "A Cantabile a saját zenédet a Home Assistant médiájának egy mappájából játssza (NAS fül: előadó → album → számok). Zenét tartalmazó mappák:\n\n{found}\n\nVálassz egyet (vagy írj be egy media-source utat), vagy **hagyd üresen, ha most kihagyod**.\n\n**NAS-on van a zene?** Előbb vedd fel: [Beállítások → Rendszer → Tárhely]({storage_url}) → **Hálózati tárhely hozzáadása**, felhasználás: *Médiatartalmak*. Ezután a [Média]({media_url}) alatt, a *Saját média* között látszik – utána futtasd újra ezt a lépést (Konfigurálás → Beállítás varázsló → Zenetár).",
+        "data": {
+          "media_folder": "Zenemappa",
+          "hires_folder": "A 48 kHz-es másolatok mappája (nem kötelező)",
+          "upload_folder": "Feltöltések mappája"
+        },
+        "data_description": {
+          "media_folder": "Media-source út, pl. media-source://media_source/local/Music. Felépítés: előadó / album / számok.",
+          "hires_folder": "A Sonos legfeljebb 48 kHz-et játszik: a zenemappa almappája a hi-res albumok 48 kHz-es másolataival (mappa / előadó / album). Hagyd üresen, ha nincs ilyen.",
+          "upload_folder": "A TELEFON fül feltöltései ide kerülnek, a zenemappán belül (írási jog kell)."
+        }
+      },
+      "radio": {
+        "title": "Rádióadók (nem kötelező)",
+        "description": "Az országod ({country}) legnépszerűbb adói a Radio Browserből. A kipipáltak kerülnek a rádió adógombjaira – legfeljebb {max}. Ha mindet kiveszed, a gombok üresek maradnak; a NET gombbal bármikor több ezer adó közül választhatsz, a kártya ⚙ gombjával pedig adót vehetsz fel vagy cserélhetsz.",
+        "data": {
+          "stations": "Adógombok"
+        },
+        "data_description": {
+          "stations": "A legnépszerűbbek elöl. Sonoson az MP3 / AAC adás a legbiztosabb."
+        }
+      },
+      "radio_offline": {
+        "title": "Rádióadók (nem kötelező)",
+        "description": "A Radio Browser most nem érhető el (nincs internet?). Hagyd ki ezt a lépést – az adógombok üresek maradnak, később a kártyán töltheted fel őket: koppints egy üres **+** gombra vagy a **NET**-re, vagy használd a ⚙ → Adók részt."
+      },
+      "tv": {
+        "title": "TV (nem kötelező)",
+        "description": "A Cantabile TV a TV-ből hangszórót csinál, amely a képernyőn mutatja a számot. A képernyős **Google Cast** eszköz (Chromecast / Google TV, Android TV, Nest Hub) az élő TV-oldalt kapja, a **DLNA-s TV** egy álló adatlapot. Csak az egyértelműen TV-nek látszó eszközök vannak kipipálva.\n\nFeltételek:\n- {https_mark} **Https-cím** a Cast TV-oldalhoz (Home Assistant Cloud vagy saját külső cím tanúsítvánnyal): {https_url}\n- {internal_mark} **Belső cím** a DLNA-TV-khez: {internal_url}\n- {ffmpeg_mark} **ffmpeg** (VU-jel, DLNA-adatlap; a Home Assistant OS-ben és a konténerben benne van)\n\nHa valami hiányzik, a TV a zenét akkor is megkapja – a [Beállítások → Rendszer → Hálózat]({network_url}) alatt pótolhatod, a varázslót nem kell újra futtatni. Cast TV-hez egy rejtett *Cantabile TV* vezérlőpult jön létre (ezt az oldalt tölti be a TV); a TV-lejátszók maguktól felkerülnek a kártyára.",
+        "data": {
+          "tv_players": "TV-lejátszók (Cantabile TV)"
+        },
+        "data_description": {
+          "tv_players": "Mindegyik „TV · …” hangszóró lesz a kártyán."
+        }
+      },
+      "tv_none": {
+        "title": "TV (nem kötelező)",
+        "description": "Nem találtam Google Cast vagy DLNA-s TV-t – itt most nincs teendő. Ha később TV-t használnál, vedd fel a *Google Cast* vagy a *DLNA Digital Media Renderer* integrációval ([Beállítások → Eszközök és szolgáltatások]({integrations_url})), majd válaszd ki a **Konfigurálás → Beállítás varázsló → TV** alatt.\n\nA feltételek ezen a Home Assistanton:\n- {https_mark} **Https-cím** a Cast TV-oldalhoz (Home Assistant Cloud vagy saját külső cím tanúsítvánnyal): {https_url}\n- {internal_mark} **Belső cím** a DLNA-TV-khez: {internal_url}\n- {ffmpeg_mark} **ffmpeg** (VU-jel, DLNA-adatlap; a Home Assistant OS-ben és a konténerben benne van)"
+      },
+      "voice": {
+        "title": "Hangvezérlés",
+        "description": "MI-s (LLM-es) beszélgetőügynökkel mondhatod, hogy *„Játszd a Queent a nappaliban”* vagy *„Kapcsold be a Petőfi Rádiót”*. A talált beszélgetőügynökök:\n\n{agents}\n\nA Home Assistant nem engedi, hogy egy integráció egy másik beállításait átírja, ezért az ügynöknél neked kell bekapcsolnod a Cantabile-t:\n1. Nyisd meg a [Beállítások → Eszközök és szolgáltatások]({integrations_url}) oldalt, és válaszd az ügynök integrációját (pl. *Google Gemini*, *OpenAI*, *Anthropic*, *Ollama*).\n2. Kattints az ügynök melletti **Konfigurálás** (⚙) gombra.\n3. A **Home Assistant vezérlése** alatt pipáld ki a **Cantabile**-t az *Assist* mellett.\n4. Küldd el, és próbáld ki az Assistben.",
         "data": {
           "llm_api": "Assist-eszköz (LLM API)"
         },
         "data_description": {
-          "llm_api": "Az LLM-es beszélgetőügynökök (Gemini, OpenAI, Claude…) zenét és rádiót indíthatnak vele. Az ügynök beállításaiban is kapcsold be a „Cantabile”-t."
+          "llm_api": "Felkínálja a Cantabile eszközt az LLM-es beszélgetőügynököknek. Kapcsold ki, ha nem használsz hangvezérlést."
         }
+      },
+      "dashboard": {
+        "title": "Vezérlőpult",
+        "description": "Hová kerüljön a Cantabile kártya? Az előző lépésekben választott hangszórókkal, adókkal és zenemappával kitöltve kerül fel. A vezérlőpultjaid a [Beállítások → Irányítópultok]({dashboards_url}) alatt vannak.",
+        "data": {
+          "placement": "A kártya helye"
+        }
+      },
+      "dashboard_none": {
+        "title": "Vezérlőpult",
+        "description": "A kártyához legalább egy hangszóró kell, ezért most nem kerül fel. Vedd fel a hangszóróid integrációját ([Beállítások → Eszközök és szolgáltatások]({integrations_url})), majd futtasd a **Konfigurálás → Beállítás varázsló → Hangszórók** és **Vezérlőpult** lépést – vagy később tedd fel magad a kártyát (Vezérlőpult szerkesztése → Kártya hozzáadása → Cantabile)."
+      },
+      "dashboard_new": {
+        "title": "Új vezérlőpult",
+        "description": "Új vezérlőpult, rajta a kártya teljes szélességben; az oldalsávban látszik, így egy koppintással elérhető.",
+        "data": {
+          "title": "Cím az oldalsávban",
+          "icon": "Ikon"
+        }
+      },
+      "dashboard_existing": {
+        "title": "Meglévő vezérlőpult",
+        "description": "Válaszd ki a vezérlőpultot és a nézetet. A kártya a nézet végére kerül (szekciós nézetben új szekcióba). A YAML-ban kezelt vezérlőpultok is a listában vannak – azokhoz a kártya kódrészletét kapod, amit magad illesztesz be.",
+        "data": {
+          "view": "Vezérlőpult › nézet"
+        }
+      },
+      "dashboard_yaml": {
+        "title": "YAML-vezérlőpult",
+        "description": "Ezt a vezérlőpultot YAML-ban kezeled, ezért a Cantabile nem módosítja. Ezt a kártyát illeszd be magad a nézetbe:\n\n{yaml}"
+      },
+      "summary": {
+        "title": "Összefoglaló",
+        "description": "- **Hangszórók** (★ alapértelmezett): {speakers}\n- **Zenemappa** (· 48 kHz-es másolatok · ⬆ feltöltések): {library}\n- **Rádióadók:** {radio}\n- **TV-lejátszók:** {tv}\n- **Assist-eszköz** (hang): {voice}\n- **Vezérlőpult:** {dashboard}\n- **Meglévő Cantabile kártyák:** {cards}\n\n✅ beállítva · ⏭️ kihagyva (később is beállítható) · – nem változott · ⚠️ figyelmet kér. Az új TV-lejátszók maguktól felkerülnek a kártyára „TV · …” hangszóróként.\n\n**Később így módosíthatod:** a hangszórókat, az adókat, a zenemappát és a kinézetet a kártya ⚙ gombjával (a *Mentés* minden Cantabile kártyába beírja); a TV-lejátszókat, a bemondáskori halkítást, a Spotify / Tidal kulcsokat és az Assist-eszközt a [Beállítások → Eszközök és szolgáltatások]({integrations_url}) → Cantabile → **Konfigurálás** alatt – itt a varázsló is újra futtatható, lépésenként is."
       }
     }
   },
   "options": {
+    "error": {
+      "too_many_stations": "Legfeljebb 12 adó fér az adógombokra – vegyél ki néhányat.",
+      "folder_invalid": "A zenemappa media-source út legyen (media-source://…).",
+      "hires_not_found": "Nincs ilyen almappa a zenemappában."
+    },
     "step": {
       "init": {
+        "title": "Cantabile",
+        "menu_options": {
+          "settings": "Beállítások – Assist-eszköz, halkítás, TV-lejátszók, kulcsok",
+          "wizard": "Beállítás varázsló – hangszórók, zenetár, rádió, TV, hang, vezérlőpult"
+        }
+      },
+      "wizard": {
+        "title": "Beállítás varázsló",
+        "description": "Futtasd végig az elejétől, vagy válassz egy lépést. A választásaid a **Mentés és befejezés** alatt kerülnek a kártyákba és a beállításokba.",
+        "menu_options": {
+          "welcome": "A teljes varázsló",
+          "speakers": "Hangszórók",
+          "library": "Zenetár",
+          "radio": "Rádióadók",
+          "tv": "TV",
+          "voice": "Hangvezérlés",
+          "dashboard": "Vezérlőpult (kártya felvétele)",
+          "summary": "Mentés és befejezés"
+        }
+      },
+      "settings": {
+        "title": "Cantabile",
+        "menu_options": {
+          "settings": "Beállítások – Assist-eszköz, halkítás, TV-lejátszók, kulcsok",
+          "wizard": "Beállítás varázsló – hangszórók, zenetár, rádió, TV, hang, vezérlőpult"
+        }
+      },
+      "welcome": {
+        "title": "Cantabile beállítása",
+        "description": "A Cantabile egy régi hi-fi rádió és kazettás magnó kártyát hoz a vezérlőpultra. A varázsló néhány lépésben beállítja:\n\n1. **Hangszórók** – mely lejátszóidon szóljon a kártya, és melyik legyen az alapértelmezett.\n2. **Zenetár** *(nem kötelező)* – a saját zenemappád, pl. egy NAS megosztása.\n3. **Rádióadók** *(nem kötelező)* – az országod legnépszerűbb adói az adógombokon.\n4. **TV** *(nem kötelező)* – TV-k, amelyek a képernyőn mutatják a számot (Cantabile TV).\n5. **Hangvezérlés** – zeneindítás hanggal, MI-s beszélgetőügynökkel.\n6. **Vezérlőpult** – hová kerüljön a kártya: új *Zene* vezérlőpultra az oldalsávban, egy meglévőre, vagy egyelőre sehová.\n\nHa kihagysz egy lépést, semmi sem vész el: minden később is módosítható a kártyán (⚙) vagy a **Konfigurálás → Beállítás varázsló** alatt."
+      },
+      "speakers": {
+        "title": "Hangszórók",
+        "description": "{count} médialejátszót találtam ({groups}). Pipáld ki, melyeken szóljon a Cantabile – a hangszórók már ki vannak pipálva, a TV-k és a médiaszerverek nem. Az **alapértelmezett hangszóró** áll elsőként a kártya hangszóróválasztóján.\n\nA 8 karakternél hosszabb nevek rövid nevet kapnak a kártyán; később a kártyán, a ⚙ → Hangszórók alatt átírhatod.",
         "data": {
-          "llm_api": "Assist-eszköz (LLM API)",
-          "duck_sources": "Bemondó eszközök (halkítás, amíg beszélnek)",
-          "duck_level": "A zene hangereje bemondás alatt",
-          "spotify_client_id": "Spotify client ID (kísérleti)",
-          "spotify_client_secret": "Spotify client secret",
-          "tidal_client_id": "Tidal client ID (kísérleti)",
-          "tidal_client_secret": "Tidal client secret",
+          "speakers": "Hangszórók a kártyán",
+          "default_speaker": "Alapértelmezett hangszóró"
+        },
+        "data_description": {
+          "speakers": "Integrációnként: Sonos, WiiM, LinkPlay, Google Cast, DLNA, Music Assistant, Squeezebox, egyéb.",
+          "default_speaker": "Elsőként áll a választón; a hangszóró megnevezése nélküli hangparancsok is ezt használják."
+        }
+      },
+      "speakers_none": {
+        "title": "Még nincs hangszóró",
+        "description": "A Home Assistantban még nincs médialejátszó, így nincs min szólnia. Előbb vedd fel a hangszóróid integrációját: [Beállítások → Eszközök és szolgáltatások]({integrations_url}) → **Integráció hozzáadása** → pl. *Sonos*, *WiiM*, *LinkPlay*, *Google Cast*, *DLNA Digital Media Renderer*, *Music Assistant* vagy *Squeezebox*.\n\nMost továbbléphetsz, a hangszórókat később is felveheted – a kártyán (⚙ → Hangszórók) vagy a **Konfigurálás → Beállítás varázsló → Hangszórók** alatt."
+      },
+      "library": {
+        "title": "Zenetár (nem kötelező)",
+        "description": "A Cantabile a saját zenédet a Home Assistant médiájának egy mappájából játssza (NAS fül: előadó → album → számok). Zenét tartalmazó mappák:\n\n{found}\n\nVálassz egyet (vagy írj be egy media-source utat), vagy **hagyd üresen, ha most kihagyod**.\n\n**NAS-on van a zene?** Előbb vedd fel: [Beállítások → Rendszer → Tárhely]({storage_url}) → **Hálózati tárhely hozzáadása**, felhasználás: *Médiatartalmak*. Ezután a [Média]({media_url}) alatt, a *Saját média* között látszik – utána futtasd újra ezt a lépést (Konfigurálás → Beállítás varázsló → Zenetár).",
+        "data": {
+          "media_folder": "Zenemappa",
+          "hires_folder": "A 48 kHz-es másolatok mappája (nem kötelező)",
+          "upload_folder": "Feltöltések mappája"
+        },
+        "data_description": {
+          "media_folder": "Media-source út, pl. media-source://media_source/local/Music. Felépítés: előadó / album / számok.",
+          "hires_folder": "A Sonos legfeljebb 48 kHz-et játszik: a zenemappa almappája a hi-res albumok 48 kHz-es másolataival (mappa / előadó / album). Hagyd üresen, ha nincs ilyen.",
+          "upload_folder": "A TELEFON fül feltöltései ide kerülnek, a zenemappán belül (írási jog kell)."
+        }
+      },
+      "radio": {
+        "title": "Rádióadók (nem kötelező)",
+        "description": "Az országod ({country}) legnépszerűbb adói a Radio Browserből. A kipipáltak kerülnek a rádió adógombjaira – legfeljebb {max}. Ha mindet kiveszed, a gombok üresek maradnak; a NET gombbal bármikor több ezer adó közül választhatsz, a kártya ⚙ gombjával pedig adót vehetsz fel vagy cserélhetsz.",
+        "data": {
+          "stations": "Adógombok"
+        },
+        "data_description": {
+          "stations": "A legnépszerűbbek elöl. Sonoson az MP3 / AAC adás a legbiztosabb."
+        }
+      },
+      "radio_offline": {
+        "title": "Rádióadók (nem kötelező)",
+        "description": "A Radio Browser most nem érhető el (nincs internet?). Hagyd ki ezt a lépést – az adógombok üresek maradnak, később a kártyán töltheted fel őket: koppints egy üres **+** gombra vagy a **NET**-re, vagy használd a ⚙ → Adók részt."
+      },
+      "tv": {
+        "title": "TV (nem kötelező)",
+        "description": "A Cantabile TV a TV-ből hangszórót csinál, amely a képernyőn mutatja a számot. A képernyős **Google Cast** eszköz (Chromecast / Google TV, Android TV, Nest Hub) az élő TV-oldalt kapja, a **DLNA-s TV** egy álló adatlapot. Csak az egyértelműen TV-nek látszó eszközök vannak kipipálva.\n\nFeltételek:\n- {https_mark} **Https-cím** a Cast TV-oldalhoz (Home Assistant Cloud vagy saját külső cím tanúsítvánnyal): {https_url}\n- {internal_mark} **Belső cím** a DLNA-TV-khez: {internal_url}\n- {ffmpeg_mark} **ffmpeg** (VU-jel, DLNA-adatlap; a Home Assistant OS-ben és a konténerben benne van)\n\nHa valami hiányzik, a TV a zenét akkor is megkapja – a [Beállítások → Rendszer → Hálózat]({network_url}) alatt pótolhatod, a varázslót nem kell újra futtatni. Cast TV-hez egy rejtett *Cantabile TV* vezérlőpult jön létre (ezt az oldalt tölti be a TV); a TV-lejátszók maguktól felkerülnek a kártyára.",
+        "data": {
           "tv_players": "TV-lejátszók (Cantabile TV)"
         },
         "data_description": {
-          "llm_api": "Az LLM-es beszélgetőügynökök zenét és rádiót indíthatnak vele. Az ügynök beállításaiban is kapcsold be a „Cantabile”-t.",
-          "duck_sources": "Assist-segédállomások (pl. Voice PE: amíg hallgat, gondolkodik vagy válaszol) és médialejátszók (amíg szöveget mondanak). Közben a szóló Sonos / WiiM hangszórók halkabban szólnak.",
-          "duck_level": "Az eredeti hangerő százalékában; 0 = elnémul.",
-          "spotify_client_id": "A developer.spotify.com → Dashboard → Create app oldalról. A SPOTIFY fülön a katalógus keresését engedi. Nem kell, ha be van kötve a Home Assistant Spotify-integrációja (azzal a saját listák is látszanak). Lejátszás: Sonoson a Sonos appba bekötött Spotify-jal, vagy Spotify Connect-hangszórón a Spotify-integráción át (Premium).",
-          "tidal_client_id": "A developer.tidal.com → Dashboard → Create app oldalról. A TIDAL fülön a katalógus keresését engedi; lejátszás Sonoson, a Sonos appba bekötött Tidallal.",
-          "tv_players": "TV-k, amelyek Cantabile-hangszóróként szólnak, a képernyőn a számmal. Cast-eszközön (pl. TV-stick) a teljes TV-oldal: equalizer / hullámforma, előadókép, a szám adatai és haladásjelző (kell hozzá a „cantabile-tv” vezérlőpult egy „tv” nézettel, benne a Cantabile TV kártyával, lásd README). DLNA-s TV-n (DLNA Digital Media Renderer integráció) álló adatlap: borító, előadókép és a szám adatai."
+          "tv_players": "Mindegyik „TV · …” hangszóró lesz a kártyán."
         }
+      },
+      "tv_none": {
+        "title": "TV (nem kötelező)",
+        "description": "Nem találtam Google Cast vagy DLNA-s TV-t – itt most nincs teendő. Ha később TV-t használnál, vedd fel a *Google Cast* vagy a *DLNA Digital Media Renderer* integrációval ([Beállítások → Eszközök és szolgáltatások]({integrations_url})), majd válaszd ki a **Konfigurálás → Beállítás varázsló → TV** alatt.\n\nA feltételek ezen a Home Assistanton:\n- {https_mark} **Https-cím** a Cast TV-oldalhoz (Home Assistant Cloud vagy saját külső cím tanúsítvánnyal): {https_url}\n- {internal_mark} **Belső cím** a DLNA-TV-khez: {internal_url}\n- {ffmpeg_mark} **ffmpeg** (VU-jel, DLNA-adatlap; a Home Assistant OS-ben és a konténerben benne van)"
+      },
+      "voice": {
+        "title": "Hangvezérlés",
+        "description": "MI-s (LLM-es) beszélgetőügynökkel mondhatod, hogy *„Játszd a Queent a nappaliban”* vagy *„Kapcsold be a Petőfi Rádiót”*. A talált beszélgetőügynökök:\n\n{agents}\n\nA Home Assistant nem engedi, hogy egy integráció egy másik beállításait átírja, ezért az ügynöknél neked kell bekapcsolnod a Cantabile-t:\n1. Nyisd meg a [Beállítások → Eszközök és szolgáltatások]({integrations_url}) oldalt, és válaszd az ügynök integrációját (pl. *Google Gemini*, *OpenAI*, *Anthropic*, *Ollama*).\n2. Kattints az ügynök melletti **Konfigurálás** (⚙) gombra.\n3. A **Home Assistant vezérlése** alatt pipáld ki a **Cantabile**-t az *Assist* mellett.\n4. Küldd el, és próbáld ki az Assistben.",
+        "data": {
+          "llm_api": "Assist-eszköz (LLM API)"
+        },
+        "data_description": {
+          "llm_api": "Felkínálja a Cantabile eszközt az LLM-es beszélgetőügynököknek. Kapcsold ki, ha nem használsz hangvezérlést."
+        }
+      },
+      "dashboard": {
+        "title": "Vezérlőpult",
+        "description": "Hová kerüljön a Cantabile kártya? Az előző lépésekben választott hangszórókkal, adókkal és zenemappával kitöltve kerül fel. A vezérlőpultjaid a [Beállítások → Irányítópultok]({dashboards_url}) alatt vannak.",
+        "data": {
+          "placement": "A kártya helye"
+        }
+      },
+      "dashboard_none": {
+        "title": "Vezérlőpult",
+        "description": "A kártyához legalább egy hangszóró kell, ezért most nem kerül fel. Vedd fel a hangszóróid integrációját ([Beállítások → Eszközök és szolgáltatások]({integrations_url})), majd futtasd a **Konfigurálás → Beállítás varázsló → Hangszórók** és **Vezérlőpult** lépést – vagy később tedd fel magad a kártyát (Vezérlőpult szerkesztése → Kártya hozzáadása → Cantabile)."
+      },
+      "dashboard_new": {
+        "title": "Új vezérlőpult",
+        "description": "Új vezérlőpult, rajta a kártya teljes szélességben; az oldalsávban látszik, így egy koppintással elérhető.",
+        "data": {
+          "title": "Cím az oldalsávban",
+          "icon": "Ikon"
+        }
+      },
+      "dashboard_existing": {
+        "title": "Meglévő vezérlőpult",
+        "description": "Válaszd ki a vezérlőpultot és a nézetet. A kártya a nézet végére kerül (szekciós nézetben új szekcióba). A YAML-ban kezelt vezérlőpultok is a listában vannak – azokhoz a kártya kódrészletét kapod, amit magad illesztesz be.",
+        "data": {
+          "view": "Vezérlőpult › nézet"
+        }
+      },
+      "dashboard_yaml": {
+        "title": "YAML-vezérlőpult",
+        "description": "Ezt a vezérlőpultot YAML-ban kezeled, ezért a Cantabile nem módosítja. Ezt a kártyát illeszd be magad a nézetbe:\n\n{yaml}"
+      },
+      "summary": {
+        "title": "Összefoglaló",
+        "description": "- **Hangszórók** (★ alapértelmezett): {speakers}\n- **Zenemappa** (· 48 kHz-es másolatok · ⬆ feltöltések): {library}\n- **Rádióadók:** {radio}\n- **TV-lejátszók:** {tv}\n- **Assist-eszköz** (hang): {voice}\n- **Vezérlőpult:** {dashboard}\n- **Meglévő Cantabile kártyák:** {cards}\n\n✅ beállítva · ⏭️ kihagyva (később is beállítható) · – nem változott · ⚠️ figyelmet kér. Az új TV-lejátszók maguktól felkerülnek a kártyára „TV · …” hangszóróként.\n\n**Később így módosíthatod:** a hangszórókat, az adókat, a zenemappát és a kinézetet a kártya ⚙ gombjával (a *Mentés* minden Cantabile kártyába beírja); a TV-lejátszókat, a bemondáskori halkítást, a Spotify / Tidal kulcsokat és az Assist-eszközt a [Beállítások → Eszközök és szolgáltatások]({integrations_url}) → Cantabile → **Konfigurálás** alatt – itt a varázsló is újra futtatható, lépésenként is."
       }
     }
   },
@@ -90,6 +310,13 @@
         "deezer": "Deezer",
         "spotify": "Spotify (kísérleti)",
         "tidal": "Tidal (kísérleti)"
+      }
+    },
+    "placement": {
+      "options": {
+        "new": "Új „Zene” vezérlőpultra az oldalsávban (gyors elérés)",
+        "existing": "Egy meglévő vezérlőpultra",
+        "skip": "Egyelőre sehová – magam teszem fel (Vezérlőpult szerkesztése → Kártya hozzáadása → Cantabile)"
       }
     }
   },
