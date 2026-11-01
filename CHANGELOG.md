@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Lyrics: a passing LRCLIB error (503, timeout) no longer stops the music-folder lyrics collector for half an hour – it waits 10 / 30 / 60 seconds and asks for the same track again, and pauses only after 5 failures in a row. Lyrics shown while playing are asked again after a timeout too, not only after a 503.
+- Lyrics: LRCLIB's rate limit (429 “too many requests”) is respected. Cantabile waits as long as LRCLIB asks (`Retry-After`, at least a minute) and doesn't ask LRCLIB at all meanwhile – lyrics shown while playing come from lyrics.ovh then. Requests are at least 1 second apart; the collector takes 5 seconds between tracks, slows down after each 429 (up to 30 seconds) and speeds up again gradually; its current pace is `szunet` in `cantabile/lyrics/collect_status`.
 
 ## 2.3.0 – 2026-10-31
 

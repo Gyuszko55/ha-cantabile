@@ -131,14 +131,42 @@ def _eredmeny(adat: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
+class Korlat(aiohttp.ClientError):
+    """Az LRCLIB 429-cel jelzi, hogy túl sok volt a kérés; `varj` mp múlva lehet újra kérni."""
+
+    def __init__(self, varj: float) -> None:
+        super().__init__(f"LRCLIB: túl sok kérés, {varj:.0f} mp múlva újra")
+        self.varj = varj
+
+
+KERES_KOZ = 1.0          # mp legalább két LRCLIB-kérés között
+_lrclib = {"utolso": 0.0, "tilt": 0.0}
+_zar = asyncio.Lock()
+
+
 async def _ker(sess: aiohttp.ClientSession, ut: str, param: dict[str, Any]) -> Any:
     for proba in range(3):          # az LRCLIB néha átmeneti 503-at / időtúllépést ad – kétszer újra
+        if (hatra := _lrclib["tilt"] - time.monotonic()) > 0:
+            raise Korlat(hatra)                  # korlátozás alatt nem kérdezzük (a lejátszás a tartalékot kéri)
+        async with _zar:                         # a kérések között legalább KERES_KOZ mp
+            await asyncio.sleep(max(0.0, _lrclib["utolso"] + KERES_KOZ - time.monotonic()))
+            _lrclib["utolso"] = time.monotonic()
         try:
             async with sess.get(f"{API}/{ut}", params=param, headers={"User-Agent": UA}, timeout=aiohttp.ClientTimeout(total=10)) as v:
                 if v.status == 404:
                     return None
+                if v.status == 429:
+                    try:
+                        varj = float(v.headers.get("Retry-After") or 60)
+                    except ValueError:
+                        varj = 60.0
+                    varj = min(max(varj, 60.0), 3600.0)
+                    _lrclib["tilt"] = time.monotonic() + varj
+                    raise Korlat(varj)
                 v.raise_for_status()             # tartós 5xx: hiba (nem „nincs dalszöveg”)
                 return await v.json()
+        except Korlat:
+            raise
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             if proba == 2 or (isinstance(err, aiohttp.ClientResponseError) and err.status < 500):
                 raise
@@ -229,7 +257,8 @@ async def keres(hass: HomeAssistant, eloado: str, cim: str, album: str | None, h
 
 
 UJRA_NAP = 30            # a nem talált / csak sima szövegű számot ennyi nap múlva kérdezi újra
-KOZ = 2.0                # mp két szám között (az LRCLIB kímélése)
+KOZ = 5.0                # mp két szám között (az LRCLIB kímélése); 429 után nő, legfeljebb KOZ_MAX-ig
+KOZ_MAX = 30.0
 VARAKOZAS = (10, 30, 60, 60)   # mp: LRCLIB-hiba után ennyit vár, mielőtt ugyanazt a számot újra kéri
 HIBA_MAX = 5             # ennyi egymás utáni hiba után az LRCLIB-et leállnak veszi (30 perc múlva folytatja)
 
@@ -259,7 +288,8 @@ class Gyujto:
         self.hass = hass
         self.fajl = hass.config.path(".cache", "cantabile_dalszoveg.json")
         self.allapot: dict[str, dict[str, Any]] = {}
-        self.statusz: dict[str, Any] = {"fut": False, "kesz": 0, "osszes": 0, "szinkron": 0, "sima": 0, "nincs": 0, "lrclib": None}
+        self.statusz: dict[str, Any] = {"fut": False, "kesz": 0, "osszes": 0, "szinkron": 0, "sima": 0, "nincs": 0, "lrclib": None,
+                                        "szunet": KOZ}
 
     def _betolt(self) -> dict[str, dict[str, Any]]:
         try:
@@ -277,6 +307,8 @@ class Gyujto:
     async def _lrclib_el(self) -> bool:
         try:
             await _ker(async_get_clientsession(self.hass), "get", {"artist_name": "Queen", "track_name": "Bohemian Rhapsody"})
+        except Korlat:
+            return True                              # elérhető, csak korlátoz: a kör kivárja
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
             return False
         return True
@@ -319,6 +351,7 @@ class Gyujto:
         teendo = [f for f in fajlok if not f.startswith("_Azonosítatlan/")
                   and not ((a := self.allapot.get(f)) and (a.get("e") == "szinkron" or most - a.get("t", 0) < UJRA_NAP * 86400))]
         self.statusz.update(fut=True, osszes=len(teendo), kesz=0)
+        koz = KOZ
         for n, f in enumerate(teendo, 1):
             ut = os.path.join(gyoker, f)
             c = await self.hass.async_add_executor_job(_cimkek, ut)
@@ -330,7 +363,15 @@ class Gyujto:
                     try:
                         e = await keres(self.hass, c["eloado"], c["cim"], c.get("album"), c.get("hossz"), csak_lrclib=True,
                                         lrc_fajl=os.path.splitext(ut)[0] + ".lrc")
+                        koz = max(KOZ, koz * 0.95)       # sikeres kérések után lassan visszaáll az alaptempó
+                        self.statusz["szunet"] = round(koz, 1)
                         break
+                    except Korlat as err:
+                        # túl sok kérés: kivárja, amennyit az LRCLIB kér, és ezután ritkábban kérdez (nem számít hibának)
+                        koz = min(koz * 1.5, KOZ_MAX)
+                        self.statusz["szunet"] = round(koz, 1)
+                        _LOGGER.debug("Cantabile: %s; a begyűjtő ezután %.1f mp-enként kérdez", err, koz)
+                        await asyncio.sleep(err.varj + 1)
                     except (aiohttp.ClientError, asyncio.TimeoutError) as err:
                         hiba += 1
                         if hiba >= HIBA_MAX:
@@ -342,7 +383,7 @@ class Gyujto:
                 eredm = "szinkron" if e.get("synced") else "sima" if e.get("found") and e.get("plain") else "nincs"
                 self.allapot[f] = {"e": eredm, "t": time.time()}
                 self.statusz[eredm] += 1
-                await asyncio.sleep(KOZ)
+                await asyncio.sleep(koz)
             self.statusz["kesz"] = n
             if n % 25 == 0:
                 await self.hass.async_add_executor_job(self._ment)
