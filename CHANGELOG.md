@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 2.4.0 – 2026-11-01
+
+Cantabile 2.4: lyrics of streamed tracks are kept on the server and upgraded to timed lyrics when they appear, the lyrics collector copes with LRCLIB's outages and rate limit, and the TV window on the card follows track changes again.
 
 - **Lyrics store for streaming:** lyrics of tracks that don't come from the music folder (Deezer, Spotify, Music Assistant, Sonos favourites, AirPlay, radio with artist and title) are saved on the Home Assistant server in `.cache/cantabile_dalszoveg/Artist/Title.lrc` (bracketed suffixes like “(Remastered 2011)” dropped from the name) and read from there next time – without internet and after a restart. When the same track is in the music folder too, the lyrics are saved beside that file as well (looked up in the already-read folder list while playing, so it never waits for a folder scan). The background collector also goes through the store: plain lyrics are checked for a timed version every 30 days and replaced when one appears (status: `tarolo`, `tarolo_kesz`, `tarolo_csere` in `cantabile/lyrics/collect_status`).
 - **Fix: the TV window on the card didn't follow track changes.** Its listeners ran outside Home Assistant's event loop, so a new track's details (title, cover, length, lyrics) never arrived – the window kept showing what played when it was opened, also after switching speakers, until it was closed and opened again. The same fix applies to the TV mirror's and the VU meter's reaction to the WiiM's precise (UPnP) track changes.
