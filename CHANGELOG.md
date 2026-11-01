@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 2.5.0 – 2026-11-01
+
+Cantabile 2.5: the TV window goes full screen on tablets and notebooks, with a video-player-style volume slider on the left edge.
 
 - **TV window in full screen:** a ⛶ FULL SCREEN button in the TV window's bottom bar shows the TV page across the whole screen – on a notebook the browser goes full screen (like F11), on a tablet too, turned to landscape on Android; where the browser doesn't allow it (some embedded views, a kiosk browser), the picture covers the whole Home Assistant page instead. A tap, Esc or closing the window goes back; the screen doesn't sleep meanwhile; switching speakers keeps it full screen, and it closes 5 seconds after the music stops, like the window.
 - **Volume slider in full screen:** in the TV window's full screen a linear volume slider slides out on the left edge, like in video players – tap the left edge (or move the mouse there) to show it; drag up / down on the left edge to change the volume relatively, or set it directly on the slider; the mouse wheel and ↑ / ↓ change it by 2%. It hides after 2.5 seconds; tapping the left edge doesn't leave full screen.

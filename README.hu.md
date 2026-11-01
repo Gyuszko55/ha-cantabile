@@ -158,11 +158,18 @@ vagy a lenti `select` / `switch` entitásokkal. Ha a TV-ről másik hangszórór
 számát (tükör), a Home Assistant újraindítása után is.
 
 A kártya **TV-gombja** (az ⓘ előtt) ugyanezt az oldalt kis ablakban mutatja a kiválasztott hangszóróról, a kijelző
-fölött; a zene megállása után 5 mp-cel magától bezárul.
+fölött; követi a szám- és hangszóróváltást, és a zene megállása után 5 mp-cel magától bezárul. Az ablak alsó sávjában
+a **⛶ FULL SCREEN** teljes képernyőre nagyítja – tableten, notebookon kényelmes (a böngésző teljes képernyőre vált,
+androidos tableten fekvő helyzetben); koppintás vagy Esc visszaléptet. Teljes képernyőn a bal szélen **hangerő-csúszka**
+bújik elő, mint a videólejátszókban: koppints a bal szélre (vagy vidd oda az egeret), húzd fel-le, vagy használd a
+görgőt és a ↑ / ↓ nyilat.
 
-A dalszöveg az [LRCLIB](https://lrclib.net)-ből jön (időzítve, karaoke-szerű kiemeléssel); ha az nem érhető el, vagy
-nincs nála a szám, a [lyrics.ovh](https://lyrics.ovh)-ból (sima szöveg). Ha nincs dalszöveg, a helyén az oka fut.
-Lásd lent: *TV-lejátszók*.
+A dalszöveg az [LRCLIB](https://lrclib.net)-ből jön (időzítve, karaoke-szerű kiemeléssel, 🎤 KARAOKE jelzéssel); ha az
+nem érhető el, vagy nincs nála a szám, a [lyrics.ovh](https://lyrics.ovh)-ból (sima szöveg). Ha nincs dalszöveg, a
+helyén az oka fut. A megtalált szöveg **megmarad**: zenemappás számnál a fájl mellett `.lrc`-ként (a Kodi és más
+lejátszók is olvassák), streamingnél (Deezer, Spotify, Music Assistant, rádió) a Home Assistant szerveren
+(`.cache/cantabile_dalszoveg/Előadó/Cím.lrc`). Egy háttérfolyamat kíméletes tempóban begyűjti a zenemappa időzített
+dalszövegeit, és a sima szöveget időzítettre cseréli, ha megjelenik. Lásd lent: *TV-lejátszók*.
 
 ![Cantabile TV Cast TV-n: előadókép, borító, a szám adatai, equalizer és haladásjelző](docs/images/tv-cast.png)
 
@@ -461,7 +468,8 @@ A korábbi magyar kulcsok (`hangszorok`, `adok`, `magno`, `nas` …) is működn
   A PARTY vendégoldala (`/api/cantabile/party/<token>`) nem kér bejelentkezést: a véletlen link védi, csak a party alatt (és bekapcsolt vendégkívánságoknál) él, és csak azt tudja, hogy mutassa, mi szól, keressen a zenemappában és kívánságot vegyen fel (vendégenként 3, összesen 30). A *VENDÉGEK: KI* a régi linket érvényteleníti.
 - **A listák és a party** a szerveren élnek: a listák a Home Assistant tárolójában (`cantabile_listak`), a party Home Assistant-újraindításkor véget ér.
 - A Radio Browser, a Deezer és az LRCLIB nyilvános adatbázis; a Cantabile csak a keresett szöveget küldi nekik
-  (dalszövegnél: előadó, cím, album, hossz). A dalszövegeket csak a memóriában tárolja.
+  (dalszövegnél: előadó, cím, album, hossz). A dalszövegeket `.lrc`-fájlként menti: a zenemappa számai mellé, a
+  streamingről szólókét a szerveren (`.cache/cantabile_dalszoveg`); a háttér-begyűjtő betartja az LRCLIB korlátait.
 
 ## Licenc
 

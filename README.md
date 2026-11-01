@@ -160,11 +160,18 @@ starts right at the position). Looks: **cover** (default), **spinning vinyl** wi
 keeps showing that speaker's track (mirror), also after a Home Assistant restart.
 
 The **TV button** on the card (before ⓘ) opens the same page in a small window over the deck for the selected speaker;
-it closes by itself 5 seconds after the music stops.
+it follows track and speaker changes and closes by itself 5 seconds after the music stops. **⛶ FULL SCREEN** in the
+window's bottom bar shows it across the whole screen – handy on a tablet or a notebook (the browser goes full screen;
+on Android tablets in landscape); a tap or Esc goes back. In full screen a **volume slider** slides out on the left
+edge, like in video players: tap the left edge (or move the mouse there), drag up / down, or use the mouse wheel and
+↑ / ↓.
 
-Lyrics come from [LRCLIB](https://lrclib.net) (timed, karaoke-style highlight); when it is down or doesn't have the
-track, from [lyrics.ovh](https://lyrics.ovh) (plain text). Without lyrics, the reason runs along in their place. See
-*TV players* below.
+Lyrics come from [LRCLIB](https://lrclib.net) (timed, karaoke-style highlight, with a 🎤 KARAOKE tag); when it is down
+or doesn't have the track, from [lyrics.ovh](https://lyrics.ovh) (plain text). Without lyrics, the reason runs along in
+their place. Found lyrics are **kept**: beside the track as an `.lrc` file for the music folder (Kodi and other players
+read it too), and on the Home Assistant server (`.cache/cantabile_dalszoveg/Artist/Title.lrc`) for streamed tracks
+(Deezer, Spotify, Music Assistant, radio). A background job collects timed lyrics for the whole music folder at a
+gentle pace and replaces plain lyrics with timed ones when they appear. See *TV players* below.
 
 ![Cantabile TV on a Cast TV: artist image, cover, track details, equalizer and progress bar](docs/images/tv-cast.png)
 
@@ -462,7 +469,8 @@ The earlier Hungarian keys (`hangszorok`, `adok`, `magno`, `nas` …) are accept
   The PARTY guest page (`/api/cantabile/party/<token>`) needs no login: it is protected by its random link, works only while the party runs (and guests are on), and can only show what plays, search the music folder and add requests (3 per guest, 30 in all). *GUESTS: OFF* makes the old link invalid.
 - **Playlists and the party** live on the server: playlists are kept in Home Assistant's storage (`cantabile_listak`), a party ends with a Home Assistant restart.
 - Radio Browser, Deezer and LRCLIB are public directories; Cantabile sends them only your search terms (for lyrics:
-  artist, title, album and length of the song). Lyrics are cached in memory only.
+  artist, title, album and length of the song). Lyrics are saved as `.lrc` files beside the music-folder tracks and in
+  `.cache/cantabile_dalszoveg` on the server for streamed tracks; the background collector respects LRCLIB's rate limit.
 
 ## Licence
 
