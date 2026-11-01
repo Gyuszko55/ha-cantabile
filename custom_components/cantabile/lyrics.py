@@ -5,12 +5,15 @@ keres, és ha van, időzített (LRC) szöveget ad – ebből a kártya a lejáts
 pontos egyezés nincs, a keresőből a hosszban legközelebbi, lehetőleg időzített találatot választja. Ha az LRCLIB nem
 érhető el, vagy nincs nála a szám, a lyrics.ovh-ból pótolja (az csak sima, időzítés nélküli szöveget ad); ha egyik sem
 válaszol, hibát ad (és nem tárolja el, hogy később újra lehessen próbálni). A szöveget a
-szerver nem tárolja tartósan, csak a memóriában (legfeljebb 200 dal), hogy ugyanazt ne kérje le újra.
+szerver a zenemappa számainál a fájl mellé menti (.lrc), a többi forrásnál (Deezer, Spotify, Music Assistant, rádió…)
+a streaming-tárolóba (.cache/cantabile_dalszoveg/Előadó/Cím.lrc); ha a streamingről szóló szám a zenemappában is megvan,
+a fájl mellé is. A begyűjtő a tárolóban is végigmegy: a csak sima szövegűhöz 30 naponta időzítettet keres.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -77,6 +80,26 @@ def lrc_olvas(lrc: str) -> dict[str, Any] | None:
     return {"found": True, "instrumental": False, "synced": None, "plain": sima, "source": "file"} if sima else None
 
 
+def lrc_fej(lrc: str) -> dict[str, Any]:
+    """A .lrc fejléce (előadó, cím, album, hossz) – a streaming-tároló újrakérdezéséhez."""
+    ki: dict[str, Any] = {}
+    try:
+        with open(lrc, encoding="utf-8-sig", errors="replace") as f:
+            for sor in f:
+                if not (m := re.match(r"^\[(ar|ti|al|length):(.*)\]\s*$", sor.strip(), re.I)):
+                    if _IDO.match(sor.strip()) or (sor.strip() and not _LRC_FEJ.match(sor.strip())):
+                        break                    # a fejléc után a szöveg jön
+                    continue
+                k, v = m.group(1).lower(), m.group(2).strip()
+                if k == "length" and (h := re.match(r"^(\d+):(\d+)$", v)):
+                    ki["hossz"] = int(h.group(1)) * 60 + int(h.group(2))
+                elif k != "length" and v:
+                    ki[{"ar": "eloado", "ti": "cim", "al": "album"}[k]] = v
+    except OSError:
+        pass
+    return ki
+
+
 def lrc_ir(lrc: str, e: dict[str, Any], eloado: str, cim: str, album: str | None, hossz: float | None) -> bool:
     """A megtalált szöveg mentése a zenefájl mellé (.lrc – a Kodi és más lejátszók is olvassák). Időzített szöveg felülírja
     a sima szöveget, fordítva nem."""
@@ -91,6 +114,7 @@ def lrc_ir(lrc: str, e: dict[str, Any], eloado: str, cim: str, album: str | None
     else:
         test = str(e["plain"]).splitlines()
     try:
+        os.makedirs(os.path.dirname(lrc), exist_ok=True)
         with open(lrc + ".tmp", "w", encoding="utf-8") as f:
             f.write("\n".join(fej + test) + "\n")
         os.replace(lrc + ".tmp", lrc)
@@ -98,6 +122,55 @@ def lrc_ir(lrc: str, e: dict[str, Any], eloado: str, cim: str, album: str | None
         _LOGGER.debug("A dalszöveg nem menthető (%s): %s", lrc, err)
         return False
     return True
+
+
+TAROLO = (".cache", "cantabile_dalszoveg")      # a streaming-tároló a HA konfigurációs mappájában
+_NEVBE_NEM = re.compile(r'[\x00-\x1f/\\:*?"<>|]+')
+
+
+def _nev(t: str) -> str:
+    """Fájl- / mappanév az előadóból vagy a címből (tiltott jelek nélkül, legfeljebb 120 karakter)."""
+    return _NEVBE_NEM.sub(" ", t).strip().strip(".").strip()[:120].strip() or "_"
+
+
+def tarolo_ut(hass: HomeAssistant, eloado: str, cim: str) -> str:
+    """A streamingről szóló szám dalszövege a tárolóban: Előadó/Cím.lrc (a cím a zárójeles toldalékok nélkül)."""
+    return os.path.join(hass.config.path(*TAROLO), _nev(eloado), _nev(_TOLDALEK.sub("", cim).strip() or cim) + ".lrc")
+
+
+_beolvas: dict[str, Any] = {}
+
+
+async def _zenemappaban(hass: HomeAssistant, eloado: str, cim: str, varhat: bool = False) -> str | None:
+    """A streamingről szóló szám .lrc-útja a zenemappában, ha ott is megvan (előadó és cím szerint, mint a helyettesítés).
+    Lejátszás közben (`varhat=False`) csak a már beolvasott mappalistában keres: a hideg beolvasás percekig tarthat, azt
+    a háttérben indítja el, és most nem vár rá."""
+    from .helyettesit import _nas_index, _nas_keres
+    from .library import ELOTAG, media_ut
+    from .music import _nas_tar, kartya
+
+    try:
+        nas = str((await kartya(hass)).get("magno", {}).get("nas") or "").rstrip("/")
+        if not nas.startswith(ELOTAG):
+            return None
+        if not varhat:
+            forras, _, rel = nas[len(ELOTAG):].partition("/")
+            alap = hass.config.media_dirs.get(forras)
+            gy = media_ut(alap, rel) if alap else None
+            t = _nas_tar.get(gy) if gy else None
+            if not t or time.monotonic() - t[0] >= 1800:
+                if not (f := _beolvas.get(nas)) or f.done():
+                    async def beolvas() -> None:
+                        with contextlib.suppress(Exception):
+                            await hass.async_add_executor_job(_nas_index, hass, nas)
+                    _beolvas[nas] = hass.async_create_background_task(beolvas(), "cantabile lyrics music index")
+                return None
+        idx = await hass.async_add_executor_job(_nas_index, hass, nas)
+        mid = _nas_keres(idx, eloado, cim)
+        return await hass.async_add_executor_job(lrc_ut, hass, mid) if mid else None
+    except Exception:  # noqa: BLE001 – a zenemappa nélkül is megy (csak a tárolóba ment)
+        _LOGGER.debug("Cantabile: a zenemappában nem kerestem (%s – %s)", eloado, cim, exc_info=True)
+        return None
 # zárójeles / kötőjeles toldalékok, amelyek a keresést elrontják: (Remastered 2011), - Live, [Radio Edit], feat. X
 _TOLDALEK = re.compile(r"\s*[\(\[][^)\]]*(remaster|live|edit|version|mono|stereo|mix|feat|deluxe|bonus)[^)\]]*[\)\]]"
                        r"|\s+-\s+.*(remaster|live|edit|version|mono|stereo|mix).*$|\s+feat\.?\s.*$", re.I)
@@ -201,15 +274,25 @@ async def keres(hass: HomeAssistant, eloado: str, cim: str, album: str | None, h
     """Dalszöveg: előbb a zenefájl melletti .lrc, aztán az LRCLIB, végül a lyrics.ovh; a megtaláltat a fájl mellé menti.
     `csak_lrclib`: a begyűjtő csak az LRCLIB-et kérdezi, és annak hibájánál kivételt ad (nem a tartalékkal pótol)."""
     lrc = lrc_fajl or (await hass.async_add_executor_job(lrc_ut, hass, media_id) if media_id else None)
+    masik: str | None = None                 # streamingnél a zenemappa azonos száma (oda is ment)
+    if lrc is None:
+        # nem zenemappás szám (Deezer, Spotify, MA, rádió…): a zenemappa azonos száma, különben a streaming-tároló
+        masik = await _zenemappaban(hass, eloado, cim)
+        lrc = tarolo_ut(hass, eloado, cim)
+        if masik and (helyi := await hass.async_add_executor_job(lrc_olvas, masik)) and (helyi.get("synced") or not csak_lrclib):
+            return helyi
     if lrc and (helyi := await hass.async_add_executor_job(lrc_olvas, lrc)):
         if helyi.get("synced") or not csak_lrclib:
+            if masik:
+                await hass.async_add_executor_job(lrc_ir, masik, helyi, eloado, cim, album, hossz)
             return helyi
     kulcs = f"{eloado.casefold()}|{cim.casefold()}|{round(hossz or 0)}"
     if kulcs in _tar and not csak_lrclib:
         _tar.move_to_end(kulcs)
         e = _tar[kulcs]
-        if lrc:
-            await hass.async_add_executor_job(lrc_ir, lrc, e, eloado, cim, album, hossz)
+        for ut in (lrc, masik):
+            if ut:
+                await hass.async_add_executor_job(lrc_ir, ut, e, eloado, cim, album, hossz)
         return e
     sess = async_get_clientsession(hass)
     adat = None
@@ -251,8 +334,9 @@ async def keres(hass: HomeAssistant, eloado: str, cim: str, album: str | None, h
     _tar[kulcs] = eredmeny
     while len(_tar) > TAR_MERET:
         _tar.popitem(last=False)
-    if lrc:
-        await hass.async_add_executor_job(lrc_ir, lrc, eredmeny, eloado, cim, album, hossz)
+    for ut in (lrc, masik):
+        if ut:
+            await hass.async_add_executor_job(lrc_ir, ut, eredmeny, eloado, cim, album, hossz)
     return eredmeny
 
 
@@ -338,14 +422,14 @@ class Gyujto:
         try:
             nas = str((await kartya(self.hass)).get("magno", {}).get("nas") or "").rstrip("/")
         except HibaUzenet:
-            return True
+            return await self._tarolo_kor()   # zenemappa nélkül is: a tároló
         if not nas.startswith(ELOTAG):
-            return True
+            return await self._tarolo_kor()   # zenemappa nélkül is: a tároló
         forras, _, rel = nas[len(ELOTAG):].partition("/")
         alap = self.hass.config.media_dirs.get(forras)
         gyoker = media_ut(alap, rel) if alap else None
         if not gyoker:
-            return True
+            return await self._tarolo_kor()   # zenemappa nélkül is: a tároló
         fajlok = (await self.hass.async_add_executor_job(_bejar, gyoker))["fajlok"]
         most = time.time()
         teendo = [f for f in fajlok if not f.startswith("_Azonosítatlan/")
@@ -387,6 +471,52 @@ class Gyujto:
             self.statusz["kesz"] = n
             if n % 25 == 0:
                 await self.hass.async_add_executor_job(self._ment)
+        await self.hass.async_add_executor_job(self._ment)
+        return await self._tarolo_kor()
+
+    def _tarolo_lista(self) -> list[tuple[str, str]]:
+        """A streaming-tároló csak sima szövegű fájljai, amelyeket 30 napja nem kérdeztünk: (kulcs, út)."""
+        gy, most, ki = self.hass.config.path(*TAROLO), time.time(), []
+        for mappa, _, fajlok in os.walk(gy):
+            for f in sorted(fajlok):
+                if not f.endswith(".lrc"):
+                    continue
+                ut = os.path.join(mappa, f)
+                kulcs = "tarolo/" + os.path.relpath(ut, gy)
+                a = self.allapot.get(kulcs)
+                if a and a.get("e") == "szinkron":
+                    continue
+                with contextlib.suppress(OSError):
+                    t = a.get("t", 0) if a else os.path.getmtime(ut)     # új fájl: a mentéskor már kérdeztük
+                    if most - t >= UJRA_NAP * 86400 and not (lrc_olvas(ut) or {}).get("synced"):
+                        ki.append((kulcs, ut))
+        return ki
+
+    async def _tarolo_kor(self) -> bool:
+        """A streaming-tároló sima szövegeihez időzített változat (LRCLIB); ha van, kicseréli."""
+        teendo = await self.hass.async_add_executor_job(self._tarolo_lista)
+        self.statusz.update(fut=True, tarolo=len(teendo), tarolo_kesz=0)
+        for n, (kulcs, ut) in enumerate(teendo, 1):
+            c = await self.hass.async_add_executor_job(lrc_fej, ut)
+            if c.get("eloado") and c.get("cim"):
+                while True:
+                    try:
+                        e = await keres(self.hass, c["eloado"], c["cim"], c.get("album"), c.get("hossz"), csak_lrclib=True, lrc_fajl=ut)
+                        break
+                    except Korlat as err:
+                        await asyncio.sleep(err.varj + 1)
+                    except (aiohttp.ClientError, asyncio.TimeoutError):
+                        await self.hass.async_add_executor_job(self._ment)
+                        self.statusz["lrclib"] = False
+                        return False
+                self.allapot[kulcs] = {"e": "szinkron" if e.get("synced") else "sima", "t": time.time()}
+                if e.get("synced"):
+                    self.statusz["tarolo_csere"] = self.statusz.get("tarolo_csere", 0) + 1
+                    # ha a szám a zenemappában is megvan, oda is kerül az időzített
+                    if masik := await _zenemappaban(self.hass, c["eloado"], c["cim"], varhat=True):
+                        await self.hass.async_add_executor_job(lrc_ir, masik, e, c["eloado"], c["cim"], c.get("album"), c.get("hossz"))
+                await asyncio.sleep(KOZ)
+            self.statusz["tarolo_kesz"] = n
         await self.hass.async_add_executor_job(self._ment)
         return True
 
