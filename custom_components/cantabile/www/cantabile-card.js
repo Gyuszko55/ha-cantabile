@@ -132,6 +132,8 @@ const EN = {
   "Áttekintés": "Overview",
   "KERESÉS": "SEARCH",
   "RÁDIÓK": "RADIO",
+  "Teljes képernyő": "Full screen",
+  "Koppintásra vissza az ablakba": "Tap to go back to the window",
   "Keresés mindenhol…": "Search everywhere…",
   "Írd be, mit keresel – egyszerre keres a zenemappában, a Deezeren, a Spotifyn, a WiiM-presetek, a kedvencek és a rádiók között.": "Type what you're looking for – it searches the music folder, Deezer, Spotify, the WiiM presets, the favourites and the radio stations at once.",
   "Nem érhető el most: {h}": "Not available right now: {h}",
@@ -876,7 +878,7 @@ class CantabileCard extends HTMLElement {
 
   disconnectedCallback() {
     if (HELYI_KOZOS.kartya === this) HELYI_KOZOS.kartya = null;   // a BT-hang eseményei ne egy lekerült kártyára menjenek
-    this._fedelZar(); this._jelutZar?.();
+    this._fedelZar(); this._jelutZar?.(); this._tvTeljesKi?.(true);   // a teljes képernyős kép ne maradjon a lap fölött
     clearTimeout(this._netGiroIdo); this._netGiro = null;
     this._lato?.disconnect(); this._lato = null;
     this._meret?.disconnect(); this._meret = null;
@@ -1592,6 +1594,9 @@ class CantabileCard extends HTMLElement {
         .tvreteg .uzablak.tvablak { width: min(96%, 760px); padding: 10px 10px 8px; cursor: pointer; }
         .tvablak cantabile-tv { display: block; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,.08); }
         .tvablak .tvlab { display: flex; justify-content: space-between; align-items: center; margin-top: 7px; font: 700 calc(8px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .16em; color: #b9c2cc; }
+        .tvablak .tvtk { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; margin: -4px 0; border-radius: 4px; cursor: pointer; }
+        .tvablak .tvtk:hover { color: #fff; background: rgba(255,255,255,.07); }
+        .tvablak .tvtk svg { width: calc(12px * var(--bk, 1)); height: calc(12px * var(--bk, 1)); }
         .jelreteg .uzablak.jelablak { width: min(94%, 680px); cursor: default; padding: 12px 16px 12px; }
         .jsor { display: flex; align-items: stretch; gap: 0; margin: 4px 0 10px; }
         .jdoboz { flex: 1 1 0; min-width: 0; padding: 8px 10px 9px; border-radius: 5px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04);
@@ -5953,17 +5958,19 @@ class CantabileCard extends HTMLElement {
     const hsz = this._hangszoro(), kartya = this.shadowRoot?.querySelector("ha-card");
     if (!kartya || !this._hass) return;
     if (!hsz || hsz.entity === HELYI || this._nincsIntegracio) return this._uzen(T("A TV-ablak hangszóróhoz tartozik – válassz hangszórót."));
-    this._tvAblakZar(true);
+    const tk = this._tvTk;                           // teljes képernyőn (pl. hangszóróváltáskor) az is marad
+    this._tvAblakZar(true, !!tk);
     this._tvAblakE = hsz.entity;
     this.shadowRoot.querySelectorAll(".tvg").forEach((b) => b.classList.add("be"));
     const r = document.createElement("div"); r.className = "tvreteg";
-    r.innerHTML = `<div class="uzablak tvablak" role="dialog" aria-label="TV"><div class="tvhely"></div><div class="tvlab"><span>TV · ${ESC(KN(hsz))}</span><span>CLOSE</span></div></div>`;
+    r.innerHTML = `<div class="uzablak tvablak" role="dialog" aria-label="TV"><div class="tvhely"></div><div class="tvlab"><span>TV · ${ESC(KN(hsz))}</span><span class="tvtk" role="button" title="${T("Teljes képernyő")}">${TV_TK_SVG}FULL SCREEN</span><span>CLOSE</span></div></div>`;
     const ab = r.firstElementChild;
     ab.addEventListener("click", (ev) => { ev.stopPropagation(); this._tvAblakZar(); });
+    ab.querySelector(".tvtk").addEventListener("click", (ev) => { ev.stopPropagation(); this._tvTeljesBe(); });
     const tv = document.createElement("cantabile-tv");
     // az ablakban a borítós nézet (kicsiben ez a legolvashatóbb), a hangszóró adataival
     tv.setConfig({ elonezet: hsz.entity, visual: "cover", ...(this._tvIdojaras ? { weather: this._tvIdojaras } : {}) });
-    ab.querySelector(".tvhely").appendChild(tv);
+    if (tk) { tv.setAttribute("tk", ""); tk.o.replaceChildren(tv); } else ab.querySelector(".tvhely").appendChild(tv);
     kartya.appendChild(r);
     // a kártya tetejétől a látható gombsor (rádió: adógombok, magnó: billentyűk) tetejéig fér el – a gombokat nem takarja
     const kr = kartya.getBoundingClientRect(), gs = [...this.shadowRoot.querySelectorAll(".gombsor")].find((x) => x.offsetParent);
@@ -5991,7 +5998,8 @@ class CantabileCard extends HTMLElement {
     else if (!this._tvAblakVege) this._tvAblakVege = setTimeout(() => { this._tvAblakVege = null; const s2 = this._hass?.states[this._tvAblakE]; if (this._tvAblakE && !SZOL(s2) && !SZUNETEL(s2)) this._tvAblakZar(); }, 5000);
   }
 
-  _tvAblakZar(azonnal = false) {
+  _tvAblakZar(azonnal = false, tkMarad = false) {
+    if (!tkMarad) this._tvTeljesKi(true);
     this._tvAblakE = null; clearTimeout(this._tvAblakVege); this._tvAblakVege = null;
     const sr = this.shadowRoot;
     sr?.querySelectorAll(".tvg").forEach((b) => b.classList.remove("be"));
@@ -6000,6 +6008,48 @@ class CantabileCard extends HTMLElement {
     if (azonnal) return r.remove();
     a.classList.remove("lat"); a.classList.add("zar");
     setTimeout(() => r.remove(), 600);
+  }
+
+  // ---- a TV-ablak teljes képernyőn: a kép a dokumentum fölé kerül (egy fedőrétegbe), és ha a böngésző engedi, valódi teljes
+  // képernyő lesz (notebookon mint az F11, tableten fekvő helyzetben); ahol nem engedi, a fedőréteg takarja el a felületet.
+  // Koppintás, Esc vagy az ablak bezárása visszaléptet; amíg teljes képernyő, a képernyő nem alszik el.
+  async _tvTeljesBe() {
+    const tv = this.shadowRoot?.querySelector(".tvablak cantabile-tv");
+    if (!tv || this._tvTk) return;
+    const o = document.createElement("div");
+    o.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:#000;cursor:pointer";
+    o.title = T("Koppintásra vissza az ablakba");
+    const t = this._tvTk = { o, api: false, zar: null };
+    tv.setAttribute("tk", "");
+    o.appendChild(tv);
+    document.body.appendChild(o);
+    o.addEventListener("click", (ev) => { ev.stopPropagation(); this._tvTeljesKi(); });
+    const billentyu = (ev) => { if (ev.key === "Escape") this._tvTeljesKi(); };
+    const valt = () => { if (t.api && !(document.fullscreenElement || document.webkitFullscreenElement)) this._tvTeljesKi(); };
+    document.addEventListener("keydown", billentyu);
+    document.addEventListener("fullscreenchange", valt); document.addEventListener("webkitfullscreenchange", valt);
+    t.le = () => { document.removeEventListener("keydown", billentyu); document.removeEventListener("fullscreenchange", valt); document.removeEventListener("webkitfullscreenchange", valt); };
+    try {
+      const f = o.requestFullscreen || o.webkitRequestFullscreen;
+      if (f) { await f.call(o, { navigationUI: "hide" }); t.api = true; }
+    } catch (e) { /* nem engedi (pl. beágyazott nézet): marad a fedőréteg */ }
+    if (this._tvTk !== t) return;
+    if (t.api && matchMedia("(pointer: coarse)").matches) screen.orientation?.lock?.("landscape").catch(() => {});
+    try { if ("wakeLock" in navigator) t.zar = await navigator.wakeLock.request("screen"); } catch (e) { t.zar = null; }
+    if (this._tvTk !== t) t.zar?.release().catch(() => {});
+  }
+
+  _tvTeljesKi(ablakIs = false) {
+    const t = this._tvTk;
+    if (!t) return;
+    this._tvTk = null;
+    t.le?.();
+    if (t.api && (document.fullscreenElement || document.webkitFullscreenElement)) (document.exitFullscreen || document.webkitExitFullscreen)?.call(document)?.catch?.(() => {});
+    try { screen.orientation?.unlock?.(); } catch (e) { /* nincs zárva */ }
+    t.zar?.release().catch(() => {});
+    const tv = t.o.querySelector("cantabile-tv"), hely = !ablakIs && this.shadowRoot?.querySelector(".tvablak .tvhely");
+    if (tv && hely) { tv.removeAttribute("tk"); hely.appendChild(tv); } else tv?.remove();
+    t.o.remove();
   }
 
   _jelutNyit() {
@@ -7225,6 +7275,8 @@ const TV_IDO_SVG = (() => {
   T["lightning-rainy"] = T.lightning; T["windy-variant"] = T.windy; T.exceptional = T.cloudy;
   return T;
 })();
+// a TV-ablak teljes képernyő ikonja (négy sarok)
+const TV_TK_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>`;
 const TV_SVG_LEMEZ = `<svg viewBox="0 0 200 200"><defs><radialGradient id="tvl" cx=".5" cy=".5" r=".5"><stop offset=".18" stop-color="#d9a441"/><stop offset=".2" stop-color="#121214"/><stop offset=".98" stop-color="#1c1c1f"/><stop offset="1" stop-color="#070708"/></radialGradient></defs>
   <circle cx="100" cy="100" r="98" fill="url(#tvl)"/>${[30, 38, 46, 54, 62, 70, 78, 86, 93].map((r) => `<circle cx="100" cy="100" r="${r}" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="1"/>`).join("")}
   <path d="M100 2 A98 98 0 0 1 198 100" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="3"/><circle cx="100" cy="100" r="3" fill="#070708"/></svg>`;
@@ -7308,6 +7360,7 @@ class CantabileTv extends HTMLElement {
     sr.innerHTML = `<style>
       :host { display: block; position: relative; width: 100%; padding-top: 56.25%; overflow: hidden; background: #050506; }
       :host([teljes]) { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; padding: 0; z-index: 9; }
+      :host([tk]) { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; }
       .v { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; overflow: hidden; color: #f3ead8;
         font-family: "Exo 2", "Cantabile Sans", Arial, sans-serif; background: #070708; }
       .hat { position: absolute; left: -4%; top: -4%; width: 108%; height: 108%; background: center / cover no-repeat; opacity: 0; transition: opacity 2.5s ease;
@@ -7411,7 +7464,8 @@ class CantabileTv extends HTMLElement {
     this._v.classList.toggle("bak", this._c.visual === "vinyl");
     this._v.classList.toggle("bmod", this._c.visual === "cover");
     const meret = () => {
-      const w = this._teljes ? innerWidth : this.clientWidth, hh = this._teljes ? innerHeight : this.clientWidth * 0.5625;
+      const tk = this.hasAttribute("tk");          // a kártya TV-ablaka teljes képernyőn
+      const w = this._teljes ? innerWidth : this.clientWidth, hh = this._teljes ? innerHeight : tk ? this.clientHeight : this.clientWidth * 0.5625;
       const s = Math.min(w / 1280, hh / 720) || 1;
       this._v.style.transform = `translate(${(w - 1280 * s) / 2}px, ${(hh - 720 * s) / 2}px) scale(${s})`;
       const dpr = Math.min(1.5, (window.devicePixelRatio || 1) * s);

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **TV window in full screen:** a ⛶ FULL SCREEN button in the TV window's bottom bar shows the TV page across the whole screen – on a notebook the browser goes full screen (like F11), on a tablet too, turned to landscape on Android; where the browser doesn't allow it (some embedded views, a kiosk browser), the picture covers the whole Home Assistant page instead. A tap, Esc or closing the window goes back; the screen doesn't sleep meanwhile; switching speakers keeps it full screen, and it closes 5 seconds after the music stops, like the window.
+
 ## 2.4.0 – 2026-11-01
 
 Cantabile 2.4: lyrics of streamed tracks are kept on the server and upgraded to timed lyrics when they appear, the lyrics collector copes with LRCLIB's outages and rate limit, and the TV window on the card follows track changes again.
