@@ -259,7 +259,7 @@ nyelvét követik: **magyar** vagy **angol**.
 1. A NAS-on oszd meg a zenemappát **SMB**-n (vagy NFS-en) – az olvasási jog elég; írás csak akkor kell, ha a PHONE fülről véglegesen is fel akarsz tölteni.
 2. **Beállítások → Rendszer → Tárhely → Hálózati tárhely hozzáadása**: név (pl. `Zene`), felhasználás **Média**, protokoll, szervercím, megosztás neve, felhasználó / jelszó.
 3. Nyisd meg az oldalsáv **Média** menüjét: a megosztás a *Saját médiák* alatt jelenik meg. Az útvonala `media-source://media_source/local/<név>`, pl. `media-source://media_source/local/Zene`.
-4. A kártyán: **⚙ → Zenemappa** → illeszd be az útvonalat → *Mentés*. A NAS fülön megjelennek az előadók → albumok → számok.
+4. Futtasd a **Konfigurálás → Beállítás varázsló → Zenetár** lépést – ott felkínálja a megosztást –, vagy a kártyán: **⚙ → Zenemappa** → illeszd be az útvonalat → *Mentés*. A NAS fülön megjelennek az előadók → albumok → számok.
 
 - Elvárt szerkezet: `<előadó>/<album>/<számok>` (MP3, FLAC, AAC/M4A, OGG… – amit a hangszóróid lejátszanak).
 - **A Sonos legfeljebb 48 kHz-et játszik**: a hi-res albumok 48 kHz-es másolatait tartsd külön mappában, és add meg a *48 kHz-es másolatok mappáját* (`hires_folder`); Sonoson a Cantabile a másolatot játssza, máshol az eredetit.
@@ -279,23 +279,67 @@ Másold a `custom_components/cantabile` mappát a `config/custom_components` map
 
 ## Beállítás
 
-1. **Beállítások → Eszközök és szolgáltatások → Integráció hozzáadása → Cantabile.** Ha hangvezérlést is szeretnél,
-   hagyd bekapcsolva az „Assist-eszközt”.
+### Beállítás varázsló
+A **Beállítások → Eszközök és szolgáltatások → Integráció hozzáadása → Cantabile** egy rövid varázslót indít (magyarul vagy
+angolul). Az üdvözlés utáni lépések mind kihagyhatók, és később is módosíthatók:
+
+1. **Üdvözlés** – mi kerül beállításra, és mi nem kötelező.
+2. **Hangszórók** – a médialejátszóid integrációnként (Sonos, WiiM, LinkPlay, Google Cast, DLNA, Music Assistant,
+   Squeezebox, egyéb); a hangszórók már ki vannak pipálva, a TV-k és a médiaszerverek nem. Válaszd ki az *alapértelmezett
+   hangszórót* – ez áll elsőként a kártyán. A 8 karakternél hosszabb nevek rövid nevet kapnak a kártyára. Ha még nincs
+   hangszóró, a lépés megmondja, melyik integrációt vedd fel előbb.
+3. **Zenetár** *(nem kötelező)* – a Home Assistant médiájának zenét tartalmazó mappái, a *Beállítások → Rendszer →
+   Tárhely* alatt felvett hálózati tárhely is; a 48 kHz-es másolatok mappáját (pl. *Hi-Res 48kHz*) és a feltöltések
+   mappáját felismeri. Üresen hagyva kimarad.
+4. **Rádióadók** *(nem kötelező)* – az országod legnépszerűbb adói a Radio Browserből, az első hat kipipálva, legfeljebb 12
+   (gombonként egy). Ha az adó nevében frekvencia áll, a skálán is oda kerül. Internet nélkül kihagyható.
+5. **TV** *(nem kötelező)* – a képernyős Google Cast eszközök és a DLNA-s TV-k, és hogy mi kell a Cantabile TV-hez
+   (https-cím vagy Home Assistant Cloud a Casthoz, belső cím a DLNA-hoz, ffmpeg). Cast TV-hez létrejön a rejtett
+   `cantabile-tv` vezérlőpult; a TV-lejátszók maguktól felkerülnek a kártyára.
+6. **Hangvezérlés** – a talált beszélgetőügynökök, az *Assist-eszköz* kapcsolója, és hogy az ügynöknél hol kell
+   bekapcsolni a Cantabile-t (a Home Assistant nem engedi, hogy egy integráció egy másik beállításait átírja).
+7. **Vezérlőpult** – hová kerüljön a kártya: új **Zene** vezérlőpultra az oldalsávban (címe és ikonja választható), egy
+   meglévő vezérlőpult nézetébe (szekciós nézetben új szekcióba), vagy egyelőre sehová. A kártya a fenti választásokkal
+   kitöltve kerül fel. YAML-vezérlőpulthoz a kártya kódrészletét kapod, amit magad illesztesz be.
+8. **Összefoglaló** – mi lett beállítva, mi maradt ki, és később hol módosíthatod.
+
+A kártyát az integráció maga szolgálja ki és regisztrálja, külön erőforrás nem kell (YAML-módú erőforrásoknál vedd fel a
+`/cantabile_static/cantabile-card.js` fájlt *module* típusú erőforrásként).
+
+![Beállítás varázsló: üdvözlés](docs/images/wizard/hu-1-udvozles.png)
+![Beállítás varázsló: hangszórók integrációnként](docs/images/wizard/hu-2-hangszorok.png)
+![Beállítás varázsló: az ország legnépszerűbb rádióadói](docs/images/wizard/hu-4-radio.png)
+![Beállítás varázsló: hová kerüljön a kártya](docs/images/wizard/hu-7-vezerlopult.png)
+![Beállítás varázsló: összefoglaló](docs/images/wizard/hu-8-osszefoglalo.png)
+
+**Újrafuttatás:** *Beállítások → Eszközök és szolgáltatások → Cantabile → Konfigurálás → **Beállítás varázsló*** – a
+teljes varázsló az elejétől, vagy egy-egy lépés (hangszórók, zenetár, rádió, TV, hang, vezérlőpult). A *Mentés és
+befejezés* a hangszórókat, az adókat és a zenemappát ugyanúgy írja a Cantabile kártyáidba, mint a kártya ⚙ *Mentése*
+(minden, az elsővel azonosan beállított kártyába, a saját magyar vagy angol kulcsaival; a többi kártya és beállítás
+változatlan marad). A régi lehetőségek (halkítás bemondáskor, TV-lejátszók, Spotify / Tidal kulcsok, Assist-eszköz) a
+*Konfigurálás → Beállítások* alatt vannak.
+
+![Konfigurálás → Beállítás varázsló: a teljes varázsló vagy egy lépés](docs/images/wizard/hu-beallitas-varazslo.png)
+
+A 2.5-ös vagy korábbi változatról frissítve a varázsló nem indul el, és a kártyáid, beállításaid nem változnak.
+
+### Kézi beállítás
+1. Vedd fel az integrációt (a varázsló minden lépése kihagyható).
 2. Kártya a vezérlőpultra: **Vezérlőpult szerkesztése → Kártya hozzáadása → Cantabile** (vagy *Kézi* kártya
-   `type: custom:cantabile-card` sorral). A kártyát az integráció maga szolgálja ki és regisztrálja, külön erőforrás nem kell.
-   > **A kártya magától nem jelenik meg.** Az integráció létrehozza az entitásokat és elérhetővé teszi a kártyát, de a
-   > vezérlőpultra neked kell feltenned. Ha a kártyaválasztóban nincs „Cantabile”, az újraindítás után frissítsd a
-   > böngészőt (Ctrl+F5, vagy újratöltés a mobilappban). YAML-módú erőforrásoknál vedd fel a
-   > `/cantabile_static/cantabile-card.js` fájlt *module* típusú erőforrásként.
+   `type: custom:cantabile-card` sorral). Ha a kártyaválasztóban nincs „Cantabile”, az újraindítás után frissítsd a
+   böngészőt (Ctrl+F5, vagy újratöltés a mobilappban).
 3. A kártya **⚙** gombjával állítsd be a hangszórókat, az adókat és a zenemappát. A *Mentés* minden vezérlőpult minden
    Cantabile kártyájába beírja, így a tablet és a telefon egyforma marad.
 
 ### Hangvezérlés
-Az integráció beállítása után nyisd meg a beszélgetőügynök beállításait (pl. **Google Gemini → Beállítás**), és a
-*Home Assistant vezérlése* résznél az *Assist* mellett kapcsold be a **Cantabile**-t is.
+Nyisd meg a beszélgetőügynök beállításait (pl. **Google Gemini → Konfigurálás**), és a *Home Assistant vezérlése*
+résznél az *Assist* mellett kapcsold be a **Cantabile**-t is – a varázsló *Hangvezérlés* lépése felsorolja az ügynökeidet,
+és ugyanezt a lépéssort mutatja.
 
 ### TV-lejátszók (Cantabile TV)
-1. **Beállítások → Eszközök és szolgáltatások → Cantabile → Beállítás → TV-lejátszók**: válaszd ki a TV-ket. A
+1. **Beállítások → Eszközök és szolgáltatások → Cantabile → Konfigurálás → Beállítás varázsló → TV** (vagy
+   *Konfigurálás → Beállítások → TV-lejátszók*): válaszd ki a TV-ket. A varázsló a 2. lépés `cantabile-tv`
+   vezérlőpultját is létrehozza, és a TV-lejátszókat felveszi a kártyára (3. lépés). A
    Cast-eszköz (*Google Cast* integráció) élő TV-oldalt kap, a DLNA-s TV (*DLNA Digital Media Renderer* integráció)
    álló adatlapot. Mindegyikből egy „Cantabile TV · …” nevű `media_player` lesz.
 2. **Csak Cast-os TV-hez**, egyszer: hozd létre a TV-oldalt: **Beállítások → Irányítópultok → Irányítópult hozzáadása →

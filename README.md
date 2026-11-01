@@ -261,7 +261,8 @@ Assistant language: **Hungarian** or **English**.
 1. On the NAS, share the music folder over **SMB** (or NFS) – read access is enough; write access only if you want to upload from the PHONE tab for good.
 2. **Settings → System → Storage → Add network storage**: a name (e.g. `Music`), usage **Media**, protocol, server address, share name, user / password.
 3. Open **Media** in the sidebar: the share appears under *My media*. Its path is `media-source://media_source/local/<name>`, e.g. `media-source://media_source/local/Music`.
-4. On the card: **⚙ → Music folder** → paste the path → *Save*. The NAS tab now lists artists → albums → tracks.
+4. Run **Configure → Setup wizard → Music library** – the share is offered there – or on the card: **⚙ → Music folder** →
+   paste the path → *Save*. The NAS tab now lists artists → albums → tracks.
 
 - Expected layout: `<artist>/<album>/<tracks>` (MP3, FLAC, AAC/M4A, OGG… – whatever your speakers play).
 - **Sonos plays at most 48 kHz**: for hi-res albums keep 48 kHz copies in a separate folder and set *Folder of 48 kHz copies* (`hires_folder`); Cantabile picks the copy on Sonos and the original elsewhere.
@@ -281,22 +282,70 @@ Copy `custom_components/cantabile` into your `config/custom_components` folder a
 
 ## Setup
 
-1. **Settings → Devices & services → Add integration → Cantabile.** Leave “Assist tool” on if you want voice control.
+### Setup wizard
+**Settings → Devices & services → Add integration → Cantabile** starts a short wizard (English or Hungarian). Every step
+after the welcome can be skipped and changed later:
+
+1. **Welcome** – what will be set up and what is optional.
+2. **Speakers** – your media players grouped by integration (Sonos, WiiM, LinkPlay, Google Cast, DLNA, Music Assistant,
+   Squeezebox, others); speakers are ticked already, TVs and media servers aren't. Pick the *default speaker* – it comes
+   first on the card. Names longer than 8 characters get a short name for the card. No speakers yet? The step tells you
+   which integration to add first.
+3. **Music library** *(optional)* – the folders in Home Assistant's media that hold music, including network storage
+   added under *Settings → System → Storage*; a folder of 48 kHz copies (e.g. *Hi-Res 48kHz*) and the uploads folder are
+   recognised. Leave it empty to skip.
+4. **Radio stations** *(optional)* – the most popular stations of your country from Radio Browser, the top six ticked,
+   at most 12 (one per preset button). A frequency in the station's name puts it on the dial. Offline? Skip it.
+5. **TV** *(optional)* – Google Cast devices with a screen and DLNA TVs, with a check of what Cantabile TV needs
+   (https address or Home Assistant Cloud for Cast, the internal URL for DLNA, ffmpeg). For a Cast TV the hidden
+   `cantabile-tv` dashboard is created; the TV players are added to the card by themselves.
+6. **Voice** – the conversation agents found, the *Assist tool* option, and where to turn Cantabile on in the agent
+   (Home Assistant doesn't let one integration change another one's options).
+7. **Dashboard** – where the card goes: a new **Music** dashboard in the sidebar (title and icon of your choice), a view
+   of an existing dashboard (in a sections view as a new section), or nowhere for now. The card comes filled in with the
+   choices above. For a YAML dashboard you get the card snippet to paste.
+8. **Summary** – what was set up, what was skipped, and where to change things later.
+
+The integration serves and registers the card itself – no separate resource is needed (YAML-mode resources: add
+`/cantabile_static/cantabile-card.js` as a *module* resource).
+
+![Setup wizard: welcome](docs/images/wizard/en-1-welcome.png)
+![Setup wizard: speakers grouped by integration](docs/images/wizard/en-2-speakers.png)
+![Setup wizard: music library](docs/images/wizard/en-3-library.png)
+![Setup wizard: the most popular radio stations of the country](docs/images/wizard/en-4-radio.png)
+![Setup wizard: TV and its requirements](docs/images/wizard/en-5-tv.png)
+![Setup wizard: voice control](docs/images/wizard/en-6-voice.png)
+![Setup wizard: where the card goes](docs/images/wizard/en-7-dashboard.png)
+![Setup wizard: summary](docs/images/wizard/en-8-summary.png)
+
+<img src="docs/images/wizard/en-phone-speakers.png" width="260" alt="The wizard on a phone: speakers"> <img src="docs/images/wizard/en-phone-dashboard.png" width="260" alt="The wizard on a phone: dashboard"> <img src="docs/images/wizard/en-phone-music-dashboard.png" width="260" alt="The new Music dashboard with the card on a phone">
+
+**Running it again:** *Settings → Devices & services → Cantabile → Configure → **Setup wizard*** – the whole wizard from
+the start, or a single step (speakers, music library, radio, TV, voice, dashboard). *Save and finish* writes the speakers,
+stations and music folder into your Cantabile cards the same way the card's ⚙ *Save* does (every card set up like the
+first one, in its own Hungarian or English keys; other cards and settings stay as they are). The old options form
+(announcements, TV players, Spotify / Tidal keys, Assist tool) is under *Configure → Settings*.
+
+![Configure → Setup wizard: the whole wizard or one step](docs/images/wizard/en-options-wizard.png)
+
+Upgrading from 2.5 or earlier doesn't start the wizard and doesn't change your cards or options.
+
+### Manual setup
+1. Add the integration (you can skip every wizard step).
 2. Add the card to a dashboard: **Edit dashboard → Add card → Cantabile** (or a *Manual* card with
-   `type: custom:cantabile-card`). The integration serves and registers the card itself – no separate resource is needed.
-   > **The card does not appear on its own.** The integration creates the entities and makes the card available, but you
-   > have to add it to a dashboard yourself. If “Cantabile” is missing from the card picker, hard-refresh the browser
-   > (Ctrl+F5, or reload in the companion app) after the restart. With YAML-mode resources, add
-   > `/cantabile_static/cantabile-card.js` as a *module* resource.
+   `type: custom:cantabile-card`). If “Cantabile” is missing from the card picker, hard-refresh the browser (Ctrl+F5, or
+   reload in the companion app) after the restart.
 3. Open **⚙** on the card to set the speakers, stations and the music folder. *Save* writes the settings into every
    Cantabile card on all your dashboards, so the tablet and the phone stay identical.
 
 ### Voice control
-After setting up the integration, open your conversation agent's options (e.g. **Google Gemini → Configure**) and turn on
-**Cantabile** next to *Assist* under *Control Home Assistant*.
+Open your conversation agent's options (e.g. **Google Gemini → Configure**) and turn on **Cantabile** next to *Assist*
+under *Control Home Assistant* – the wizard's *Voice* step lists your agents and shows the same steps.
 
 ### TV players (Cantabile TV)
-1. **Settings → Devices & services → Cantabile → Configure → TV players**: pick the TVs. A Cast device (integration
+1. **Settings → Devices & services → Cantabile → Configure → Setup wizard → TV** (or *Configure → Settings → TV
+   players*): pick the TVs. The wizard also creates the `cantabile-tv` dashboard of step 2 and adds the TV players to the
+   card (step 3). A Cast device (integration
    *Google Cast*) gets the live TV page, a DLNA TV (integration *DLNA Digital Media Renderer*) the still track card.
    Each becomes a `media_player` called “Cantabile TV · …”.
 2. **For Cast TVs only**, create the TV page once: **Settings → Dashboards → Add dashboard → New dashboard from
