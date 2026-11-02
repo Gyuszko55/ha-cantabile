@@ -274,6 +274,7 @@ const EN = {
   "A Deezer csak Sonos hangszórón szól – válts Sonos hangszóróra.": "Deezer only plays on Sonos speakers – switch to a Sonos speaker.",
   "„{c}” a(z) {h} hangszórón nem szólhat, és máshonnan sem találtam meg.": "“{c}” can't play on {h}, and I didn't find it anywhere else.",
   "A(z) {h} hangszórón innen szól: {f}.": "On {h} it plays from: {f}.",
+  "a WiiM saját Deezere – „{c}”": "the WiiM's own Deezer – “{c}”",
   "{n} szám nincs meg, kimarad.": "{n} tracks weren't found and are skipped.",
   "zenemappa": "music folder",
   "TV-kinézet": "TV look",
@@ -2977,6 +2978,10 @@ class CantabileCard extends HTMLElement {
       if (dzf) {
         const t0 = Date.now();
         await this._csoportAllit(uj);
+        // WiiM: a saját Deezere (ugyanaz a lista / album); a régi Sonos csak utána szünetel, hogy a zene ne álljon meg
+        if (await this._wiimDeezer(regi.entity, uj, { ...dzf, poz: dzf.poz + (Date.now() - t0) / 1000 })) {
+          return this._hiv("media_player", "media_pause", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
+        }
         if (!(await this._helyettesitJatszik({ deezer: dzf.ids }, a.media_album_name || a.media_title || "Deezer", dzf.kezdo, uj, dzf.poz, t0))) {
           this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); return this._frissit();
         }
@@ -3051,6 +3056,17 @@ class CantabileCard extends HTMLElement {
     if (pontrol) return this._kazettaFolytat({ kaz, kezdo: i, poz, t0 }, hsz);
     await this._betolt(kaz, i);
     return true;
+  }
+
+  // a Sonoson szóló Deezer-lista / -album WiiM-en a WiiM saját Deezeréről (a saját integráció a fő út, a Music Assistant
+  // csak tartalék): a Sonos kedvencei közül cím szerint megkeresi, és a szóló számtól, ugyanattól a ponttól indítja
+  async _wiimDeezer(regiEntity, uj, dzf) {
+    if (this._nincsIntegracio || !dzf?.ids?.length || !["wiim", "linkplay"].includes(this._hass?.entities?.[uj.entity]?.platform)) return false;
+    try {
+      const r = await this._hass.callWS({ type: "cantabile/wiim_deezer/from_sonos", source: regiEntity, target: uj.entity, track: String(dzf.ids[0]), position: Number(dzf.poz) || 0 });
+      this._uzen(T("A(z) {h} hangszórón innen szól: {f}.", { h: KN(uj), f: T("a WiiM saját Deezere – „{c}”", { c: r.title || "Deezer" }) }));
+      return true;
+    } catch (_) { return false; }            // nincs Deezer a WiiM-ben, nem kedvenc lista, vagy a szám nincs benne: tartalék út
   }
 
   // a Sonoson szóló Deezer-sor: a sor elemei, hányadiknál és hol tart (más forrású elemek is maradhatnak benne)
@@ -3791,6 +3807,7 @@ class CantabileCard extends HTMLElement {
       if (sz?.dz && sz.hova === hsz.entity && !SZOL(s)) {
         this._szunetAtvitel = null;
         await this._csoportAllit(hsz);
+        if (sz.regi && await this._wiimDeezer(sz.regi, hsz, sz.dz)) return;
         return this._helyettesitJatszik({ deezer: sz.dz.ids }, sz.cim, sz.dz.kezdo, hsz, sz.dz.poz);
       }
       if (sz && sz.hova === hsz.entity && !SZOL(s)) { this._szunetAtvitel = null; return this._kazettaFolytat(sz, hsz); }
@@ -3927,6 +3944,17 @@ class CantabileCard extends HTMLElement {
         await this._hiv("media_player", "play_media", { ...e, media_content_id: kaz.id, media_content_type: "music" });
       } else if (kaz.forras === "stream") {
         if (hsz.mod !== "sonos" && kaz.tipus === "spotify" && this._stream?.spotify_entity && hsz.entity !== HELYI) return this._spotifyConnect(kaz, hsz);
+        // Deezer-album / -lista WiiM-en: a WiiM saját Deezere (a saját integráció a fő út; lossless) – a kért számtól
+        const dzl = kaz.tipus === "deezer" && /deezer\.com\/(?:\w+\/)?(album|playlist)\/(\d+)/i.exec(String(kaz.id || ""));
+        if (dzl && !this._nincsIntegracio && ["wiim", "linkplay"].includes(this._hass?.entities?.[hsz.entity]?.platform)) {
+          const szam = /track\/(\d+)|tr(?:%3a|:|-flac:)(\d+)/i.exec(String(kaz.szamok?.[kezdo] || ""));
+          try {
+            await this._hass.callWS({ type: "cantabile/wiim_deezer/play", entity_id: hsz.entity, kind: dzl[1].toLowerCase(), id: dzl[2], ...(kezdo > 0 && szam ? { track: szam[1] || szam[2] } : {}) });
+            this._uzen(T("A(z) {h} hangszórón innen szól: {f}.", { h: KN(hsz), f: T("a WiiM saját Deezere – „{c}”", { c: kaz.cim || "Deezer" }) }));
+            TAR.ir("tablet-magno-kazetta", JSON.stringify({ ...kaz, entity: hsz.entity }));
+            return this._frissit();
+          } catch (_) { /* nincs Deezer a WiiM-ben: tartalék út */ }
+        }
         // Deezer nem Sonoson: ugyanazok a számok a gomb MA-lejátszóján (az MA Deezere) vagy a zenemappából
         if (hsz.mod !== "sonos" && kaz.tipus === "deezer" && !this._nincsIntegracio && hsz.entity !== HELYI
           && await this._helyettesitJatszik({ deezer: kaz.szamok?.length ? kaz.szamok : [kaz.id] }, kaz.cim, kezdo, hsz)) return;
