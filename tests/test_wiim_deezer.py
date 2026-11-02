@@ -169,3 +169,17 @@ def test_deezer_kozvetito_engedi_a_felhasznaloi_konyvtarat():
 def test_sor_betoltve():
     assert W.sor_betoltve("<TotalNumber>315</TotalNumber><TrackNumber>40</TrackNumber>") == 40     # az összlétszám nem számít
     assert W.sor_betoltve("<Tracks></Tracks>") == 0
+
+
+def test_ha_a_wiim_nem_szolal_meg_hibat_jelez(wiim, monkeypatch):
+    # üres sor (pl. rossz lista-azonosító, lejárt Deezer-belépés): a WiiM elfogadja a sort, de nem szól – ez nem „siker”
+    async def api(hass, host, parancs):
+        wiim.naplo.append(("api", parancs))
+        return '{"status":"stop","mute":"0"}' if parancs == "getPlayerStatusEx" else "OK"
+
+    ora = iter(range(0, 10_000))
+    monkeypatch.setattr(W, "_api", api)
+    monkeypatch.setattr(W.time, "monotonic", lambda: next(ora))
+    with pytest.raises(HomeAssistantError, match="not_playing"):
+        asyncio.run(W.lejatszik(None, "media_player.wiim", "playlist", "989611251", "4140323881", 60))
+    assert [t for a, t in wiim.naplo if a == "api"][-1] == "setPlayerCmd:mute:0"   # a némítás akkor is feloldódik

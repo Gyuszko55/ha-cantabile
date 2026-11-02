@@ -36,7 +36,7 @@ import voluptuous as vol
 from aiohttp import web
 
 from homeassistant.components import media_source, websocket_api
-from homeassistant.components.http import HomeAssistantView
+from homeassistant.components.http import KEY_HASS, HomeAssistantView
 from homeassistant.components.http.auth import async_sign_path
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -480,9 +480,9 @@ class TvKozpont:
         kulcs = hashlib.sha1(f"{kep}|{fajl}|{mtime}{f'|{kezdet}' if kezdet else ''}".encode()).hexdigest()[:20]
         tar = self.hass.config.path(".cache", "cantabile_tv")
         cel = os.path.join(tar, f"video_{kulcs}.mp4")
-        if not os.path.exists(cel):
+        if not await _letezik(self.hass, cel):
             async with self._video_zar.setdefault(cel, asyncio.Lock()):
-                if not os.path.exists(cel):
+                if not await _letezik(self.hass, cel):
                     ideig = cel + ".tmp.mp4"
                     for kodolo in (["-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage", "-pix_fmt", "yuv420p"],
                                    ["-c:v", "mpeg4", "-q:v", "3", "-pix_fmt", "yuv420p"]):
@@ -503,17 +503,16 @@ class TvKozpont:
                             # megszakított kérés: az ffmpeg ne írjon tovább a közös ideiglenes fájlba
                             with contextlib.suppress(ProcessLookupError):
                                 p.kill()
-                            with contextlib.suppress(OSError):
-                                os.remove(ideig)
                             self._video_zar.pop(cel, None)
+                            await _takarit_megszakitaskor(self.hass, ideig)
                             raise
-                        if p.returncode == 0 and os.path.exists(ideig):
+                        if p.returncode == 0 and await _letezik(self.hass, ideig):
                             await self.hass.async_add_executor_job(os.replace, ideig, cel)
                             break
                         _LOGGER.warning("Cantabile TV: a DLNA-videó nem készült el (%s): %s", kodolo[1], (hiba or b"")[-300:].decode(errors="replace"))
                     self._video_zar.pop(cel, None)
                     await self.hass.async_add_executor_job(_takarit, tar)
-        if not os.path.exists(cel):
+        if not await _letezik(self.hass, cel):
             return None
         return self.belso_cim(f"{VIDEO_URL}/{os.path.basename(cel)}")
 
@@ -542,7 +541,7 @@ class TvKozpont:
                                         sort_keys=True, default=str).encode()).hexdigest()[:20]
         tar = self.hass.config.path(".cache", "cantabile_tv")
         cel = os.path.join(tar, f"dlna_{kulcs}.jpg")
-        if not os.path.exists(cel):
+        if not await _letezik(self.hass, cel):
             borito = None
             if meta.get("_cover_file"):
                 borito = await self.hass.async_add_executor_job(_olvas, meta["_cover_file"])
@@ -647,6 +646,22 @@ def _cue(fajl: str) -> dict[str, Any] | None:
     return None
 
 
+def _torol_csendben(ut: str) -> None:
+    """Fájl törlése; ha nincs meg vagy nem törölhető, csendben."""
+    with contextlib.suppress(OSError):
+        os.remove(ut)
+
+
+async def _takarit_megszakitaskor(hass: HomeAssistant, ut: str) -> None:
+    """Megszakított feladat ideiglenes fájlja az executorban törlődik; a shield miatt a törlés akkor is lefut, ha a
+    feladatot közben újra megszakítják."""
+    await asyncio.shield(hass.async_add_executor_job(_torol_csendben, ut))
+
+
+async def _letezik(hass: HomeAssistant, ut: str) -> bool:
+    return await hass.async_add_executor_job(os.path.exists, ut)
+
+
 def _olvas(ut: str) -> bytes | None:
     try:
         with open(ut, "rb") as f:
@@ -659,7 +674,7 @@ async def beagyazott(hass: HomeAssistant, ut: str) -> str | None:
     """A zenefájlba ágyazott borító kibontva a tárba (ffmpeg); a tárbeli kép útja, vagy None."""
     tar = hass.config.path(".cache", "cantabile_tv")
     cel = os.path.join(tar, hashlib.sha1(ut.encode()).hexdigest() + ".jpg")
-    if not os.path.exists(cel):
+    if not await _letezik(hass, cel):
         if not await ffmpeg_van(hass):
             return None
         await hass.async_add_executor_job(lambda: os.makedirs(tar, exist_ok=True))
@@ -677,8 +692,7 @@ async def beagyazott(hass: HomeAssistant, ut: str) -> str | None:
         except asyncio.CancelledError:
             with contextlib.suppress(ProcessLookupError):
                 p.kill()
-            with contextlib.suppress(OSError):
-                os.remove(ideig)
+            await _takarit_megszakitaskor(hass, ideig)
             raise
 
         def helyere() -> None:
@@ -689,7 +703,7 @@ async def beagyazott(hass: HomeAssistant, ut: str) -> str | None:
 
         await hass.async_add_executor_job(helyere)
         await hass.async_add_executor_job(_takarit, tar)
-    return cel if os.path.exists(cel) else None
+    return cel if await _letezik(hass, cel) else None
 
 
 HATTER_NEV = re.compile(r"^(fanart|backdrop|background|artist|extrafanart)[-_ ]?\d*\.(jpe?g|png|webp)$", re.I)
@@ -739,7 +753,7 @@ class TvBetu(HomeAssistantView):
 
     async def get(self, request: web.Request, nev: str) -> web.StreamResponse:
         ut = os.path.join(os.path.dirname(__file__), "www", nev)
-        if not re.fullmatch(r"[A-Za-z0-9-]+\.woff2", nev) or not os.path.isfile(ut):
+        if not re.fullmatch(r"[A-Za-z0-9-]+\.woff2", nev) or not await request.app[KEY_HASS].async_add_executor_job(os.path.isfile, ut):
             return web.Response(status=404)
         return web.FileResponse(ut, headers={"Cache-Control": "max-age=604800", "Content-Type": "font/woff2"})
 

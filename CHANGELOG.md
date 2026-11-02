@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.6.3 – 2026-11-02
+
+- **Fix: Deezer albums and playlists didn't start on a WiiM from the library** (e.g. MY LIBRARY → the Technics): the card sent the album / playlist id in a field called `id`, which Home Assistant's websocket reserves for the message number – the WiiM got a queue that doesn't exist, stayed silent, and the card showed no message. The field is now `item`, and `cantabile/wiim_deezer/play` only reports success once the WiiM is really playing (otherwise `not_playing`).
+- **Choose the route.** When a Deezer album, playlist or track list can reach a non-Sonos speaker more than one way (the WiiM's own Deezer, Music Assistant's Deezer, the music folder), the card asks once which one to use and remembers it for that speaker. Every “plays from” message has an **OTHER ROUTE** button to switch; if the chosen route doesn't play, the card says so and offers the others.
+- **No blocking file I/O in the event loop** (`tv.py`): removing a cancelled temporary file and the file-exists checks in the DLNA video and embedded-cover coroutines now run in the executor (the removal shielded, so it still runs when the task is cancelled); the font view checks the file in the executor too.
+
 ## 2.6.2 – 2026-11-02
 
 - **Fix:** after switching a paused queue to a speaker that was itself paused, PLAY resumed that speaker's own old content instead of the queue brought over. The pending transfer now comes first. Tested live: a Sonos Spotify queue (paused) → the WiiM: PLAY continues it there with Spotify Connect.

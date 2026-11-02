@@ -17,7 +17,7 @@ Deezer-kedvencek (`user-tracks-<felhasználó>`) a felhasználó „kedvenc szá
 
 Websocket:
 - `cantabile/wiim_deezer/available` `{entity_id}` → `{available}`
-- `cantabile/wiim_deezer/play` `{entity_id, kind: album|playlist, id, track?, position?}` → `{index, total}`
+- `cantabile/wiim_deezer/play` `{entity_id, kind: album|playlist, item, track?, position?}` → `{index, total}`
 - `cantabile/wiim_deezer/from_sonos` `{source, target, track, position?}` → `{kind, id, title, index, total}`
 """
 
@@ -199,12 +199,19 @@ async def lejatszik(hass: HomeAssistant, entity_id: str, fajta: str, did: str, s
                     break
                 await asyncio.sleep(0.7)
             await _pq(hass, host, "PlayQueueWithIndex", f"<QueueName>{SOR_NEV}</QueueName><Index>{index}</Index>")
-        if ugrik:
-            # a kért szám elindult (a némítás csak utána oldódik: a lista első számából semmi nem hallatszik)
-            await asyncio.sleep(0.8)
-            hatar = time.monotonic() + 12
-            while time.monotonic() < hatar and (await _allapot(hass, host)).get("status") != "play":
-                await asyncio.sleep(0.5)
+        # a kért szám elindult (a némítás csak utána oldódik: a lista első számából semmi nem hallatszik); ha a WiiM a
+        # sort nem tudta betölteni (üres sor, lejárt Deezer-belépés), nem szólal meg – ezt jelezni kell, nem csendben
+        # „sikerülni”, hogy a hívó másik utat választhasson
+        await asyncio.sleep(0.8)
+        hatar = time.monotonic() + 15
+        szol = False
+        while time.monotonic() < hatar:
+            if (await _allapot(hass, host)).get("status") == "play":
+                szol = True
+                break
+            await asyncio.sleep(0.5)
+        if not szol:
+            raise HomeAssistantError("not_playing")
         if poz > 3:
             await _api(hass, host, f"setPlayerCmd:seek:{int(poz)}")
         return {"index": index, "total": osszes}
@@ -400,13 +407,15 @@ def regisztral(hass: HomeAssistant) -> None:
 
     @websocket_api.websocket_command({
         vol.Required("type"): "cantabile/wiim_deezer/play", vol.Required("entity_id"): str,
-        vol.Required("kind"): vol.In(["album", "playlist"]), vol.Required("id"): vol.Coerce(str),
+        vol.Required("kind"): vol.In(["album", "playlist"]),
+        # az album / lista Deezer-azonosítója; NEM „id”: azt a websocket az üzenet sorszámának foglalja (a frontend felülírja)
+        vol.Required("item"): vol.Coerce(str),
         vol.Optional("track"): vol.Any(None, vol.Coerce(str)), vol.Optional("position", default=0): vol.Coerce(float),
     })
     @websocket_api.async_response
     async def ws_play(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
         try:
-            r = await lejatszik(hass, msg["entity_id"], msg["kind"], msg["id"], msg.get("track"), msg["position"])
+            r = await lejatszik(hass, msg["entity_id"], msg["kind"], msg["item"], msg.get("track"), msg["position"])
         except HomeAssistantError as err:
             conn.send_error(msg["id"], "nem_sikerult", str(err))
             return
