@@ -256,7 +256,86 @@ async def sonos_forras(hass: HomeAssistant, sonos: str) -> dict[str, str] | None
     return None
 
 
+PRESET_DZ = re.compile(r"/deezer/(album|playlist)/(\d+)", re.I)
+PRESET_TUNEIN = re.compile(r"(?:profiles/|[?&]id=)(s\d+)", re.I)
+
+
+def preset_sorok(valasz: str) -> dict[str, dict[str, str]]:
+    """A PlayQueue „TotalQueue” listájából: preset-név → {forras, kereso} (a sor neve „<név>_#~<mentés ideje>”)."""
+    ki: dict[str, dict[str, str]] = {}
+    for blk in re.findall(r"<List\d+>(.*?)</List\d+>", html.unescape(valasz), re.S):
+        def g(k: str, b: str = blk) -> str:
+            m = re.search(f"<{k}>(.*?)</{k}>", b, re.S)
+            return html.unescape(m.group(1)).strip() if m else ""
+        nev = g("Name").split("_#~")[0].strip()
+        if nev and nev not in ki:
+            ki[nev] = {"forras": g("Source"), "kereso": g("SearchUrl")}
+    return ki
+
+
+def preset_leforditva(forras: str, kereso: str) -> dict[str, str] | None:
+    """Egy preset tartalma más hangszórónak is érthetően: Deezer-album / -lista (link), vagy TuneIn-adó (azonosító)."""
+    if forras.lower().startswith("deezer") and (m := PRESET_DZ.search(kereso)):
+        return {"deezer_kind": m.group(1).lower(), "deezer_id": m.group(2),
+                "deezer": f"https://www.deezer.com/{m.group(1).lower()}/{m.group(2)}"}
+    if "tunein" in forras.lower() and (m := PRESET_TUNEIN.search(kereso)):
+        return {"tunein": m.group(1)}
+    return None
+
+
+async def _tunein_cim(hass: HomeAssistant, allomas: str) -> str | None:
+    """A TuneIn-adó stream-címe (a nyilvános OPML API-ból)."""
+    s = async_get_clientsession(hass)
+    try:
+        async with s.get(f"https://opml.radiotime.com/Tune.ashx?id={allomas}&render=json",
+                         timeout=aiohttp.ClientTimeout(total=8)) as r:
+            d = await r.json(content_type=None)
+    except Exception:  # noqa: BLE001
+        return None
+    for x in (d or {}).get("body") or []:
+        if str(x.get("url") or "").startswith(("http://", "https://")):
+            return x["url"]
+    return None
+
+
+async def presetek(hass: HomeAssistant, entity_id: str) -> list[dict[str, Any]]:
+    """A WiiM presetjei a tartalmukkal: {number, name, source, image, deezer?, deezer_kind?, deezer_id?, radio?}. A Deezer-
+    és a TuneIn-preset így bármelyik hangszórón szólhat (Deezer-albumként / rádióként), a többi csak a WiiM-en."""
+    host = _wiim(hass, entity_id)
+    if not host:
+        raise HomeAssistantError("not_wiim")
+    info = json.loads(await _api(hass, host, "getPresetInfo"))
+    try:
+        sorok = preset_sorok(await _pq(hass, host, "BrowseQueue", "<QueueName>TotalQueue</QueueName>"))
+    except Exception:  # noqa: BLE001 – régebbi firmware: csak a WiiM-en játszható presetek
+        sorok = {}
+    ki = []
+    for p in info.get("preset_list") or []:
+        nev = str(p.get("name") or "").strip()
+        x: dict[str, Any] = {"number": int(p.get("number") or 0), "name": nev, "source": str(p.get("source") or ""),
+                             "image": p.get("picurl") or None}
+        sor = sorok.get(nev)
+        if sor and (f := preset_leforditva(sor["forras"] or x["source"], sor["kereso"])):
+            if allomas := f.pop("tunein", None):
+                if cim := await _tunein_cim(hass, allomas):
+                    x["radio"] = cim
+            else:
+                x.update(f)
+        ki.append(x)
+    return ki
+
+
 def regisztral(hass: HomeAssistant) -> None:
+    @websocket_api.websocket_command({vol.Required("type"): "cantabile/wiim_presets", vol.Required("entity_id"): str})
+    @websocket_api.async_response
+    async def ws_presets(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        try:
+            conn.send_result(msg["id"], {"presets": await presetek(hass, msg["entity_id"])})
+        except Exception as err:  # noqa: BLE001 – nem WiiM, vagy nem válaszol
+            conn.send_error(msg["id"], "nem_sikerult", str(err) or type(err).__name__)
+
+    websocket_api.async_register_command(hass, ws_presets)
+
     @websocket_api.websocket_command({vol.Required("type"): "cantabile/wiim_deezer/available", vol.Required("entity_id"): str})
     @websocket_api.async_response
     async def ws_available(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:

@@ -140,6 +140,9 @@ const EN = {
   "A(z) {h} hangszórón ez egyik forrásból sem szól – {l}.": "None of the sources plays this on {h} – {l}.",
   "WiiM-presetek": "WiiM presets",
   "WiiM-preset {n}": "WiiM preset {n}",
+  "WiiM-preset {n} · Deezer": "WiiM preset {n} · Deezer",
+  "WiiM-preset {n} · rádió": "WiiM preset {n} · radio",
+  "A Deezer- és a rádió-presetek itt is szólnak; a többi (pl. Tidal) csak a(z) {h} hangszórón – ahhoz válts rá.": "Deezer and radio presets play here too; the others (e.g. Tidal) only on {h} – switch to it for those.",
   "Nincs WiiM a hangszórók között.": "There is no WiiM among the speakers.",
   "A WiiM-presetek nem olvashatók: {h}": "The WiiM presets can't be read: {h}",
   "A WiiM-presetek a(z) {h} hangszórón szólnak – válts rá.": "WiiM presets play on {h} – switch to it.",
@@ -4850,6 +4853,19 @@ class CantabileCard extends HTMLElement {
   _wiim(h) { return !!h && h.entity !== HELYI && this._hass?.entities?.[h.entity]?.platform === "wiim"; }
 
   async _wiimPresetek(cel) {
+    // a Cantabile kiolvassa, mi van a preset mögött: a Deezer-album / -lista Deezer-kazettaként, a TuneIn-adó rádióként
+    // bármelyik hangszórón szól (minden forrás mindenhol); a többi (Tidal, Qobuz…) csak a WiiM-en, a WiiM saját presetjeként
+    if (!this._nincsIntegracio) {
+      try {
+        const v = await this._hass.callWS({ type: "cantabile/wiim_presets", entity_id: cel.entity });
+        return (v.presets || []).map((x) => {
+          const kep = x.image || null, n = x.number;
+          if (x.deezer) return { cim: x.name, alcim: T("WiiM-preset {n} · Deezer", { n }), forras: "stream", tipus: "deezer", id: x.deezer, kep, wiimPreset: n };
+          if (x.radio) return { cim: x.name, alcim: T("WiiM-preset {n} · rádió", { n }), forras: "stream", tipus: "preset_radio", id: x.radio, kep, wiimPreset: n };
+          return { cim: x.name, alcim: T("WiiM-preset {n}", { n }), forras: "stream", tipus: "wiim_preset", id: String(n), kep };
+        });
+      } catch (_) { /* régebbi integráció / nem válaszol: a HA WiiM-integrációjának presetjei */ }
+    }
     const r = await this._hass.callWS({ type: "media_player/browse_media", entity_id: cel.entity, media_content_id: "wiim_library/library_root/favorites", media_content_type: "playlist" });
     return (r.children || []).filter((x) => x.can_play).map((x) => ({ cim: x.title, alcim: T("WiiM-preset {n}", { n: x.media_content_id }), forras: "stream", tipus: "wiim_preset", id: String(x.media_content_id), kep: x.thumbnail || null }));
   }
@@ -4991,7 +5007,14 @@ class CantabileCard extends HTMLElement {
       if (this._mod !== "radio") { this._mod = "radio"; TAR.ir("tablet-radio-mod", "radio"); this._frissit(); this._igazitKesobb(); }
       if (x.sajat != null) this._hangol(x.sajat); else this._netIndit(x.rb);
     }));
-    lista.querySelectorAll(".kazettak .kt").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._betolt(presetek[Number(b.dataset.i)].k); }));
+    lista.querySelectorAll(".kazettak .kt").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._presetIndit(presetek[Number(b.dataset.i)].k); }));
+  }
+
+  // preset-kazetta indítása: a rádió-preset a rádió NET-adójaként (bármelyik hangszórón), a többi kazettaként
+  _presetIndit(k) {
+    if (k?.tipus !== "preset_radio") return this._betolt(k);
+    if (this._mod !== "radio") { this._mod = "radio"; TAR.ir("tablet-radio-mod", "radio"); this._frissit(); this._igazitKesobb(); }
+    return this._netIndit({ name: k.cim, url_resolved: k.id, favicon: k.kep || "" });
   }
 
   async _wiimRajz(lista) {
@@ -5003,10 +5026,10 @@ class CantabileCard extends HTMLElement {
     try { kaz = await this._wiimPresetek(cel); }
     catch (err) { lista.innerHTML = `<div class="puzenet">${T("A WiiM-presetek nem olvashatók: {h}", { h: ESC(err?.message || err) })}</div>`; return; }
     if (this._polc !== pl || pl.ful !== "wiim") return;
-    lista.innerHTML = (this._wiim(hsz) ? "" : `<div class="puzenet">${T("A WiiM-presetek a(z) {h} hangszórón szólnak – válts rá.", { h: ESC(KN(cel)) })}</div>`)
+    lista.innerHTML = (this._wiim(hsz) || !kaz.some((k) => k.tipus === "wiim_preset") ? "" : `<div class="puzenet">${T("A Deezer- és a rádió-presetek itt is szólnak; a többi (pl. Tidal) csak a(z) {h} hangszórón – ahhoz válts rá.", { h: ESC(KN(cel)) })}</div>`)
       + (kaz.length ? `<div class="kazettak">${kaz.map((k, i) => this._kazettaCsempe(k, i)).join("")}</div>` : "")
       + `<div class="puzenet">${kaz.length ? "" : T("Még nincs WiiM-preset.") + " "}${T("Presetet a WiiM Home appban menthetsz – bármelyik zenei szolgáltatásból (Tidal, Qobuz, Amazon, Deezer, rádió…).")}</div>`;
-    lista.querySelectorAll(".kt").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._betolt(kaz[Number(b.dataset.i)]); }));
+    lista.querySelectorAll(".kt").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._presetIndit(kaz[Number(b.dataset.i)]); }));
   }
 
   _sorForras() {

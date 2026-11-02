@@ -96,3 +96,43 @@ def test_deezer_sorrend_lapozva(monkeypatch):
     monkeypatch.setattr(W, "deezer", deezer)
     s = asyncio.run(W.deezer_sorrend(None, "playlist", "989611251"))
     assert len(s) == 315 and s[314] == "314"
+
+
+TOTAL = html.escape("""<?xml version="1.0"?><PlayQueue><TotalQueue>3</TotalQueue><PlayListInfo>
+<List1><Name>A Joyful Noise_#~2026-02-19 13:28:34</Name><ListInfo><Source>Deezer2</Source><SearchUrl>https://1.airable.io/deezer/album/1950311</SearchUrl></ListInfo></List1>
+<List2><Name>Rádió Dabas 93.4_#~2026-02-20 08:09:20</Name><ListInfo><Source>newTuneIn</Source><SearchUrl>https://api.radiotime.com/profiles/s107198/media?partnerId=x&amp;latlon=,</SearchUrl></ListInfo></List2>
+<List3><Name>Valami Tidal_#~2026-03-01 10:00:00</Name><ListInfo><Source>Tidal</Source><SearchUrl>https://api.tidal.com/x</SearchUrl></ListInfo></List3>
+</PlayListInfo></PlayQueue>""")
+
+
+def test_preset_sorok_es_leforditas():
+    s = W.preset_sorok(f"<QueueContext>{TOTAL}</QueueContext>")
+    assert set(s) == {"A Joyful Noise", "Rádió Dabas 93.4", "Valami Tidal"}
+    assert W.preset_leforditva(s["A Joyful Noise"]["forras"], s["A Joyful Noise"]["kereso"]) == {
+        "deezer_kind": "album", "deezer_id": "1950311", "deezer": "https://www.deezer.com/album/1950311"}
+    assert W.preset_leforditva(s["Rádió Dabas 93.4"]["forras"], s["Rádió Dabas 93.4"]["kereso"]) == {"tunein": "s107198"}
+    assert W.preset_leforditva(s["Valami Tidal"]["forras"], s["Valami Tidal"]["kereso"]) is None
+
+
+def test_presetek(monkeypatch):
+    async def api(hass, host, parancs):
+        assert parancs == "getPresetInfo"
+        return ('{"preset_num": 3, "preset_list": [{"number": 1, "name": "A Joyful Noise", "source": "Deezer2", "picurl": "k1"},'
+                '{"number": 2, "name": "Rádió Dabas 93.4", "source": "newTuneIn", "picurl": "k2"},'
+                '{"number": 3, "name": "Valami Tidal", "source": "Tidal", "picurl": "k3"}]}')
+
+    async def pq(hass, host, akcio, torzs):
+        return f"<QueueContext>{TOTAL}</QueueContext>"
+
+    async def tunein(hass, allomas):
+        assert allomas == "s107198"
+        return "http://192.0.2.5:7040/;stream"
+
+    monkeypatch.setattr(W, "_api", api)
+    monkeypatch.setattr(W, "_pq", pq)
+    monkeypatch.setattr(W, "_tunein_cim", tunein)
+    monkeypatch.setattr(W, "_wiim", lambda hass, e: "192.0.2.1")
+    p = asyncio.run(W.presetek(None, "media_player.wiim"))
+    assert p[0]["deezer"] == "https://www.deezer.com/album/1950311" and p[0]["image"] == "k1"
+    assert p[1]["radio"] == "http://192.0.2.5:7040/;stream" and "deezer" not in p[1]
+    assert "deezer" not in p[2] and "radio" not in p[2] and p[2]["number"] == 3     # Tidal: csak a WiiM-en

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.6.0b4 – 2026-11-02
+
+- **WiiM presets play on any speaker.** The library's WIIM tab and SEARCH now read what is behind each preset (the WiiM's play queue): a Deezer album or playlist preset becomes a Deezer cassette – it plays on every speaker through the usual routes (Sonos: its own Deezer; WiiM: its own Deezer; others: Music Assistant or the music folder); a TuneIn radio preset becomes a radio station (its stream address from TuneIn) and plays on any speaker, BT included. Presets from other services (Tidal, Qobuz…) still play only on the WiiM. New websocket command `cantabile/wiim_presets`; without it the card falls back to the HA WiiM integration's preset list.
+
 ## 2.6.0b3 – 2026-11-02
 
 - **WiiM plays Deezer from its own Deezer (lossless).** If a Deezer account is linked in the WiiM Home app, Deezer albums and playlists now play on WiiM / LinkPlay speakers through the speaker itself (its own integration – the main route), in lossless quality; Music Assistant stays the fallback. Used when you start a Deezer album or playlist on a WiiM, and when you switch from a Sonos playing a Deezer list (e.g. your Deezer favourites) to a WiiM: the list is found among the Sonos favourites (album, playlist or the Deezer favourites), and the WiiM continues from the same track and position – muted while it jumps there, so the start of the list isn't heard. If the list isn't found or the track isn't in it, the Music Assistant route takes over (from the same track). The WiiM's local PlayQueue (UPnP) and HTTP API are used; new `cantabile/wiim_deezer/*` websocket commands.
