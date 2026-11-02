@@ -190,6 +190,20 @@ def hibat_ralo(m: dict[str, Any], hibak: dict[tuple[str, str, str], float], most
         cella.update(osszegez(cella["utak"]))
 
 
+def jeloles_nelkul(m: dict[str, Any]) -> None:
+    """A „nem szólt” jelölések le a mátrixról (az utak állapota újra a többi feltételből)."""
+    for sor in (m.get("cellak") or {}).values():
+        for cella in sor.values():
+            valt = False
+            for u in cella["utak"]:
+                if any(x["k"] == "lejatszas" for x in u["feltetelek"]):
+                    u["feltetelek"] = [x for x in u["feltetelek"] if x["k"] != "lejatszas"]
+                    u["allapot"] = _ut_allapot([x["ok"] for x in u["feltetelek"]])
+                    valt = True
+            if valt:
+                cella.update(osszegez(cella["utak"]))
+
+
 def epit(be: dict[str, Any]) -> dict[str, Any]:
     """A mátrix a bemenetekből (tiszta függvény: tesztelhető, a HA-tól független).
 
@@ -365,8 +379,11 @@ class UtMatrix:
         self.hibak: dict[tuple[str, str, str], float] = {}
 
     async def betolt(self) -> None:
-        """A tárolt mátrix (az előző futásból): induláskor azonnal megvan, a friss a HA elindulása után készül."""
+        """A tárolt mátrix (az előző futásból): induláskor azonnal megvan, a friss a HA elindulása után készül. Az előző
+        futás „nem szólt” jelölései nem jönnek át (újraindítás után minden út újra próbálható)."""
         self.adat = await self.store.async_load()
+        if self.adat:
+            jeloles_nelkul(self.adat)
 
     async def frissit(self, ok: str = "kérés") -> dict[str, Any]:
         async with self._zar:

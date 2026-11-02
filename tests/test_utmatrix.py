@@ -117,3 +117,11 @@ def test_nem_szolo_ut_egy_oraig_kimarad():
     m2 = U.epit(_be())
     U.hibat_ralo(m2, hibak, 100.0 + U.HIBA_IDO + 1)                       # egy óra után újra az első
     assert m2["cellak"]["deezer"]["media_player.wiim"]["elso"] == 0 and not hibak
+
+
+def test_tarolt_jelolesek_indulaskor_le():
+    m = U.epit(_be())
+    U.hibat_ralo(m, {("deezer", "media_player.wiim", "wiim_deezer"): 1.0}, 2.0)
+    U.jeloles_nelkul(m)
+    c = m["cellak"]["deezer"]["media_player.wiim"]
+    assert c["elso"] == 0 and c["utak"][0]["allapot"] == "ok" and all(x["k"] != "lejatszas" for x in c["utak"][0]["feltetelek"])

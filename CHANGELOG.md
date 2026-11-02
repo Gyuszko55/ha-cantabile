@@ -2,7 +2,7 @@
 
 ## 2.7.0b4 – 2026-11-02
 
-- Route matrix: only a real playback failure marks a route as not playing – when the content itself can't be found on a route (e.g. a Deezer album that is no longer available), the next route is tried without marking, and if none has it, one clear message says so. New websocket `cantabile/matrix/reset` clears the marks.
+- Route matrix: only a real playback failure marks a route as not playing – when the content itself can't be found on a route (e.g. a Deezer album that is no longer available), the next route is tried without marking, and if none has it, one clear message says so. New websocket `cantabile/matrix/reset` clears the marks. The stored matrix drops the previous run's marks at start-up.
 
 ## 2.7.0b3 – 2026-11-02
 
