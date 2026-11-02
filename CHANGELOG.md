@@ -9,6 +9,7 @@ One device, one speaker – its own integration first, other ways in as fallback
 - **Fallback in the background.** What the device's own integration can't play (Music Assistant library, Music Assistant's Deezer) goes through its fallback route automatically; everything else plays via the own integration. The card gets the device map from `cantabile/info` (`devices`), so pairing now also works where Music Assistant's player id differs from the integration's (name / MAC match).
 - **Existing cards are tidied up automatically:** a speaker entry pointing at a device's secondary player (e.g. the Music Assistant "Living room" next to the Sonos one, or a SmartBox added twice) moves to the device's main player; the same device appears only once, keeping its first entry's name. The wizard does the same when it writes the cards.
 - **TV step:** a device's secondary Cast or DLNA player can still be picked as a Cantabile TV.
+- **No waiting for the merged buttons:** the card remembers the device map in the browser, so on the next open the buttons are merged right away (on a big dashboard `cantabile/info` can take 10–20 s while the rest of the UI loads); the map is rebuilt as soon as it arrives, without waiting for Music Assistant. A device's own speaker integration (Cast, DLNA…) stays the main route even while it is unavailable (e.g. a switched-off TV's DLNA player), not the TV's own remote-control player.
 
 ## 2.6.0b1 – 2026-11-01
 

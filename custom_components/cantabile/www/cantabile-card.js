@@ -584,7 +584,7 @@ let ATADANDO = null;
 let MA_PAROK = null;
 // készülékenként egy hangszóró (cantabile/info „devices”): fo = lejátszó → a készülék fő (saját integrációs) lejátszója,
 // ma = a fő lejátszó Music Assistant-útja; null: még nincs adat (vagy régi integráció) – akkor a régi MA-párosítás
-let KESZ = null;
+let KESZ = null;   // a TAR betöltése után a böngészőben megjegyzett térképpel indul (lent)
 const RB_SZERVEREK = () => (RB_LISTA ||= (async () => {
   const ctl = new AbortController(), ido = setTimeout(() => ctl.abort(), 5000);
   try {
@@ -724,6 +724,10 @@ const TAR = {
   json(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } },
 };
 
+// a készüléktérkép a böngészőben megjegyezve: a következő megnyitáskor a gombok azonnal összevonva (a cantabile/info
+// válasza nagy vezérlőpulton 10–20 mp is lehet, amíg a felület többi része tölt) – a friss válasz felülírja
+KESZ = TAR.json("cantabile-keszulekek");
+
 class CantabileCard extends HTMLElement {
   setConfig(eredeti) {
     // angol kulcsok (speakers, stations…) is jók; belül a magyar nevek
@@ -826,12 +830,14 @@ class CantabileCard extends HTMLElement {
     let ujKesz = false;
     try {
       const v = await this._hass.callWS({ type: "cantabile/info" }); this._ent = v.entities || {}; this._haIndult = v.started ? v.started * 1000 : null; this._stream = v.streaming || {}; this._tvMap = v.tv || {};
-      if (v.devices && JSON.stringify(v.devices) !== JSON.stringify(KESZ)) { KESZ = v.devices; ujKesz = true; }
+      if (v.devices && JSON.stringify(v.devices) !== JSON.stringify(KESZ)) { KESZ = v.devices; ujKesz = true; TAR.ir("cantabile-keszulekek", JSON.stringify(KESZ)); }
     }
     catch (e) { this._ent = {}; this._nincsIntegracio = true; }
     // a készüléktérkép megjött / változott: a gombok újra (összevonva, a tartalék úttal); a már beépültnek nem kell
-    const kellUjra = ujKesz || (KESZ && this._keszVolt !== KESZ);
+    let kellUjra = ujKesz || (KESZ && this._keszVolt !== KESZ);
     this._keszVolt = KESZ;
+    // a térkép az első válasszal megjön: a gombok azonnal összevonva (a Music Assistant adatait nem kell megvárni)
+    if (kellUjra && this._eredetiCfg) { this.setConfig(this._eredetiCfg); kellUjra = false; }
     if (!this._nincsIntegracio && MA_PAROK === null) {
       await this._maInfoLeker();
       MA_PAROK = this._maInfo?.available ? this._maInfo.pairs || {} : {};
