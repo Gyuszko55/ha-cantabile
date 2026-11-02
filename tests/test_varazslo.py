@@ -97,7 +97,7 @@ def _valodi():
         _mp("media_player.samsung_7_series_43", "samsungtv", "Samsung 7 Series (43)", eszkoz="t1", eszkoznev="Samsung 7 Series (43)",
             mac=["24:fc:e5:de:7a:c0"], device_class="tv"),
         _mp("media_player.nappali_tv", "dlna_dmr", "Nappali TV", eszkoz="t2", eszkoznev="[TV] Samsung 7 Series (43)",
-            mac=["24:fc:e5:de:7a:c0"]),
+            mac=["24:fc:e5:de:7a:c0"], features=0),
         _mp("media_player.samsung_7_series_43_2", M, "Samsung 7 Series (43)", eszkoz="m5", eszkoznev="Samsung 7 Series (43)"),
         _mp("media_player.voice", "esphome", "Home Assistant Voice", eszkoz="e1", eszkoznev="Home Assistant Voice 093239"),
         _mp("media_player.voice_ma", M, "Home Assistant Voice", eszkoz="m6", eszkoznev="Home Assistant Voice 093239"),
@@ -121,7 +121,8 @@ def test_keszulekenkent_egy_hangszoro_valodi_telepitesen():
     assert e["media_player.wiim_mini_a16a_4"]["ma"] == "media_player.wiim_mini_a16a"           # név szerint párosítva
     # SmartBox: a Cast a fő (hangszóró-integráció), az Android TV Remote és az MA tartalék
     assert [u["entity_id"] for u in e["media_player.smartbox"]["utak"]] == ["media_player.smartbox_2", "media_player.smartbox_3"]
-    # Samsung TV: MAC-cím köti össze; a DLNA a fő út (zenét fogad), a TV saját lejátszója tartalék; képernyős
+    # Samsung TV: MAC-cím köti össze; a DLNA a fő út (zenét fogad – kikapcsolt TV-nél sincs funkciója), a TV saját
+    # lejátszója tartalék; képernyős
     tv = e["media_player.nappali_tv"]
     assert {u["entity_id"] for u in tv["utak"]} == {"media_player.samsung_7_series_43", "media_player.samsung_7_series_43_2"}
     assert tv["kepernyo"] and not tv["elore"]

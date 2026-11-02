@@ -166,11 +166,14 @@ def keszulekek(elemek: list[dict[str, Any]], parok: dict[str, str] | None = None
         sajat = [e for e in g if e.get("platform") != MA and e.get("eszkoz")]
         if not sajat:
             continue                     # csak Music Assistant / eszköz nélküli lejátszó: nem hangszóró
-        sajat.sort(key=lambda e: (not _lejatszik(e), _rang(e.get("platform") or ""), str(e.get("nev") or "").casefold()))
+        # a hangszóró-integráció (Sonos, Cast, DLNA…) akkor is a fő út, ha épp nem elérhető (kikapcsolt TV DLNA-ja: az
+        # állapotban és a regiszterben sincs funkció) – a TV / távirányító saját lejátszója zenei címet nem fogad
+        sajat.sort(key=lambda e: (e.get("platform") not in UT_SORREND, not _lejatszik(e), _rang(e.get("platform") or ""),
+                                  str(e.get("nev") or "").casefold()))
         fo = sajat[0]
         mak = [e for e in g if e.get("platform") == MA]
         ma = next((m for m in mak if parok.get(fo["entity_id"]) == m["entity_id"]), None) or (mak[0] if mak else None)
-        if not _lejatszik(fo) and not (ma and _lejatszik(ma)):
+        if not any(_lejatszik(e) for e in sajat) and not (ma and _lejatszik(ma)):
             continue                     # semmilyen úton nem fogad zenét (pl. csak távirányítható)
         ki.append({"fo": fo, "tobbi": sajat[1:], "ma": ma})
     return ki
