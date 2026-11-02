@@ -291,6 +291,47 @@ async def sonos_forras(hass: HomeAssistant, sonos: str) -> dict[str, str] | None
     return None
 
 
+SONOS_SPOTIFY = re.compile(r"spotify(?:%3a|:)(playlist|album|track|artist)(?:%3a|:)([A-Za-z0-9]+)", re.I)
+SONOS_TUNEIN = re.compile(r"x-sonosapi-(?:stream|radio):(s\d+)", re.I)
+
+
+async def kedvenc_leforditva(hass: HomeAssistant, cim: str) -> dict[str, str] | None:
+    """Egy Sonos-kedvenc tartalma más hangszórónak is érthetően (cím szerint): Deezer-album / -lista / a Deezer-kedvencek
+    listája (link), Spotify (spotify:…), vagy rádióadó (stream-cím); None, ha nem fordítható (pl. Sonos-rádió saját
+    szolgáltatásból)."""
+    keresett = str(cim or "").strip().casefold()
+    sonosok = [e.entity_id for e in er.async_get(hass).entities.values()
+               if e.platform == "sonos" and e.domain == "media_player" and not e.disabled]
+    for sonos in sonosok:
+        try:
+            kedvencek = await _sonos_kedvencek(hass, sonos)
+        except Exception:  # noqa: BLE001
+            continue
+        for c, uri in kedvencek:
+            if c.strip().casefold() != keresett:
+                continue
+            if f := kedvencbol(uri):
+                fajta, did = f
+                if fajta == "kedvenc":
+                    lista = await deezer(hass, f"/user/{did}/playlists?limit=100")
+                    did = next((str(x["id"]) for x in (lista or {}).get("data") or [] if x.get("is_loved_track")), None)
+                    if not did:
+                        return None
+                    fajta = "playlist"
+                return {"deezer": f"https://www.deezer.com/{fajta}/{did}"}
+            if m := SONOS_SPOTIFY.search(uri):
+                return {"spotify": f"spotify:{m.group(1).lower()}:{m.group(2)}"}
+            if m := SONOS_TUNEIN.search(uri):
+                return {"radio": u} if (u := await _tunein_cim(hass, m.group(1))) else None
+            if uri.startswith("x-rincon-mp3radio://"):
+                return {"radio": "http://" + uri[len("x-rincon-mp3radio://"):]}
+            if uri.startswith(("http://", "https://")):
+                return {"radio": uri}
+            return None
+        return None                                       # a kedvencek olvashatók, de ilyen nincs köztük
+    return None
+
+
 PRESET_DZ = re.compile(r"/deezer/(album|playlist)/(\d+)", re.I)
 PRESET_TUNEIN = re.compile(r"(?:profiles/|[?&]id=)(s\d+)", re.I)
 
@@ -449,5 +490,10 @@ def regisztral(hass: HomeAssistant) -> None:
             return
         conn.send_result(msg["id"], {**f, **r})
 
-    for c in (ws_available, ws_play, ws_from_sonos):
+    @websocket_api.websocket_command({vol.Required("type"): "cantabile/sonos_favorite", vol.Required("title"): str})
+    @websocket_api.async_response
+    async def ws_sonos_favorite(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        conn.send_result(msg["id"], await kedvenc_leforditva(hass, msg["title"]) or {})
+
+    for c in (ws_available, ws_play, ws_from_sonos, ws_sonos_favorite):
         websocket_api.async_register_command(hass, c)

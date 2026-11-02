@@ -27,7 +27,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import CoreState, Event, HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
@@ -47,7 +47,7 @@ SONOS = ("sonos", "sonos_csoport")       # a Multiroom (a Sonosok csoportja) a S
 MULTIROOM = "cantabile:multiroom"
 BT = "helyi:bt"                          # a böngésző (a kártyát mutató telefon / tablet) saját hangja
 # a böngészőn csak ezek az utak élnek (Deezer, Spotify, MA nem szól a böngészőben)
-BT_UTAK = {"sajat", "ideiglenes", "preset_forditva"}
+BT_UTAK = {"sajat", "ideiglenes", "preset_forditva", "kedvenc_forditva", "nas_helyett", "deezer_tartalek"}
 # TV-n (Cantabile TV-oldallal) a zenemappás helyettesítés áll elöl (kép, borító, dalszöveg); az MA csak hangként, utána
 TV_ELORE = {"nas_helyett"}
 
@@ -65,6 +65,7 @@ FELTETELEK: dict[str, str] = {
     "tidal": "Tidal-hozzáférés",
     "deezer_cella": "a Deezer szól ezen a hangszórón",
     "preset_cella": "a preset tartalma (Deezer / rádió) szól ezen a hangszórón",
+    "kedvenc_cella": "a kedvenc tartalma (Deezer / rádió) szól ezen a hangszórón",
     "lejatszas": "legutóbb nem szólt (egy óráig kimarad)",
 }
 
@@ -103,6 +104,7 @@ FORRASOK: list[tuple[str, str, list[tuple[Any, ...]]]] = [
     ]),
     ("sonos_kedvenc", "Sonos-kedvencek", [
         ("sonos_kedvenc", "a Sonos kedvence", "fo", "kozvetlen", SONOS, []),
+        ("kedvenc_forditva", "a kedvenc tartalma: Deezer-album / -lista, Spotify vagy rádió", "fo", "helyettesites", None, ["kedvenc_cella"]),
     ]),
     ("ma_konyvtar", "Music Assistant-könyvtár", [
         ("ma_sajat", "a Music Assistant saját sora", "ma", "kozvetlen", None, ["ma"]),
@@ -159,7 +161,7 @@ def _feltetel(k: str, h: dict[str, Any], be: dict[str, Any], kesz: dict[str, dic
         return None if be.get("spotify_ha") else False      # a Spotify a tétlen eszközt gyakran nem mutatja
     if k == "tidal":
         return bool(be.get("tidal"))
-    if k in ("deezer_cella", "preset_cella"):
+    if k in ("deezer_cella", "preset_cella", "kedvenc_cella"):
         forrasok = ("deezer",) if k == "deezer_cella" else ("deezer", "radio")
         allapotok = [kesz.get(f, {}).get(e, {}).get("allapot") for f in forrasok]
         return True if "ok" in allapotok or "helyettesites" in allapotok else None if "?" in allapotok else False
@@ -224,12 +226,22 @@ def epit(be: dict[str, Any]) -> dict[str, Any]:
                 ki = h["entity_id"] if kimenet == "fo" else h.get("ma")
                 if kimenet == "fo" and h.get("tv"):
                     ki, nev = h["tv"], f"{nev} – a TV-oldalon" if kulcs != "sajat" else "a TV-oldal (kép, borító, dalszöveg)"
-                if kulcs == "preset_forditva":
+                if platformok is None and kulcs == "kedvenc_forditva" and h.get("platform") in SONOS:
+                    continue                                    # Sonoson a kedvenc maga szól
+                if kulcs in ("preset_forditva", "kedvenc_forditva"):
                     # a preset tartalma közvetlenül szól, ha a mögötte lévő cellák (Deezer, rádió) közvetlenek
                     al = [cellak.get(f, {}).get(h["entity_id"], {}).get("allapot") for f in ("deezer", "radio")]
                     mod = "kozvetlen" if all(a in ("ok", "nem") for a in al) and "ok" in al else "helyettesites"
+                # a hang mellett kép: a TV-oldalon maga a TV; hangszórón a helyiség tükrözni tudó TV-i (a hang a
+                # készüléken szól – a saját lejátszóján vagy az MA-lejátszóján)
+                if h.get("tv") and ki == h["tv"]:
+                    kep = ["saját képernyő"]
+                elif ki and ki in (h["entity_id"], h.get("ma")) or h["entity_id"] == MULTIROOM:
+                    kep = [t["nev"] for t in h.get("tv_kep") or [] if t.get("tukor")]
+                else:
+                    kep = []
                 lista.append({
-                    "ut": kulcs, "nev": nev, "mod": mod, "kimenet": ki,
+                    "ut": kulcs, "nev": nev, "mod": mod, "kimenet": ki, "kep": kep,
                     "feltetelek": [{"k": k, "nev": FELTETELEK[k], "ok": v} for k, v in ertek.items()],
                     "allapot": _ut_allapot(list(ertek.values())),
                 })
@@ -239,9 +251,10 @@ def epit(be: dict[str, Any]) -> dict[str, Any]:
         cellak[fk] = sor
     return {
         "forrasok": [{"k": k, "nev": n} for k, n, _ in FORRASOK],
-        "hangszorok": [{x: h.get(x) for x in ("entity_id", "nev", "platform", "ma", "tv", "kartyan", "elerheto")}
+        "hangszorok": [{x: h.get(x) for x in ("entity_id", "nev", "platform", "ma", "tv", "kartyan", "elerheto", "terulet", "tv_kep")}
                        for h in be.get("hangszorok") or []],
         "cellak": cellak,
+        "figyelmeztetes": list(be.get("figyelmeztetes") or []),
     }
 
 
@@ -328,14 +341,37 @@ async def bemenetek(hass: HomeAssistant) -> dict[str, Any]:
             "kartyan": x["entity_id"] in kartyan, "elerheto": bool(st and st.state != "unavailable"),
             "_nevek": [n for n in (x["nev"], d and d.name_by_user, d and d.name) if n],
         })
+    # helyiség és a helyiség TV-i (a tükör csak azonos területen: ha egy hangszóró szól, a terület TV-je mutatja)
+    tv_lista = []
+    try:
+        from . import tv as tvmod  # noqa: PLC0415
+
+        terulet_nev = {a.id: a.name for a in ar.async_get(hass).async_list_areas()}
+        for lj in tvmod.kozpont(hass).lejatszok.values() if "tv" in hass.data.get(DOMAIN, {}) else []:
+            fo_tv = fo.get(lj.cast, lj.cast)
+            tv_lista.append({"tv": lj.entity_id, "fo": fo_tv, "nev": kartya_nev.get(fo_tv) or lj.name,
+                             "terulet": tvmod.terulet(hass, lj.entity_id, lj.cast), "tukor": not lj.dlna,
+                             "ok": None if not lj.dlna else "DLNA-s TV: tükröt nem tud (a TV maga játszik)"})
+        for h in hangszorok:
+            t = tvmod.terulet(hass, h["entity_id"])
+            h["terulet"] = terulet_nev.get(t) if t else None
+            h["tv_kep"] = [{k: x[k] for k in ("tv", "nev", "tukor", "ok")} for x in tv_lista
+                           if t and x["terulet"] == t and x["fo"] != h["entity_id"]]
+    except Exception:  # noqa: BLE001
+        _LOGGER.debug("Útmátrix: a területek nem olvashatók", exc_info=True)
+    figyelmeztetes = [f"{x['nev']}: nincs területhez rendelve – a tükörhöz (kép, dalszöveg a helyiségben) add meg a területét"
+                      for x in tv_lista if not x["terulet"] and kartya_nev.get(x["fo"])]
     # a kártyán lévők elöl, a kártya sorrendjében; utána a többi
     sorrend = list(kartya_nev)
     hangszorok.sort(key=lambda h: (sorrend.index(h["entity_id"]) if h["entity_id"] in kartyan else len(sorrend)))
     sonosok = [h for h in hangszorok if h["platform"] == "sonos"]
     if len(sonosok) > 1:
+        tvk_cs = {x["tv"]: x for h in sonosok for x in h.get("tv_kep") or []}
         hangszorok.insert(max(hangszorok.index(sonosok[-1]) + 1, 0), {
             "entity_id": MULTIROOM, "nev": "Multiroom", "platform": "sonos_csoport", "lejatszik": True, "ma": None, "tv": None,
-            "kartyan": any(h["kartyan"] for h in sonosok), "elerheto": any(h["elerheto"] for h in sonosok)})
+            "kartyan": any(h["kartyan"] for h in sonosok), "elerheto": any(h["elerheto"] for h in sonosok),
+            "terulet": ", ".join(dict.fromkeys(h["terulet"] for h in sonosok if h.get("terulet"))) or None,
+            "tv_kep": list(tvk_cs.values())})
     hangszorok.append({"entity_id": BT, "nev": "BT", "platform": "bongeszo", "lejatszik": True, "ma": None, "tv": None,
                        "kartyan": True, "elerheto": True})
     wiim = {}
@@ -363,6 +399,7 @@ async def bemenetek(hass: HomeAssistant) -> dict[str, Any]:
         "spotify_ha": bool(stream.get("spotify_entity")),
         "spotify_eszkozok": await _spotify_eszkozok(hass, hangszorok) if stream.get("spotify_entity") else {},
         "tidal": bool(stream.get("tidal")),
+        "figyelmeztetes": figyelmeztetes,
     }
 
 

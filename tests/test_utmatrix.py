@@ -52,7 +52,8 @@ def test_spotify_ismeretlen_eszkoz_es_deezer_tartalek():
 
 def test_csak_sonoson_es_semmi():
     m = U.epit(_be(zenemappa=False))
-    assert m["cellak"]["sonos_kedvenc"]["media_player.tv"] == {"utak": [], "elso": None, "allapot": "nem", "elerheto": True}
+    kv = m["cellak"]["sonos_kedvenc"]["media_player.tv"]               # a kedvenc tartalma (itt: rádió) a TV-n is szól
+    assert [u["ut"] for u in kv["utak"]] == ["kedvenc_forditva"] and kv["allapot"] == "ok"
     assert m["cellak"]["deezer"]["media_player.tv"]["allapot"] == "nem"
     assert m["cellak"]["wiim_preset"]["media_player.tv"]["allapot"] == "ok"     # a rádió-preset közvetlenül szól
 
@@ -96,9 +97,11 @@ def test_multiroom_a_sonos_utjain():
 
 def test_bt_csak_a_sajat_utakon():
     m = U.epit(_be2())
-    assert m["cellak"]["deezer"][U.BT]["allapot"] == "nem" and m["cellak"]["spotify"][U.BT]["allapot"] == "nem"
+    # a böngészőben is: a Deezer és a Spotify a zenemappából (helyettesítés)
+    assert m["cellak"]["deezer"][U.BT]["allapot"] == "helyettesites" and m["cellak"]["spotify"][U.BT]["allapot"] == "helyettesites"
+    assert m["cellak"]["party"][U.BT]["allapot"] == "nem"
     assert m["cellak"]["nas"][U.BT]["allapot"] == "ok" and m["cellak"]["telefon"][U.BT]["allapot"] == "ok"
-    assert m["cellak"]["wiim_preset"][U.BT]["allapot"] == "ok"           # a rádió-preset a böngészőben közvetlen
+    assert m["cellak"]["wiim_preset"][U.BT]["allapot"] == "helyettesites"   # rádió közvetlenül, Deezer helyettesítve
 
 
 def test_wiim_preset_modja_a_mogotte_levo_cellabol():
@@ -133,3 +136,22 @@ def test_tv_oldalas_tv_kikapcsolva_is_szol():
     m = U.epit(be)
     assert m["cellak"]["nas"]["media_player.cast_tv"]["allapot"] == "ok"
     assert m["cellak"]["deezer"]["media_player.cast_tv"]["utak"][0]["allapot"] == "ok"
+
+
+
+def test_sonos_kedvenc_mashol_a_tartalma():
+    m = U.epit(_be2())
+    assert [u["ut"] for u in m["cellak"]["sonos_kedvenc"]["media_player.sonos"]["utak"]] == ["sonos_kedvenc"]     # Sonoson maga
+    w = m["cellak"]["sonos_kedvenc"]["media_player.wiim"]
+    assert w["utak"][0]["ut"] == "kedvenc_forditva" and w["allapot"] == "ok"
+
+
+def test_tv_kep_a_helyisegben():
+    be = _be2()
+    be["hangszorok"][0]["tv_kep"] = [{"tv": "media_player.cantabile_tv_nappali", "nev": "Mi Box", "tukor": True},
+                                     {"tv": "media_player.cantabile_tv_dlna", "nev": "Nap. TV", "tukor": False}]
+    m = U.epit(be)
+    u = m["cellak"]["deezer"]["media_player.sonos"]["utak"][0]
+    assert u["kep"] == ["Mi Box"]                                  # a DLNA-s TV tükröt nem tud
+    assert m["cellak"]["deezer"]["media_player.cast_tv"]["utak"][0]["kep"] == ["saját képernyő"]
+    assert m["cellak"]["deezer"]["media_player.cast_tv"]["utak"][1]["kep"] == []      # MA csak hang

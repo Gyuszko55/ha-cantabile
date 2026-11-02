@@ -292,6 +292,7 @@ const EN = {
   "Zenemappa": "Music folder",
   "MÁSIK ÚT": "OTHER ROUTE",
   "Útmátrix": "Route matrix",
+  "Sonos-kedvenc": "Sonos favourite", "nem tud tükröt": "can't mirror", "a saját képernyőjén": "on its own screen", "kép nélkül": "no picture",
   "saját": "own", "Deezerről": "from Deezer", "Deezer / rádió": "Deezer / radio", "MA sora": "MA queue", "feltöltés": "upload",
   "saját sor": "own queue", "TV-oldal": "TV page",
   "Az útmátrix most nem érhető el (régebbi integráció, vagy még nem készült el).": "The route matrix isn't available right now (older integration, or not built yet).",
@@ -1743,6 +1744,8 @@ class CantabileCard extends HTMLElement {
         .mxt th.mxsor { position: sticky; left: 0; z-index: 1; background: rgba(30,28,26,.97); }
         :host([keskeny]) .mxt th.mxsor { white-space: normal; min-width: calc(86px * var(--bk, 1)); }
         .mxt th.mxmost { color: #ffcf7a; }
+        .mxt th small.mxter { display: block; margin-top: 2px; font: 500 calc(8px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; letter-spacing: 0; color: #a99e89; text-transform: none; }
+        .mxfigy { margin-top: 6px; color: #ffb37a; font-size: calc(10.5px * var(--bk, 1)); }
         .mxt th.mxki { opacity: .55; }
         .mxt td { white-space: nowrap; padding: 4px 5px; border-radius: 3px; cursor: pointer; color: #f6efe2; text-align: center; min-width: 54px; overflow-wrap: anywhere; }
         .mxt td.ok { background: rgba(70,150,85,.55); }
@@ -4216,6 +4219,9 @@ class CantabileCard extends HTMLElement {
         if (!this._wiim(hsz)) throw Object.assign(new Error(T("A(z) {h} hangszórón ez nem játszható le – lejátszható: {l}.", { h: KN(hsz), l: this._kepesek(kaz, hsz) })), { hely: true });
         await this._hiv("media_player", "play_media", { ...e, media_content_id: kaz.id, media_content_type: "music" });
       } else if (kaz.forras === "stream") {
+        // a böngésző (BT) nem Spotify-eszköz: a Spotify-album és -szám a Deezer-utakon (ott a zenemappából)
+        if (kaz.tipus === "spotify" && hsz.entity === HELYI && !this._nincsIntegracio && this._matrixCella("spotify", hsz)
+          && await this._spotifyDeezerre(kaz, kezdo, hsz)) return;
         if (hsz.mod !== "sonos" && kaz.tipus === "spotify" && hsz.entity !== HELYI) {
           // Spotify: ahol a hangszóró Spotify Connect-eszköz, ott a Spotify játssza; ahol nem (nincs a Spotify eszközei
           // között, DLNA-s TV…), ugyanazok a számok a Deezeren (ISRC szerint), a Deezer-utakon
@@ -4228,8 +4234,17 @@ class CantabileCard extends HTMLElement {
         }
         // Deezer nem Sonoson: több út is lehet (a WiiM saját Deezere, az MA Deezere, a zenemappa) – a hangszórónként
         // megjegyzett úton; ha még nincs választva, a kártya megkérdezi, és a „MÁSIK ÚT” gombbal bármikor váltható
-        if (hsz.mod !== "sonos" && kaz.tipus === "deezer" && !this._nincsIntegracio && hsz.entity !== HELYI && this._dzUtak(kaz, hsz).length) {
+        if (hsz.mod !== "sonos" && kaz.tipus === "deezer" && !this._nincsIntegracio && (hsz.entity !== HELYI || this._matrixCella("deezer", hsz)) && this._dzUtak(kaz, hsz).length) {
           return this._dzUtonJatszik(kaz, kezdo, hsz);
+        }
+        // Sonos-kedvenc nem Sonoson: a kedvenc tartalma (Deezer-album / -lista, a Deezer-kedvencek, Spotify, rádióadó) a többi úton
+        if (hsz.mod !== "sonos" && (!kaz.tipus || kaz.tipus === "favorite_item_id") && !this._nincsIntegracio && !kaz.kedvencFordit) {
+          let f = null;
+          try { f = await this._hass.callWS({ type: "cantabile/sonos_favorite", title: kaz.cim || "" }); } catch (_) { /* régebbi integráció */ }
+          const al = T("Sonos-kedvenc");
+          if (f?.deezer) return this._betolt({ cim: kaz.cim, alcim: al, forras: "stream", tipus: "deezer", id: f.deezer, kep: kaz.kep || null, kedvencFordit: true }, kezdo);
+          if (f?.spotify) return this._betolt({ cim: kaz.cim, alcim: al, forras: "stream", tipus: "spotify", id: f.spotify, uri: f.spotify, kep: kaz.kep || null, kedvencFordit: true }, kezdo);
+          if (f?.radio) return this._presetIndit({ cim: kaz.cim, tipus: "preset_radio", id: f.radio, kep: kaz.kep || null });
         }
         if (hsz.mod !== "sonos") throw Object.assign(new Error(T("A(z) {h} hangszórón ez nem játszható le – lejátszható: {l}.", { h: KN(hsz), l: this._kepesek(kaz, hsz) })), { hely: true });
         if (kaz.tipus === "spotify" && /^spotify:\/\//.test(kaz.id)) {
@@ -6661,9 +6676,11 @@ class CantabileCard extends HTMLElement {
     const ROVID = { sajat: T("saját"), sonos_deezer: "Sonos Deezer", wiim_deezer: "WiiM Deezer", ma_deezer: "MA Deezer", nas_helyett: T("zenemappa"),
       sonos_spotify: "Sonos Spotify", spotify_connect: "Connect", deezer_tartalek: T("Deezerről"), sonos_tidal: "Sonos Tidal", wiim_preset: "WiiM preset",
       preset_forditva: T("Deezer / rádió"), sonos_kedvenc: "Sonos", ma_sajat: T("MA sora"), sonos_helyett: "Sonos Deezer", ideiglenes: T("feltöltés"),
-      airplay: "AirPlay", party: T("saját sor"), sajat_lista: T("saját sor") };
+      airplay: "AirPlay", party: T("saját sor"), sajat_lista: T("saját sor"), kedvenc_forditva: T("Deezer / rádió") };
     const rovid = (u) => (u?.ut === "sajat" && /TV-oldal/.test(u.nev || "") ? T("TV-oldal") : ROVID[u?.ut] || String(u?.nev || "").slice(0, 20));
-    const fej = `<tr><th></th>${hs.map((h) => `<th class="${h.entity_id === most ? "mxmost" : ""}${h.elerheto === false ? " mxki" : ""}" title="${ESC(h.entity_id)}">${ESC(h.nev)}${h.elerheto === false ? " !" : ""}</th>`).join("")}</tr>`;
+    const tvKep = (h) => (h.tv_kep || []).filter((x) => x.tukor).map((x) => x.nev);
+    const fej = `<tr><th></th>${hs.map((h) => `<th class="${h.entity_id === most ? "mxmost" : ""}${h.elerheto === false ? " mxki" : ""}" title="${ESC(h.entity_id)}">${ESC(h.nev)}${h.elerheto === false ? " !" : ""}`
+      + `<small class="mxter">${ESC(h.terulet || (h.entity_id === HELYI ? "" : "?"))}${tvKep(h).length ? ` · 📺 ${ESC(tvKep(h).join(", "))}` : ""}</small></th>`).join("")}</tr>`;
     const sorok = m.forrasok.map((f) => `<tr><th class="mxsor">${ESC(f.nev)}</th>${hs.map((h) => {
       const c = m.cellak[f.k]?.[h.entity_id];
       if (!c) return `<td class="nem">—</td>`;
@@ -6677,16 +6694,20 @@ class CantabileCard extends HTMLElement {
       const nev = (e) => (e && (this._hass?.states[e]?.attributes?.friendly_name || e)) || "—";
       const jel = (ok) => ok === true ? `<span class="j1">✓</span>` : ok === false ? `<span class="j0">✗</span>` : `<span class="jq">?</span>`;
       const ALL = { ok: T("szól"), hianyzik: T("nem szól"), "?": T("nem ellenőrizhető") };
-      reszlet = `<b>${ESC(fn)} · ${ESC(hn)}</b>${vc.elerheto === false ? ` <em>(${T("most nem elérhető")})</em>` : ""}
+      const hv = m.hangszorok.find((h) => h.entity_id === v.e) || {};
+      const nemTukor = (hv.tv_kep || []).filter((x) => !x.tukor).map((x) => `${x.nev}: ${x.ok || T("nem tud tükröt")}`);
+      const kepSzoveg = (u) => (u.kep || []).length ? `📺 ${u.kep.map((x) => x === "saját képernyő" ? T("a saját képernyőjén") : x).join(", ")}` : T("kép nélkül");
+      reszlet = `<b>${ESC(fn)} · ${ESC(hn)}</b>${hv.terulet ? ` – ${ESC(hv.terulet)}` : ""}${vc.elerheto === false ? ` <em>(${T("most nem elérhető")})</em>` : ""}
+        ${nemTukor.length ? `<div><small>${ESC(nemTukor.join(" · "))}</small></div>` : ""}
         ${vc.utak.length ? `<ol>${vc.utak.map((u, i) => `<li${i === vc.elso ? ` style="color:#ffcf7a"` : ""}>${ESC(u.nev)} – ${ALL[u.allapot] || u.allapot}${u.mod === "helyettesites" ? ` · ${T("helyettesítés")}` : ""}
-          <small>${T("kimenet")}: ${ESC(nev(u.kimenet))}${u.feltetelek.length ? " · " + u.feltetelek.map((x) => `${jel(x.ok)} ${ESC(x.nev)}`).join(" · ") : ""}</small></li>`).join("")}</ol>`
+          <small>${T("kimenet")}: ${ESC(nev(u.kimenet))} · ${ESC(kepSzoveg(u))}${u.feltetelek.length ? " · " + u.feltetelek.map((x) => `${jel(x.ok)} ${ESC(x.nev)}`).join(" · ") : ""}</small></li>`).join("")}</ol>`
           : `<div>${T("Ezen a hangszórón ennek a forrásnak nincs útja.")}</div>`}`;
     }
     const ido = m.ido ? new Date(m.ido).toLocaleTimeString(MAGYAR() ? "hu-HU" : undefined, { hour: "2-digit", minute: "2-digit" }) : "";
     const jel = (cl, t) => `<span><i class="mxjel" style="background:${cl}"></i>${t}</span>`;
     ab.innerHTML = `<div class="uzfej"><i></i>CANTABILE · ROUTE MATRIX</div>
       <div class="mxgorgo"><table class="mxt"><thead>${fej}</thead><tbody>${sorok}</tbody></table></div>
-      <div class="mxreszlet">${reszlet}</div>
+      <div class="mxreszlet">${reszlet}${(m.figyelmeztetes || []).length ? `<div class="mxfigy">⚠ ${m.figyelmeztetes.map(ESC).join("<br>⚠ ")}</div>` : ""}</div>
       <div class="mxlab">${jel("rgba(70,150,85,.8)", T("közvetlen"))}${jel("rgba(200,125,45,.8)", T("helyettesítés"))}${jel("rgba(200,170,60,.5)", T("nem ellenőrizhető"))}${jel("rgba(255,255,255,.12)", T("nem szól"))}
         <span>${T("frissítve")}: ${ido}</span>
         <button class="uzgomb mxmind" type="button">${this._mxE.mind ? "CARD ONLY" : "ALL DEVICES"}</button>
@@ -6893,7 +6914,7 @@ class CantabileCard extends HTMLElement {
     const hsz = cel || this._hangszoro();
     // az útmátrix cellája szerint: az MA saját sora (a gomb mögötti MA-lejátszón), vagy egyes számnál a helyettesítés
     // (Sonos Deezere / zenemappa); ha egy út nem szól, egy óráig kimarad, és a következő indul
-    if (hsz.entity !== HELYI && !this._nincsIntegracio) {
+    if ((hsz.entity !== HELYI || MATRIX) && !this._nincsIntegracio) {
       await this._matrixKer();
       const cella = this._matrixCella("ma_konyvtar", hsz);
       const u = cella?.utak.find((v) => v.allapot !== "hianyzik" && !probalt.includes(v.ut) && (v.ut === "ma_sajat" || x.type === "track"));

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.7.0b8 – 2026-11-02
+
+- **Everything everywhere, further:**
+  - **Sonos favourites on every speaker:** off a Sonos the favourite's content plays – a Deezer album / playlist or your Deezer favourites (the Deezer routes), a Spotify item (Spotify Connect / the Deezer fallback), a radio station (its stream). New websocket `cantabile/sonos_favorite`.
+  - **BT (the browser) plays Deezer, Spotify and Music Assistant tracks** from the music folder (substitution), where it has them.
+- **The TV picture in the route matrix:** each speaker shows its area and the TVs there that can mirror it (picture, lyrics – as before, the TV in the same area shows what plays); every route says where its picture appears (the TV page itself, the room's TV, or no picture – e.g. Music Assistant on a TV is sound only). A DLNA TV can't mirror (it plays itself), and the matrix warns about card TVs without an area.
+
 ## 2.7.0b7 – 2026-11-02
 
 - **Route matrix, step 4: the matrix on the card.** ⓘ (signal path) → **ROUTE MATRIX**: every source × the card's speakers (ALL DEVICES adds the others), each cell coloured – green direct, orange substitution, amber can't be checked, grey doesn't play – with the first live route's short name; the current speaker is highlighted, unreachable ones dimmed. Tap a cell for its routes in order, each with its output and conditions (✓ / ✗ / ?). REFRESH rebuilds the matrix, CLEAR MARKS forgets the “didn't play” marks. Fits the card (the table scrolls; also in the panel view and on a phone).
