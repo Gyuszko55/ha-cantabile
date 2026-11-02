@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0b4 – 2026-11-02
+
+- Route matrix: only a real playback failure marks a route as not playing – when the content itself can't be found on a route (e.g. a Deezer album that is no longer available), the next route is tried without marking, and if none has it, one clear message says so. New websocket `cantabile/matrix/reset` clears the marks.
+
 ## 2.7.0b3 – 2026-11-02
 
 - **Route matrix, step 2: Deezer and Spotify play from the matrix.** On a non-Sonos speaker a Deezer album, playlist or track list starts on the cell's first live route (or the route you chose on that speaker) – no question any more; **OTHER ROUTE** offers the cell's other live routes. If a route doesn't play, the card tells the integration (`cantabile/matrix/fail`): for an hour that route counts as not playing, and the next route of the cell starts right away. On a TV the music folder on the TV page comes first and Music Assistant (sound only) after it. Spotify goes straight to the Deezer fallback where the matrix knows Spotify Connect can't play.

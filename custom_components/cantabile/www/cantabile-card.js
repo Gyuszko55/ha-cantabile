@@ -292,6 +292,7 @@ const EN = {
   "Zenemappa": "Music folder",
   "MÁSIK ÚT": "OTHER ROUTE",
   "Music Assistant (csak hang)": "Music Assistant (sound only)",
+  "„{c}” egyik úton sem található meg a(z) {h} hangszóróra (lehet, hogy a Deezeren már nem érhető el).": "“{c}” can't be found on any route for {h} (it may no longer be available on Deezer).",
   "Zenemappa (TV-oldal)": "Music folder (TV page)",
   "„{c}” a(z) {h} hangszórón nem szólt ezen az úton: {u} – próbálom: {k}.": "“{c}” didn't play on {h} via {u} – trying: {k}.",
   "„{c}” – honnan szóljon a(z) {h} hangszórón?": "“{c}” – which route should {h} play it from?",
@@ -3132,7 +3133,7 @@ class CantabileCard extends HTMLElement {
     } })));
   }
 
-  async _dzUtonJatszik(kaz, kezdo, hsz, ut = null, probalt = []) {
+  async _dzUtonJatszik(kaz, kezdo, hsz, ut = null, probalt = [], okok = []) {
     await this._matrixKer();
     const utak = this._dzUtak(kaz, hsz), c = kaz.cim || "Deezer", h = KN(hsz);
     if (!ut) {
@@ -3155,18 +3156,25 @@ class CantabileCard extends HTMLElement {
         this._uzen(T("A(z) {h} hangszórón innen szól: {f}.", { h, f: T("a WiiM saját Deezere – „{c}”", { c }) }), masik);
         TAR.ir("tablet-magno-kazetta", JSON.stringify({ ...kaz, entity: hsz.entity }));
         return this._frissit();
-      } catch (_) { /* nem szólt: lent a többi út */ }
-    } else if (await this._helyettesitJatszik({ deezer: kaz.szamok?.length ? kaz.szamok : [kaz.id] }, kaz.cim, kezdo, hsz, 0, null, { ut, gomb: masik, ma: ez?.ma })) {
+      } catch (err) {
+        // a kért szám nincs a listában: a tartalom hibája; minden más (nem szólt, nem válaszolt): az úté
+        okok.push(/not_in_list/.test(err?.message || "") ? "nincs" : "lejatszas");
+      }
+    } else if (await this._helyettesitJatszik({ deezer: kaz.szamok?.length ? kaz.szamok : [kaz.id] }, kaz.cim, kezdo, hsz, 0, null, { ut, gomb: masik, ma: ez?.ma, csendes: true })) {
       return;
+    } else {
+      okok.push(this._helyettesitOk || "nincs");
     }
-    // ezen az úton nem szólt: a mátrixban egy óráig „nem szól”, és a cella következő útja indul (mátrix nélkül: kérdez)
+    // ezen az úton nem szólt: ha az út hibája (a tartalom megvolt), a mátrixban egy óráig „nem szól”; a cella következő
+    // útja indul (mátrix nélkül: kérdez)
     if (ez?.ut) {
-      this._matrixHiba(ez.forras, hsz, ez.ut);
+      if (okok[okok.length - 1] === "lejatszas") this._matrixHiba(ez.forras, hsz, ez.ut);
       const kov = tobbi.filter((u) => !probalt.includes(u.k));
       if (kov.length) {
-        this._uzen(T("„{c}” a(z) {h} hangszórón nem szólt ezen az úton: {u} – próbálom: {k}.", { c, h, u: nev, k: kov[0].szoveg }));
-        return this._dzUtonJatszik(kaz, kezdo, hsz, kov[0].k, [...probalt, ut]);
+        if (okok[okok.length - 1] === "lejatszas") this._uzen(T("„{c}” a(z) {h} hangszórón nem szólt ezen az úton: {u} – próbálom: {k}.", { c, h, u: nev, k: kov[0].szoveg }));
+        return this._dzUtonJatszik(kaz, kezdo, hsz, kov[0].k, [...probalt, ut], okok);
       }
+      if (okok.every((o) => o === "nincs")) return this._uzen(T("„{c}” egyik úton sem található meg a(z) {h} hangszóróra (lehet, hogy a Deezeren már nem érhető el).", { c, h }));
     } else if (tobbi.length) {
       return this._dzUtValaszt(kaz, kezdo, hsz, tobbi, T("„{c}” a(z) {h} hangszórón nem szólt ezen az úton: {u}. Melyiken próbáljam?", { c, h, u: nev }));
     }
@@ -3180,7 +3188,10 @@ class CantabileCard extends HTMLElement {
       r = await this._hass.callWS({ type: "cantabile/substitute", entity_id: hsz.entity, ma_entity: opt.ut === "nas" ? null : (opt.ma || this._maE(hsz)),
         mappa: opt.ut === "ma" ? null : String(this._config.magno?.nas || "").replace(/\/$/, "") || null, ...bem });
     } catch (_) { /* régebbi integráció */ }
-    if (!r?.mod) { this._uzen(T("„{c}” a(z) {h} hangszórón nem szólhat, és máshonnan sem találtam meg.", { c: cim || "", h: KN(hsz) })); return false; }
+    // a hiba oka a hívónak (útmátrix): „nincs” – a tartalom nincs meg ezen az úton; „lejatszas” – megvan, de nem szólt
+    this._helyettesitOk = "nincs";
+    if (!r?.mod) { if (!opt.csendes) this._uzen(T("„{c}” a(z) {h} hangszórón nem szólhat, és máshonnan sem találtam meg.", { c: cim || "", h: KN(hsz) })); return false; }
+    this._helyettesitOk = "lejatszas";
     let k = Math.max(0, kezdo);
     while (k < r.elemek.length && !r.elemek[k]) k++;            // a szóló szám nincs meg: a következő megtalálttól
     const lista = r.elemek.filter(Boolean), i = r.elemek.slice(0, k).filter(Boolean).length, pontrol = k === kezdo && poz > 3;

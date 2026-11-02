@@ -10,7 +10,7 @@ Egy cella (egy forrás egy hangszórón) az utak listája; egy út:
 A mátrix a beállításból és a HA-ból épül (`bemenetek` → `epit`), a HA tárolójában megmarad (minden indításkor azonnal
 megvan), és frissül: indításkor, ha a lejátszók vagy a vezérlőpultok (a kártya beállítása) változnak, óránként, és kérésre.
 
-2.7.0b1: a mátrix megfigyel; `cantabile/matrix` (lekérdezés), `cantabile/matrix/fail` (egy út nem szólt).
+2.7.0b1: a mátrix megfigyel; `cantabile/matrix` (lekérdezés), `cantabile/matrix/fail` (egy út nem szólt), `cantabile/matrix/reset` (a jelölések törlése).
 2.7.0b3: a kártya a Deezert és a Spotifyt a mátrixból indítja (a cella első élő útja, vagy a hangszórón választott út).
 """
 from __future__ import annotations
@@ -469,3 +469,13 @@ async def regisztral(hass: HomeAssistant) -> None:
         conn.send_result(msg["id"], {"cell": await matrix(hass).hiba(msg["source"], msg["speaker"], msg["route"])})
 
     websocket_api.async_register_command(hass, ws_fail)
+
+    @websocket_api.websocket_command({vol.Required("type"): "cantabile/matrix/reset"})
+    @websocket_api.async_response
+    async def ws_reset(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        """A „nem szólt” jelölések törlése (pl. a hiba elhárítása után): a mátrix újra a bemenetekből."""
+        mx = matrix(hass)
+        mx.hibak.clear()
+        conn.send_result(msg["id"], await mx.frissit("jelölések törölve"))
+
+    websocket_api.async_register_command(hass, ws_reset)
