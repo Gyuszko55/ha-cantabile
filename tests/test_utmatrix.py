@@ -125,3 +125,11 @@ def test_tarolt_jelolesek_indulaskor_le():
     U.jeloles_nelkul(m)
     c = m["cellak"]["deezer"]["media_player.wiim"]
     assert c["elso"] == 0 and c["utak"][0]["allapot"] == "ok" and all(x["k"] != "lejatszas" for x in c["utak"][0]["feltetelek"])
+
+
+def test_tv_oldalas_tv_kikapcsolva_is_szol():
+    be = _be2()
+    be["hangszorok"][3]["lejatszik"] = False            # kikapcsolt DLNA-s TV: a saját lejátszója nem mondja meg, mit tud
+    m = U.epit(be)
+    assert m["cellak"]["nas"]["media_player.cast_tv"]["allapot"] == "ok"
+    assert m["cellak"]["deezer"]["media_player.cast_tv"]["utak"][0]["allapot"] == "ok"

@@ -136,7 +136,9 @@ def _feltetel(k: str, h: dict[str, Any], be: dict[str, Any], kesz: dict[str, dic
     """Egy feltétel értéke a hangszórón (`h`) a bemenetek (`be`) és a már kész cellák (`kesz`) alapján."""
     e = h["entity_id"]
     if k == "url":
-        return bool(h.get("lejatszik"))
+        # TV-oldalas TV-n a Cantabile TV-lejátszója fogadja a címet (kikapcsolt DLNA-s TV-nél a saját lejátszó nem mondja
+        # meg, mit tud – ettől még szól, amikor bekapcsol)
+        return bool(h.get("lejatszik") or h.get("tv"))
     if k == "zenemappa":
         return bool(be.get("zenemappa"))
     if k == "ma":

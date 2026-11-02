@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.0b7 – 2026-11-02
+
+- **Route matrix, step 4: the matrix on the card.** ⓘ (signal path) → **ROUTE MATRIX**: every source × the card's speakers (ALL DEVICES adds the others), each cell coloured – green direct, orange substitution, amber can't be checked, grey doesn't play – with the first live route's short name; the current speaker is highlighted, unreachable ones dimmed. Tap a cell for its routes in order, each with its output and conditions (✓ / ✗ / ?). REFRESH rebuilds the matrix, CLEAR MARKS forgets the “didn't play” marks. Fits the card (the table scrolls; also in the panel view and on a phone).
+- Route matrix: a TV with a Cantabile TV page counts as able to play a URL even while the TV is off (a switched-off DLNA TV doesn't report what it can do).
+
 ## 2.7.0b6 – 2026-11-02
 
 - **Fix: FLAC on a TV page that can't open it.** Some Cast receivers (e.g. an Android TV's built-in Chromecast) can't open FLAC in the TV page (`DEMUXER_ERROR_COULD_NOT_OPEN`) – the track stopped after a second. Now, when a TV page reports that it can't open a FLAC, Cantabile remembers it for that TV and plays the same track from the same point again, converted to MP3 on the fly (ffmpeg, 320 kbit/s); from then on FLAC goes to that TV converted right away. (Seeking within a converted track isn't possible.)

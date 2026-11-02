@@ -291,6 +291,14 @@ const EN = {
   "WiiM saját Deezer": "WiiM's own Deezer",
   "Zenemappa": "Music folder",
   "MÁSIK ÚT": "OTHER ROUTE",
+  "Útmátrix": "Route matrix",
+  "saját": "own", "Deezerről": "from Deezer", "Deezer / rádió": "Deezer / radio", "MA sora": "MA queue", "feltöltés": "upload",
+  "saját sor": "own queue", "TV-oldal": "TV page",
+  "Az útmátrix most nem érhető el (régebbi integráció, vagy még nem készült el).": "The route matrix isn't available right now (older integration, or not built yet).",
+  "Koppints egy cellára: az utak sorrendben, mindegyiknél a feltételek.": "Tap a cell: its routes in order, each with its conditions.",
+  "szól": "plays", "nem szól": "doesn't play", "nem ellenőrizhető": "can't be checked", "helyettesítés": "substitution",
+  "kimenet": "output", "most nem elérhető": "not reachable right now", "közvetlen": "direct", "frissítve": "updated",
+  "Ezen a hangszórón ennek a forrásnak nincs útja.": "This source has no route on this speaker.",
   "Music Assistant (csak hang)": "Music Assistant (sound only)",
   "„{c}” egyik úton sem található meg a(z) {h} hangszóróra (lehet, hogy a Deezeren már nem érhető el).": "“{c}” can't be found on any route for {h} (it may no longer be available on Deezer).",
   "Zenemappa (TV-oldal)": "Music folder (TV page)",
@@ -1725,6 +1733,33 @@ class CantabileCard extends HTMLElement {
         .tvablak .tvtk:hover { color: #fff; background: rgba(255,255,255,.07); }
         .tvablak .tvtk svg { width: calc(12px * var(--bk, 1)); height: calc(12px * var(--bk, 1)); }
         .jelreteg .uzablak.jelablak { width: min(94%, 680px); cursor: default; padding: 12px 16px 12px; }
+        /* útmátrix-ablak (ⓘ → ROUTE MATRIX): forrás × hangszóró, cellánként az első élő út; koppintásra a cella útjai */
+        .mxreteg { position: absolute; left: 0; right: 0; z-index: 63; display: flex; justify-content: center; pointer-events: none; }
+        .mxreteg .uzablak.mxablak { width: min(97%, 980px); cursor: default; padding: 10px 12px 10px; max-height: 88vh; display: flex; flex-direction: column; }
+        .mxgorgo { overflow: auto; min-height: 0; margin: 4px 0 6px; }
+        .mxt { border-collapse: separate; border-spacing: 2px; width: 100%; font: 500 calc(10px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; }
+        .mxt th { font: 700 calc(8px * var(--bk, 1))/1.15 "Cantabile Sans", Arial, sans-serif; letter-spacing: .08em; color: #d9c9a8; padding: 4px 4px; text-align: center; vertical-align: bottom; }
+        .mxt th.mxsor { vertical-align: middle; text-align: left; color: #f3ead8; letter-spacing: .02em; font-size: calc(10px * var(--bk, 1)); white-space: nowrap; }
+        .mxt th.mxsor { position: sticky; left: 0; z-index: 1; background: rgba(30,28,26,.97); }
+        :host([keskeny]) .mxt th.mxsor { white-space: normal; min-width: calc(86px * var(--bk, 1)); }
+        .mxt th.mxmost { color: #ffcf7a; }
+        .mxt th.mxki { opacity: .55; }
+        .mxt td { white-space: nowrap; padding: 4px 5px; border-radius: 3px; cursor: pointer; color: #f6efe2; text-align: center; min-width: 54px; overflow-wrap: anywhere; }
+        .mxt td.ok { background: rgba(70,150,85,.55); }
+        .mxt td.helyettesites { background: rgba(200,125,45,.55); font-style: italic; }
+        .mxt td.kerdes { background: rgba(200,170,60,.28); box-shadow: inset 0 0 0 1px rgba(230,200,90,.6); }
+        .mxt td.nem { background: rgba(255,255,255,.05); color: #8d877b; }
+        .mxt td.ki { opacity: .55; }
+        .mxt td.valasztott { box-shadow: inset 0 0 0 2px #ffcf7a; }
+        .mxreszlet { flex: none; border-top: 1px solid rgba(255,255,255,.12); padding: 6px 2px 2px; font: 500 calc(11px * var(--bk, 1))/1.35 "Cantabile Sans", Arial, sans-serif; color: #e7dcc6; max-height: calc(110px * var(--bk, 1)); overflow: auto; }
+        .mxlab { flex: none; }
+        .mxreszlet b { color: #f3ead8; }
+        .mxreszlet ol { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+        .mxreszlet li small { display: block; color: #b9ae98; }
+        .mxreszlet .j1 { color: #8fd49c; } .mxreszlet .j0 { color: #ff9a7a; } .mxreszlet .jq { color: #e6cf7a; }
+        .mxlab { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font: 500 calc(10.5px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; color: #b9ae98; }
+        .mxlab .uzgomb:first-of-type { margin-left: auto; }
+        .mxjel { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 4px; }
         .jsor { display: flex; align-items: stretch; gap: 0; margin: 4px 0 10px; }
         .jdoboz { flex: 1 1 0; min-width: 0; padding: 8px 10px 9px; border-radius: 5px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04);
           box-shadow: inset 3px 0 0 var(--c, #888); }
@@ -6569,6 +6604,102 @@ class CantabileCard extends HTMLElement {
 
   _jelutEbreszt() { clearTimeout(this._jelutIdo); this._jelutIdo = setTimeout(() => this._jelutZar(), 60000); }
 
+  // ---- útmátrix-nézet: forrás × hangszóró (az integráció mátrixa), színkóddal; koppintásra a cella útjai ----
+  async _matrixNyit(friss = false) {
+    this._mxE = this._mxE || { mind: false, cella: null };
+    await this._matrixKer(friss);
+    this._matrixRajz();
+  }
+
+  _matrixZar() {
+    this._mxE = null;
+    const r = this.shadowRoot?.querySelector(".mxreteg"), a = r?.querySelector(".uzablak");
+    if (!a) return;
+    a.classList.remove("lat"); a.classList.add("zar");
+    setTimeout(() => { if (!this._mxE) r.remove(); }, 600);
+  }
+
+  _matrixRajz() {
+    if (!this._mxE) return;
+    const kartya = this.shadowRoot?.querySelector("ha-card");
+    if (!kartya) return;
+    let r = kartya.querySelector(".mxreteg");
+    if (!r) {
+      r = document.createElement("div"); r.className = "mxreteg";
+      r.innerHTML = `<div class="uzablak mxablak" role="dialog" aria-label="${T("Útmátrix")}"></div>`;
+      const ab = r.firstElementChild;
+      ab.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        const t = ev.target;
+        if (t.closest(".mxzar")) return this._matrixZar();
+        if (t.closest(".mxfriss")) { t.closest(".mxfriss").disabled = true; return this._matrixNyit(true); }
+        if (t.closest(".mxtorol")) {
+          try { const m = await this._hass.callWS({ type: "cantabile/matrix/reset" }); if (m?.cellak) { MATRIX = m; MATRIX_IDO = Date.now(); } } catch (_) { /* régebbi integráció */ }
+          return this._matrixRajz();
+        }
+        if (t.closest(".mxmind")) { this._mxE.mind = !this._mxE.mind; return this._matrixRajz(); }
+        const td = t.closest("td[data-f]");
+        if (td) { this._mxE.cella = { f: td.dataset.f, e: td.dataset.e }; this._matrixRajz(); }
+      });
+      kartya.appendChild(r);
+      const kr = kartya.getBoundingClientRect(), fent = Math.max(0, -kr.top), lent = Math.min(kr.height, innerHeight - kr.top);
+      // panelnézetben a kártya nagyítva (zoom): a képernyő-pixel a kártya saját pixelére átszámolva
+      const z = kr.height && kartya.offsetHeight ? kr.height / kartya.offsetHeight : 1;
+      r.style.top = `${Math.round(fent / z + 6)}px`;
+      ab.style.maxHeight = `${Math.max(220, Math.round((lent - fent) / z - 12))}px`;    // a kártyán belül: a táblázat görget
+      requestAnimationFrame(() => ab.classList.add("lat"));
+    }
+    const ab = r.firstElementChild, m = MATRIX;
+    if (!m?.cellak) {
+      ab.innerHTML = `<div class="uzfej"><i></i>CANTABILE · ROUTE MATRIX</div><div class="mxreszlet">${T("Az útmátrix most nem érhető el (régebbi integráció, vagy még nem készült el).")}</div>
+        <div class="mxlab"><button class="uzgomb mxfriss" type="button">REFRESH</button><button class="uzgomb mxzar" type="button">CLOSE</button></div>`;
+      return;
+    }
+    const most = this._matrixOszlop(this._hangszoro());
+    const hs = m.hangszorok.filter((h) => this._mxE.mind || h.kartyan);
+    const ALAP = { ok: "ok", helyettesites: "helyettesites", "?": "kerdes", nem: "nem" };
+    const ROVID = { sajat: T("saját"), sonos_deezer: "Sonos Deezer", wiim_deezer: "WiiM Deezer", ma_deezer: "MA Deezer", nas_helyett: T("zenemappa"),
+      sonos_spotify: "Sonos Spotify", spotify_connect: "Connect", deezer_tartalek: T("Deezerről"), sonos_tidal: "Sonos Tidal", wiim_preset: "WiiM preset",
+      preset_forditva: T("Deezer / rádió"), sonos_kedvenc: "Sonos", ma_sajat: T("MA sora"), sonos_helyett: "Sonos Deezer", ideiglenes: T("feltöltés"),
+      airplay: "AirPlay", party: T("saját sor"), sajat_lista: T("saját sor") };
+    const rovid = (u) => (u?.ut === "sajat" && /TV-oldal/.test(u.nev || "") ? T("TV-oldal") : ROVID[u?.ut] || String(u?.nev || "").slice(0, 20));
+    const fej = `<tr><th></th>${hs.map((h) => `<th class="${h.entity_id === most ? "mxmost" : ""}${h.elerheto === false ? " mxki" : ""}" title="${ESC(h.entity_id)}">${ESC(h.nev)}${h.elerheto === false ? " !" : ""}</th>`).join("")}</tr>`;
+    const sorok = m.forrasok.map((f) => `<tr><th class="mxsor">${ESC(f.nev)}</th>${hs.map((h) => {
+      const c = m.cellak[f.k]?.[h.entity_id];
+      if (!c) return `<td class="nem">—</td>`;
+      const u = c.elso != null ? c.utak[c.elso] : null, val = this._mxE.cella && this._mxE.cella.f === f.k && this._mxE.cella.e === h.entity_id;
+      return `<td class="${ALAP[c.allapot] || "nem"}${c.elerheto === false ? " ki" : ""}${val ? " valasztott" : ""}" data-f="${f.k}" data-e="${ESC(h.entity_id)}">${u ? ESC(rovid(u)) : c.allapot === "?" ? "?" : "—"}</td>`;
+    }).join("")}</tr>`).join("");
+    let reszlet = `<span>${T("Koppints egy cellára: az utak sorrendben, mindegyiknél a feltételek.")}</span>`;
+    const v = this._mxE.cella, vc = v && m.cellak[v.f]?.[v.e];
+    if (vc) {
+      const fn = m.forrasok.find((f) => f.k === v.f)?.nev || v.f, hn = m.hangszorok.find((h) => h.entity_id === v.e)?.nev || v.e;
+      const nev = (e) => (e && (this._hass?.states[e]?.attributes?.friendly_name || e)) || "—";
+      const jel = (ok) => ok === true ? `<span class="j1">✓</span>` : ok === false ? `<span class="j0">✗</span>` : `<span class="jq">?</span>`;
+      const ALL = { ok: T("szól"), hianyzik: T("nem szól"), "?": T("nem ellenőrizhető") };
+      reszlet = `<b>${ESC(fn)} · ${ESC(hn)}</b>${vc.elerheto === false ? ` <em>(${T("most nem elérhető")})</em>` : ""}
+        ${vc.utak.length ? `<ol>${vc.utak.map((u, i) => `<li${i === vc.elso ? ` style="color:#ffcf7a"` : ""}>${ESC(u.nev)} – ${ALL[u.allapot] || u.allapot}${u.mod === "helyettesites" ? ` · ${T("helyettesítés")}` : ""}
+          <small>${T("kimenet")}: ${ESC(nev(u.kimenet))}${u.feltetelek.length ? " · " + u.feltetelek.map((x) => `${jel(x.ok)} ${ESC(x.nev)}`).join(" · ") : ""}</small></li>`).join("")}</ol>`
+          : `<div>${T("Ezen a hangszórón ennek a forrásnak nincs útja.")}</div>`}`;
+    }
+    const ido = m.ido ? new Date(m.ido).toLocaleTimeString(MAGYAR() ? "hu-HU" : undefined, { hour: "2-digit", minute: "2-digit" }) : "";
+    const jel = (cl, t) => `<span><i class="mxjel" style="background:${cl}"></i>${t}</span>`;
+    ab.innerHTML = `<div class="uzfej"><i></i>CANTABILE · ROUTE MATRIX</div>
+      <div class="mxgorgo"><table class="mxt"><thead>${fej}</thead><tbody>${sorok}</tbody></table></div>
+      <div class="mxreszlet">${reszlet}</div>
+      <div class="mxlab">${jel("rgba(70,150,85,.8)", T("közvetlen"))}${jel("rgba(200,125,45,.8)", T("helyettesítés"))}${jel("rgba(200,170,60,.5)", T("nem ellenőrizhető"))}${jel("rgba(255,255,255,.12)", T("nem szól"))}
+        <span>${T("frissítve")}: ${ido}</span>
+        <button class="uzgomb mxmind" type="button">${this._mxE.mind ? "CARD ONLY" : "ALL DEVICES"}</button>
+        <button class="uzgomb mxtorol" type="button">CLEAR MARKS</button><button class="uzgomb mxfriss" type="button">REFRESH</button><button class="uzgomb mxzar" type="button">CLOSE</button></div>`;
+    // a táblázat annyi helyet kap, amennyi a kártyán belül marad (a többi része – részletek, gombok – mindig látszik)
+    const g = ab.querySelector(".mxgorgo"), max = parseFloat(ab.style.maxHeight) || 0;
+    if (g && max) {
+      g.style.maxHeight = "";
+      const tobbi = ab.scrollHeight - g.offsetHeight;          // a dobozt a max-height levágja: a tartalom kell
+      g.style.maxHeight = `${Math.max(80, Math.floor(max - tobbi - 4))}px`;
+    }
+  }
+
   // a mostani lejátszás útja: forrás, a feldolgozás lépései, a kimenet
   _jelutModell() {
     const c = this._config, hsz = this._hangszoro(), e = hsz?.entity, s = this._allapot(hsz), a = s?.attributes || {};
@@ -6624,7 +6755,11 @@ class CantabileCard extends HTMLElement {
       r.innerHTML = `<div class="uzablak jelablak" role="dialog" aria-label="${T("Jelút")}"></div>`;
       const ab = r.firstElementChild;
       ab.addEventListener("pointerdown", () => this._jelutEbreszt());
-      ab.addEventListener("click", (ev) => { ev.stopPropagation(); if (ev.target.closest(".jzar")) this._jelutZar(); });
+      ab.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (ev.target.closest(".jzar")) this._jelutZar();
+        if (ev.target.closest(".jmx")) { this._jelutZar(); this._matrixNyit(); }
+      });
       kartya.appendChild(r);
       const kr = kartya.getBoundingClientRect(), fent = Math.max(0, -kr.top), lent = Math.min(kr.height, innerHeight - kr.top);
       r.style.top = `${Math.round(fent + Math.max(8, (lent - fent) * 0.08))}px`;
@@ -6642,7 +6777,7 @@ class CantabileCard extends HTMLElement {
         <div class="jdoboz"><small>PROCESSING</small><ul>${(m.lepes.length ? m.lepes : [T("—")]).map((x) => `<li>${ESC(x)}</li>`).join("")}</ul></div>${nyil}
         <div class="jdoboz"><small>OUTPUT</small><b>${ESC(m.ki.cim)}</b>${sorok(m.ki.al)}</div>
       </div>
-      <div class="jlab">${m.vu ? `<span>VU: <em>${ESC(m.vu)}</em></span>` : ""}<button class="uzgomb jzar" type="button">CLOSE</button></div>`;
+      <div class="jlab">${m.vu ? `<span>VU: <em>${ESC(m.vu)}</em></span>` : ""}${this._nincsIntegracio ? "" : `<button class="uzgomb jmx" type="button">ROUTE MATRIX</button>`}<button class="uzgomb jzar" type="button">CLOSE</button></div>`;
   }
 
   // ---- Music Assistant (ma.py): választható forrás, ha a HA-ban be van állítva ----
