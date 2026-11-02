@@ -2940,6 +2940,12 @@ class CantabileCard extends HTMLElement {
       // szünetelő kazetta: a választó csak választ; a következő PLAY az új kimeneten ugyanonnan folytatja
       const f = await this._szoloForras(regi, s);
       this._szunetAtvitel = f ? { ...f, hova: uj.entity } : null;
+      // szünetelő Sonos Deezer-sora (pl. Deezer-kedvencek): a PLAY az új kimeneten ugyanazokat a számokat keresi meg ott,
+      // ahol az lejátszhatja (Music Assistant Deezere, zenemappa) – ugyanattól a számtól és ponttól
+      if (!f && regi.mod === "sonos" && uj.mod !== "sonos" && uj.entity !== HELYI) {
+        const dzf = await this._sonosDeezerForras(regi, s);
+        if (dzf) this._szunetAtvitel = { dz: dzf, cim: s?.attributes?.media_playlist || s?.attributes?.media_album_name || "Deezer", hova: uj.entity, regi: regi.entity };
+      }
     }
     return this._csoportAllit(uj);
   }
@@ -3056,7 +3062,8 @@ class CantabileCard extends HTMLElement {
       if (!ids.some((x) => /tr(%3a|:|-flac:)\d+/i.test(x))) return null;
       let kezdo = Math.max(0, (Number(a.queue_position) || 1) - 1), poz = a.media_position || 0;
       try { const ps = await this._hass.callWS({ type: "cantabile/sonos_position", entity_id: vez }); if (ps?.position >= 0) { poz = ps.position; if (ps.track >= 0) kezdo = ps.track; } } catch (_) { /* régebbi integráció */ }
-      return { ids, kezdo, poz };
+      // a szóló számtól legfeljebb 300 (a helyettesítés határa; hosszú listánál – pl. 315 kedvenc – a teljes sor elutasítódna)
+      return { ids: ids.slice(kezdo, kezdo + 300), kezdo: 0, poz };
     } catch (_) { return null; }
   }
 
@@ -3781,6 +3788,11 @@ class CantabileCard extends HTMLElement {
     if (k === "play") {
       if (SZUNETEL(s)) return this._hiv("media_player", "media_play", e);
       const sz = this._szunetAtvitel;
+      if (sz?.dz && sz.hova === hsz.entity && !SZOL(s)) {
+        this._szunetAtvitel = null;
+        await this._csoportAllit(hsz);
+        return this._helyettesitJatszik({ deezer: sz.dz.ids }, sz.cim, sz.dz.kezdo, hsz, sz.dz.poz);
+      }
       if (sz && sz.hova === hsz.entity && !SZOL(s)) { this._szunetAtvitel = null; return this._kazettaFolytat(sz, hsz); }
       if (SZOL(s) && this._adoIndex(hsz) < 0) return;
       if (kaz) return this._betolt(kaz);

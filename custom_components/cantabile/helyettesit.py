@@ -129,8 +129,36 @@ def _sonos(hass: HomeAssistant, entity_id: str) -> bool:
     return bool(r and r.platform == "sonos")
 
 
+def _dz_azonositok(elemek: list[str]) -> list[str] | None:
+    """Ha minden elem egy-egy Deezer-szám (Sonos-azonosító, számlink vagy szám), az azonosítóik – adatlekérés nélkül."""
+    ki = []
+    for x in elemek:
+        x = str(x)
+        if (m := DZ_LINK.search(x)) and m.group(1).lower() == "track":
+            ki.append(m.group(2))
+        elif m := DZ_SONOS.search(x):
+            ki.append(m.group(1))
+        elif x.isdigit():
+            ki.append(x)
+        else:
+            return None
+    return ki
+
+
 async def helyettesit(hass: HomeAssistant, entity_id: str, ma_entity: str | None, mappa: str | None,
                       dz: list[str], mae: list[dict[str, Any]]) -> dict[str, Any]:
+    # Csupa Deezer-szám (pl. egy Sonoson szóló Deezer-lista sora) Sonosra vagy Music Assistantra: a számonkénti Deezer-adat
+    # nem kell (több száz számnál percekig tartana) – Sonosnál a linkek, MA-nál az MA Deezere egy szám keresésével
+    ids = _dz_azonositok(dz) if dz and not mae else None
+    if ids:
+        if _sonos(hass, entity_id):
+            elemek = [f"https://www.deezer.com/track/{i}" for i in ids]
+            return {"mod": "sonos", "elemek": elemek, "talalt": len(elemek), "osszes": len(ids)}
+        if ma_entity:
+            minta = (await _dz_szamok(hass, ids[:1]) or [{}])[0]
+            if pl := await _ma_deezer_peldany(hass, minta):
+                elemek = [f"{pl}://track/{i}" for i in ids]
+                return {"mod": "ma", "elemek": elemek, "talalt": len(elemek), "osszes": len(ids)}
     szamok = await _dz_szamok(hass, dz) if dz else []
     for x in mae:
         uri = str(x.get("uri") or "")

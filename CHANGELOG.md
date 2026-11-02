@@ -3,6 +3,7 @@
 ## 2.6.0b3 – 2026-11-02
 
 - **Sidebar dashboard looks like the card.** In a panel view (the wizard's own sidebar dashboard) the card no longer stretches to the whole screen: it is laid out exactly as a card (1024 px wide, its own height) and scaled up or down to fit, centred – the same picture as on a normal dashboard, in both radio and tape mode. Below 600 px the phone layout stays.
+- **A Sonos Deezer list continues on any speaker.** Switching from a Sonos playing a Deezer list (e.g. your Deezer favourites) to another speaker now finds the same tracks where that speaker can play them – through its Music Assistant fallback (Music Assistant's Deezer), else the music folder – from the same track and position. Long lists work too (from the current track, up to 300 tracks; a 315-track favourites list used to be rejected), and the lookup is fast (one Deezer request instead of one per track). It also works when the Sonos is paused: PLAY on the new speaker continues there.
 
 ## 2.6.0b2 – 2026-11-02
 
