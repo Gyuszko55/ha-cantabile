@@ -73,8 +73,9 @@ szünetelteti a kívánságokat, és a régi link és QR-kód érvénytelen lesz
 
 ![A LISTÁK fül: saját listák borítóval és forrásokkal, a most szóló szám vagy a teljes sor hozzáadása, a Music Assistant listái](docs/images/library-playlists.png)
 
-**FORRÁSOK** – minden forrás külön, mint eddig: STREAMING (Sonos-kedvencek), DEEZER (toplisták, keresés, előadó-oldalak),
-SPOTIFY és TIDAL (kísérleti), WIIM (a WiiM presetjei), MA (a Music Assistant könyvtára), NAS (a zenemappa: előadó → album,
+**FORRÁSOK** – minden forrás külön, mint eddig: STREAMING (Sonos-kedvencek), DEEZER (**MY LIBRARY** – a Deezer-listáid,
+albumaid, előadóid –, toplisták, keresés, előadó-oldalak), SPOTIFY (**MY LIBRARY** a Home Assistant Spotify-fiókjából,
+keresés) és TIDAL (kísérleti), WIIM (a WiiM presetjei – a Deezer- és a rádió-preset bármelyik hangszórón szól), MA (a Music Assistant könyvtára), NAS (a zenemappa: előadó → album,
 azonnali kereséssel) és PHONE (zene a telefonról / számítógépről: BT-n közvetlenül, más hangszórón átmeneti feltöltéssel;
 vagy feltöltve a zenemappába). A sor a legutóbb használt forrást nyitja.
 
@@ -192,7 +193,7 @@ nyelvét követik: **magyar** vagy **angol**.
 | Lejátszó (HA-integráció) | Rádió | Zenemappa | Hézagmentes | Sor fül / húzás | Multiroom | Deezer / Sonos-kedvencek |
 |---|---|---|---|---|---|---|
 | **Sonos** | ✔ | ✔ | ✔ (Sonos-sor) | ✔ | ✔ (csak Sonos) | ✔ |
-| **WiiM**, **LinkPlay** (Arylic, Audio Pro…), **DLNA-renderelők** | ✔ | ✔ | ✔ (DLNA következő szám) | ✔ | – | – |
+| **WiiM**, **LinkPlay** (Arylic, Audio Pro…), **DLNA-renderelők** | ✔ | ✔ | ✔ (DLNA következő szám) | ✔ | – | Deezer: a WiiM saját Deezere (lossless), különben a Music Assistanton át |
 | **Chromecast / Google Cast**, **Music Assistant**, **Squeezebox**, más *play media*-képes | ✔ | ✔ (számonként) | – | ✔ | – | – |
 | **BT** (a készülék, amelyiken a kártya nyitva van) | ✔ | ✔ | közel hézagmentes | ✔ | – | – |
 
@@ -202,7 +203,15 @@ nyelvét követik: **magyar** vagy **angol**.
   DLNA-médiaszerver – böngészhető, és ahol a HA-ban van médiakereső, kereshető is). A Plex a HA-ban nem médiaforrás, zenemappának nem jó.
 - Elhagyható: `ffmpeg` a gazdagépen a valódi VU-jelhez (a Home Assistant OS-ben és a konténerben benne van; nélküle a
   mérők élethű utánzatot mutatnak).
-- A Deezer lejátszásához a Sonos appban be kell kötni a Deezert. A Deezer-kereséshez nem kell fiók.
+- **Egy készülék, egy hangszóró:** minden fizikai készülék egy gomb; a fő út a saját integrációja, a többi elérés (pl. a
+  Music Assistant-lejátszója) tartalék, amely magától átveszi, amit a fő út nem tud – így minden forrás minden hangszórón
+  szólhat. A böngészők (browser_mod) és a kioszk-tabletek nem hangszórók.
+- A Deezer Sonoson a Sonos appban bekötött Deezerrel, WiiM-en a WiiM Home appban bekötött Deezer-fiókkal (lossless), máshol
+  a Music Assistant Deezerével vagy a zenemappából szól. A Deezer-kereséshez nem kell fiók.
+- A Spotify Sonoson a Sonos appban bekötött Spotifyjal, Spotify Connect-eszközön (a Spotify appból egyszer küldj rá zenét,
+  hogy a fiók ismerje) a Home Assistant Spotify-integrációján át szól (Premium); máshol az album és a szám a Deezerről jön.
+  A Spotify a listák számait nem adja ki az alkalmazásoknak, ezért a Spotify-lista csak Sonoson vagy Spotify
+  Connect-hangszórón szól.
 - Böngésző: friss Chrome / Edge, Safari vagy Firefox – legalább Chrome 105, Safari / iOS 16 vagy Firefox 110 (a régebbiek,
   pl. egy régi fali tablet WebView-ja, elcsúsztathatják a kazetta és a kijelző feliratait). A kártyának saját megjelenése
   van, a Home Assistant témáit nem követi.

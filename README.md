@@ -72,8 +72,9 @@ name). Each guest can have 3 requests waiting (30 in all); requests play next, i
 
 ![The PLAYLISTS tab: own playlists with covers and sources, adding the track playing or the whole queue, and the Music Assistant playlists](docs/images/library-playlists.png)
 
-**SOURCES** – each source on its own, as before: STREAMING (Sonos favourites), DEEZER (charts, search, artist pages),
-SPOTIFY and TIDAL (experimental), WIIM (the WiiM's presets), MA (the Music Assistant library), NAS (the music folder:
+**SOURCES** – each source on its own, as before: STREAMING (Sonos favourites), DEEZER (**MY LIBRARY** – your Deezer
+playlists, albums and artists – then charts, search, artist pages), SPOTIFY (**MY LIBRARY** from the Home Assistant Spotify
+account, search) and TIDAL (experimental), WIIM (the WiiM's presets – Deezer and radio presets play on any speaker), MA (the Music Assistant library), NAS (the music folder:
 artist → album, with instant search) and PHONE (music from the phone or computer: on BT directly, on other speakers
 through a temporary upload; or uploaded to the music folder). The row reopens the source used last.
 
@@ -194,7 +195,7 @@ Assistant language: **Hungarian** or **English**.
 | Player (HA integration) | Radio | Music folder | Gapless | Queue tab / drag | Multiroom | Deezer / Sonos favourites |
 |---|---|---|---|---|---|---|
 | **Sonos** | ✔ | ✔ | ✔ (Sonos queue) | ✔ | ✔ (Sonos only) | ✔ |
-| **WiiM**, **LinkPlay** (Arylic, Audio Pro…), **DLNA renderers** | ✔ | ✔ | ✔ (DLNA next-track) | ✔ | – | – |
+| **WiiM**, **LinkPlay** (Arylic, Audio Pro…), **DLNA renderers** | ✔ | ✔ | ✔ (DLNA next-track) | ✔ | – | Deezer: WiiM's own Deezer (lossless), else via Music Assistant |
 | **Chromecast / Google Cast**, **Music Assistant**, **Squeezebox**, others with *play media* | ✔ | ✔ (track by track) | – | ✔ | – | – |
 | **BT** (the device the card is open on) | ✔ | ✔ | near-gapless | ✔ | – | – |
 
@@ -204,7 +205,15 @@ Assistant language: **Hungarian** or **English**.
   Assistant and can't be used as the music folder.
 - Optional: `ffmpeg` on the host for the real VU signal (included in Home Assistant OS and the container image;
   without it the meters show a realistic simulation).
-- Deezer playback needs the Deezer service added to your Sonos app. Searching Deezer needs no account.
+- **One device, one speaker:** each physical device is one button; its own integration is the main route, other ways to
+  it (e.g. its Music Assistant player) are fallbacks used automatically for what the main route can't play – so every
+  source can play on every speaker. Browsers (browser_mod) and kiosk tablets aren't speakers.
+- Deezer plays on Sonos through the Deezer service in your Sonos app, on a WiiM through the Deezer account in the WiiM Home
+  app (lossless), elsewhere through Music Assistant's Deezer or from the music folder. Searching Deezer needs no account.
+- Spotify plays on Sonos through the Spotify service in your Sonos app, on Spotify Connect devices (send music to the
+  speaker once from the Spotify app so the account knows it) through the Home Assistant Spotify integration (Premium);
+  elsewhere albums and tracks come from Deezer. Spotify doesn't release playlist tracks to apps, so a Spotify playlist
+  plays only on Sonos or a Spotify Connect speaker.
 - Browsers: a current Chrome / Edge, Safari or Firefox – at least Chrome 105, Safari / iOS 16 or Firefox 110 (older
   ones, e.g. an old wall-tablet WebView, may misplace the cassette and display labels). The card has its own look and
   doesn't follow Home Assistant themes.

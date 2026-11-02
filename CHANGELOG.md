@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.6.0 – 2026-11-02
+
+Cantabile 2.6 – every source on every speaker. A setup wizard; one device, one speaker, with its own integration as
+the main route and fallbacks behind it; the WiiM's own Deezer; your Deezer and Spotify libraries in the library;
+WiiM presets and Spotify on any speaker; the sidebar dashboard looks like the card. The details of each step are in the
+2.6.0b1–b6 entries below.
+
+- **Setup wizard** (b1): speakers, music library, the country's most popular radio stations, TV, voice and the dashboard
+  – a ready-filled card on a new sidebar dashboard; it can be run again, also step by step.
+- **One device, one speaker** (b2): the wizard, the card and its ⚙ list show one row per physical device. Its own
+  integration is the main route; other ways to it (usually its Music Assistant player) are fallbacks used automatically
+  for what the main route can't play. Browsers, kiosk tablets and Music Assistant-only players aren't speakers; old card
+  entries move to the device's main player.
+- **Sidebar dashboard** (b3): in a panel view the card is drawn at card size and scaled to fit, centred.
+- **WiiM's own Deezer** (b3, b5): Deezer albums and playlists play on a WiiM from the Deezer account linked in the WiiM
+  Home app, lossless. Switching from a Sonos playing a Deezer list (e.g. your Deezer favourites) to a WiiM continues the
+  same list there from the same track and position; Music Assistant and the music folder are the fallbacks.
+- **WiiM presets on any speaker** (b4): a Deezer preset plays as a Deezer album, a TuneIn preset as a radio station.
+- **MY LIBRARY** (b5, b6): the DEEZER tab shows your Deezer playlists, albums and artists (the account is found in the Sonos
+  favourites), the SPOTIFY tab your Spotify playlists, saved albums and followed artists (the Home Assistant Spotify account).
+- **Spotify on every speaker** (b6): Sonos through its own Spotify service, Spotify Connect devices through Spotify;
+  elsewhere albums and tracks come from Deezer. Spotify playlists play on Sonos and Spotify Connect speakers (Spotify
+  doesn't release playlist tracks to apps).
+- Fixes: long Deezer lists continue at the right track on the WiiM; connections to the WiiM and Sonos are closed after
+  each request and retried once; Music Assistant's Deezer instance comes from its provider list.
+
 ## 2.6.0b6 – 2026-11-02
 
 - **MY LIBRARY on the SPOTIFY tab.** With an empty search the SPOTIFY tab now shows your own Spotify library – your playlists, saved albums and followed artists – read with the Home Assistant Spotify integration's signed-in account from the Spotify API (`/me/playlists`, `/me/albums`, `/me/following`; read-only). It works even when nothing is playing (the HA Spotify media browser, used so far, only answered while Spotify was playing; it stays as a fallback).
