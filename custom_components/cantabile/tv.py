@@ -36,9 +36,11 @@ import voluptuous as vol
 from aiohttp import web
 
 from homeassistant.components import media_source, websocket_api
+from homeassistant.components.media_player import MediaPlayerState
 from homeassistant.components.http import KEY_HASS, HomeAssistantView
 from homeassistant.components.http.auth import async_sign_path
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.const import EVENT_STATE_CHANGED
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -1055,8 +1057,56 @@ async def ws_reload(hass: HomeAssistant, conn: websocket_api.ActiveConnection, m
     conn.send_result(msg["id"], {"reloaded": True})
 
 
+def _kesz(hass: HomeAssistant, entity_id: str) -> str:
+    """A lejátszó készülékének fő lejátszója (a készüléktérképből) – ugyanaz a készülék több lejátszóval is szólhat."""
+    try:
+        from . import varazslo  # noqa: PLC0415
+
+        t = hass.data[DOMAIN].setdefault("_kesz_tar", {"ido": 0.0, "fo": {}})
+        if time.monotonic() - t["ido"] > 300:
+            t["fo"], t["ido"] = varazslo.terkep(varazslo.hangszorok(hass))["fo"], time.monotonic()
+        return t["fo"].get(entity_id, entity_id)
+    except Exception:  # noqa: BLE001
+        return entity_id
+
+
+@callback
+def auto_tukor(hass: HomeAssistant, ev: Event) -> None:
+    """Ha egy helyiségben bármelyik hangszóró elkezd szólni (a kártyáról, az appból, hanggal…), a helyiség TV-je – ha a
+    Cantabile TV-oldala nyitva van rajta, és épp nem szól rajta más – hang nélkül azt mutatja (adatlap, dalszöveg)."""
+    e = ev.data.get("entity_id") or ""
+    uj, regi = ev.data.get("new_state"), ev.data.get("old_state")
+    if not e.startswith("media_player.") or e.startswith("media_player.cantabile_tv_") or uj is None or regi is None:
+        return
+    if uj.state != "playing" or regi.state == "playing":
+        return
+    kp = hass.data.get(DOMAIN, {}).get("tv")
+    if kp is None or not kp.lejatszok:
+        return
+    hol = terulet(hass, e)
+    if not hol:
+        return
+    kesz = _kesz(hass, e)
+    for lj in list(kp.lejatszok.values()):
+        if lj.dlna or lj.oldal is None or lj._tukor == e:  # noqa: SLF001
+            continue
+        if _kesz(hass, lj.cast) == kesz or terulet(hass, lj.entity_id, lj.cast) != hol:
+            continue                                     # maga a TV szól, vagy más helyiségben van
+        if lj._allapot in (MediaPlayerState.PLAYING, MediaPlayerState.PAUSED) and lj._tukor is None:  # noqa: SLF001
+            continue                                     # a TV maga szól: nem vesszük el
+        if lj._tukor and (t := hass.states.get(lj._tukor)) and t.state == "playing":  # noqa: SLF001
+            continue                                     # már egy szóló hangszórót mutat
+        lj.tukroz(e)                                     # (a TV-oldal be van jelentkezve: a TV a Cantabile-t mutatja)
+
+
 def regisztral(hass: HomeAssistant) -> None:
     kp = hass.data[DOMAIN]["tv"] = TvKozpont(hass)
+
+    @callback
+    def _allapot(ev: Event) -> None:
+        auto_tukor(hass, ev)
+
+    hass.bus.async_listen(EVENT_STATE_CHANGED, _allapot)
     hass.async_create_background_task(kp.tukrok_betolt(), "cantabile_tv_tukrok")
     # a régi kártyakóddal futó, épp nem szóló TV-oldalak újraküldése (frissítés után)
     async_track_time_interval(hass, kp._frissit_ellenoriz, timedelta(seconds=60))
