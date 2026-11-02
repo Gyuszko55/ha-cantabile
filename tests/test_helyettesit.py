@@ -114,3 +114,40 @@ def test_spotify_lista_zart(monkeypatch):
     monkeypatch.setattr(St, "_spotify_belso", belso)
     with pytest.raises(St.StreamHiba):
         asyncio.run(St.spotify_deezerre(None, "spotify:playlist:4wBDB1Bhd9CeI0F5D6aVRZ"))
+
+
+def test_spotify_eszkoz_valasztas_es_megjegyzett_nev(monkeypatch):
+    from types import SimpleNamespace as N
+    from custom_components.cantabile import streaming as St
+
+    tarolt = {}
+
+    async def tar(hass):
+        return N(async_delay_save=lambda f, d: tarolt.update(f())), tarolt
+
+    valaszok = iter([
+        {"devices": [{"id": "1b2a", "name": "WiiM Mini-A16A", "is_active": True}]},     # aktív: névvel
+        {"devices": [{"id": "1b2a", "name": "1b2a", "is_active": False}]},               # tétlen: csak azonosító
+    ])
+
+    async def hiv(hass, m, ut, json=None):
+        return next(valaszok)
+
+    monkeypatch.setattr(St, "_eszk_tar", tar)
+    monkeypatch.setattr(St, "_spotify_hiv", hiv)
+    assert asyncio.run(St.spotify_eszkozok(None))[0]["name"] == "WiiM Mini-A16A" and tarolt == {"1b2a": "WiiM Mini-A16A"}
+    e = asyncio.run(St.spotify_eszkozok(None))
+    assert e[0]["name"] == "WiiM Mini-A16A"                                 # a tétlen is felismerhető
+    assert St.eszkoz_valaszt(e, ["Technics", "WiiM Mini-A16A"])["id"] == "1b2a"
+    assert St.eszkoz_valaszt(e, ["Nest Hub"]) is None
+
+
+def test_cimek_deezerre(monkeypatch):
+    from custom_components.cantabile import streaming as St
+
+    async def keres(hass, fajta, eloado, cim):
+        return {"id": 42} if cim == "Dragonborn" else None
+
+    monkeypatch.setattr(St, "_dz_keres", keres)
+    r = asyncio.run(St.cimek_deezerre(None, [{"cim": "Dragonborn", "eloado": "Celestial Aeon Project"}, {"cim": "X"}]))
+    assert r == {"deezer": ["https://www.deezer.com/track/42", None], "talalt": 1, "osszes": 2}

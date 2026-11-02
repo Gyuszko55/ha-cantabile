@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.6.1 – 2026-11-02
+
+- **Spotify playing on a Sonos moves to other speakers.** A Sonos playing Spotify through its own Spotify service (`x-sonos-spotify`) can now be switched to another speaker: on a Spotify Connect device (e.g. a WiiM) Spotify continues the same queue from the same track and position (Spotify API, the Home Assistant Spotify account); elsewhere the same tracks come from Deezer (by artist and title) through the Deezer routes. Works from a paused Sonos too (PLAY on the new speaker). It used to be refused.
+- **The message names the real source.** When something really can't move (a Sonos radio or favourite), the card says what is playing and where it can't go – it used to say “Deezer and Sonos favourites only play on Sonos” even for Spotify.
+- **Spotify devices are recognised when idle.** Spotify often lists an idle device only by its id (the WiiM showed up as “AVR”); Cantabile remembers each device's name once it has seen it and recognises it later. New websocket commands `cantabile/spotify_connect` and `cantabile/titles_to_deezer`.
+
 ## 2.6.0 – 2026-11-02
 
 Cantabile 2.6 – every source on every speaker. A setup wizard; one device, one speaker, with its own integration as

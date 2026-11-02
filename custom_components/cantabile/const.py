@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.core import HomeAssistant
 
 DOMAIN = "cantabile"
-VERSION = "2.6.0"
+VERSION = "2.6.1"
 
 # a kártya és a betűkészlet a saját statikus útvonalon
 STATIC_URL = "/cantabile_static"
@@ -78,6 +78,8 @@ _TEXT: dict[str, dict[str, str]] = {
     "lyrics_down": {"hu": "A dalszöveg-szolgáltatás nem érhető el.", "en": "The lyrics service is not available."},
     "svc_bad_key": {"hu": "hibás fejlesztői kulcs (client ID / secret)", "en": "invalid developer key (client ID / secret)"},
     "spotify_login_down": {"hu": "a Spotify-integráció bejelentkezése nem érhető el", "en": "the Spotify integration's login is not available"},
+    "spotify_no_device": {"hu": "a hangszóró nincs a Spotify Connect-eszközök között (a Spotify appból küldj rá egyszer zenét)",
+                          "en": "the speaker isn't among the Spotify Connect devices (send music to it once from the Spotify app)"},
     "spotify_playlist_closed": {"hu": "a Spotify ennek a listának a számait nem adja ki (Spotify-korlátozás) – a lista csak Spotify Connect-hangszórón szól",
                                 "en": "Spotify doesn't release this playlist's tracks (Spotify restriction) – the playlist only plays on a Spotify Connect speaker"},
     "spotify_no_key": {"hu": "nincs Spotify-kulcs és nincs Spotify-integráció", "en": "no Spotify key and no Spotify integration"},

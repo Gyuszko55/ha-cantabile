@@ -143,6 +143,10 @@ const EN = {
   "WiiM-preset {n}": "WiiM preset {n}",
   "WiiM-preset {n} · Deezer": "WiiM preset {n} · Deezer",
   "A Spotify-könyvtárad üres.": "Your Spotify library is empty.",
+  "Ez ({f}) innen nem vihető át: a(z) {u} hangszórón nem szólhat – a(z) {h} szól tovább.": "This ({f}) can't be moved: it can't play on {u} – {h} keeps playing.",
+  "a Sonos-rádió": "the Sonos radio",
+  "a Sonos-kedvenc": "the Sonos favourite",
+  "A Spotify-sort a(z) {h} hangszórón nem tudom folytatni (nem Spotify Connect-eszköz, és a Deezeren sem találtam meg).": "I can't continue the Spotify queue on {h} (not a Spotify Connect device, and not found on Deezer).",
   "A Spotify itt nem szólhat – ugyanazok a számok a Deezerről ({t}/{o}).": "Spotify can't play here – the same tracks from Deezer ({t}/{o}).",
   "A Spotify itt nem szólhat – ugyanez az album a Deezerről.": "Spotify can't play here – the same album from Deezer.",
   "Ezen a hangszórón a Deezer-számok a zenemappából szólnak, ha ott megvannak.": "On this speaker Deezer tracks play from the music folder, if they are there.",
@@ -2956,6 +2960,10 @@ class CantabileCard extends HTMLElement {
       if (!f && regi.mod === "sonos" && uj.mod !== "sonos" && uj.entity !== HELYI) {
         const dzf = await this._sonosDeezerForras(regi, s);
         if (dzf) this._szunetAtvitel = { dz: dzf, cim: s?.attributes?.media_playlist || s?.attributes?.media_album_name || "Deezer", hova: uj.entity, regi: regi.entity };
+        else {
+          const spf = await this._sonosSpotifyForras(regi, s);
+          if (spf) this._szunetAtvitel = { sp: spf, hova: uj.entity, regi: regi.entity };
+        }
       }
     }
     return this._csoportAllit(uj);
@@ -2995,6 +3003,15 @@ class CantabileCard extends HTMLElement {
         if (!(await this._helyettesitJatszik({ deezer: dzf.ids }, a.media_album_name || a.media_title || "Deezer", dzf.kezdo, uj, dzf.poz, t0))) {
           this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); return this._frissit();
         }
+        return this._hiv("media_player", "media_pause", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
+      }
+    }
+    if (szol && ado === -1 && !forras && regi.mod === "sonos" && uj.mod !== "sonos" && uj.entity !== HELYI) {
+      // a Sonos saját Spotify-ján szóló sor: Spotify Connect-eszközön a Spotify viszi tovább, máshol a számok a Deezerről
+      const spf = await this._sonosSpotifyForras(regi, s);
+      if (spf) {
+        await this._csoportAllit(uj);
+        if (!(await this._sonosSpotifyAtvisz(uj, spf))) { this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); return this._frissit(); }
         return this._hiv("media_player", "media_pause", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
       }
     }
@@ -3066,6 +3083,46 @@ class CantabileCard extends HTMLElement {
     if (pontrol) return this._kazettaFolytat({ kaz, kezdo: i, poz, t0 }, hsz);
     await this._betolt(kaz, i);
     return true;
+  }
+
+  // a Sonos saját Spotify-ján szóló sor: a számok Spotify-azonosítója, címe, előadója a szóló számtól (≤100), és a hely
+  async _sonosSpotifyForras(hsz, s) {
+    const a = s?.attributes || {}, vez = a.group_members?.[0] || hsz.entity;
+    try {
+      const v = await this._hass.callWS({ type: "call_service", domain: "sonos", service: "get_queue", service_data: { entity_id: vez }, return_response: true });
+      const sor = v?.response?.[vez] || [];
+      if (!sor.some((x) => /^x-sonos-spotify:/i.test(x.media_content_id || ""))) return null;
+      let kezdo = Math.max(0, (Number(a.queue_position) || 1) - 1), poz = a.media_position || 0;
+      try { const ps = await this._hass.callWS({ type: "cantabile/sonos_position", entity_id: vez }); if (ps?.position >= 0) { poz = ps.position; if (ps.track >= 0) kezdo = ps.track; } } catch (_) { /* régebbi integráció */ }
+      const resz = sor.slice(kezdo, kezdo + 100);
+      const uris = resz.map((x) => { const m = /spotify(?:%3a|:)(track|episode)(?:%3a|:)([A-Za-z0-9]+)/i.exec(x.media_content_id || ""); return m ? `spotify:${m[1].toLowerCase()}:${m[2]}` : null; });
+      return { uris, elemek: resz.map((x) => ({ cim: x.media_title || "", eloado: x.media_artist || "", album: x.media_album_name || "" })), poz, cim: a.media_playlist || a.media_album_name || "Spotify" };
+    } catch (_) { return null; }
+  }
+
+  // a Sonos Spotify-sora az új hangszórón: Spotify Connect-eszközön a Spotify (ugyanattól a számtól és ponttól), máshol
+  // ugyanazok a számok a Deezerről (előadó + cím), a Deezer-utakon
+  async _sonosSpotifyAtvisz(uj, spf) {
+    const st = this._hass.states[uj.entity], ent = this._hass.entities?.[uj.entity], eszk = ent?.device_id && this._hass.devices?.[ent.device_id];
+    const nevek = [uj.spotify_device, uj.nev, uj.rovid, st?.attributes?.friendly_name, eszk?.name_by_user, eszk?.name].filter(Boolean);
+    const uris = spf.uris.filter(Boolean);
+    if (spf.uris[0] && uris.length) {
+      try {
+        const r = await this._hass.callWS({ type: "cantabile/spotify_connect", names: nevek, uris, offset: 0, position_ms: Math.round((Number(spf.poz) || 0) * 1000) });
+        this._uzen(T("A(z) {h} hangszórón innen szól: {f}.", { h: KN(uj), f: `Spotify Connect – ${r.device}` }));
+        return true;
+      } catch (e) { console.info("Cantabile: Spotify Connect nem ment, Deezer-tartalék:", e?.message || e); }
+    }
+    try {
+      const r = await this._hass.callWS({ type: "cantabile/titles_to_deezer", items: spf.elemek.slice(0, 100) });
+      if (r?.talalt) {
+        const linkek = r.deezer.filter(Boolean);
+        this._uzen(T("A Spotify itt nem szólhat – ugyanazok a számok a Deezerről ({t}/{o}).", { t: r.talalt, o: r.osszes }));
+        return this._helyettesitJatszik({ deezer: linkek }, spf.cim, 0, uj, r.deezer[0] ? spf.poz : 0);
+      }
+    } catch (e) { console.info("Cantabile: a Spotify-sor Deezer-tartaléka nem ment:", e?.message || e); }
+    this._uzen(T("A Spotify-sort a(z) {h} hangszórón nem tudom folytatni (nem Spotify Connect-eszköz, és a Deezeren sem találtam meg).", { h: KN(uj) }));
+    return false;
   }
 
   // a Sonoson szóló Deezer-lista / -album WiiM-en a WiiM saját Deezeréről (a saját integráció a fő út, a Music Assistant
@@ -3266,10 +3323,16 @@ class CantabileCard extends HTMLElement {
     }
     const tvPar = cel && this._tvPar(cel.entity);
     if (tvPar) this._uzen(T("A(z) {h} a TV saját lejátszója – csak a hang megy át. A ⚙-ben állítsd át a(z) „{n}” lejátszóra.", { h: KN(cel), n: tvPar.nev }));   // figyelmeztet, de vált
-    const dzSor = kiz === "sonos" && /tr(%3a|:|-flac:)\d+/i.test(String(regiAll?.attributes?.media_content_id || "")) && cel?.entity !== HELYI && !this._nincsIntegracio;
-    if (((kiz === "sonos" && !dzSor && !this._spotifyConnectSzol(regi)) && cel?.mod !== "sonos") || (kiz === "bt" && cel?.entity !== HELYI)) {
-      // a Deezer / Sonos-kedvenc csak Sonoson, a telefonos zene csak BT-n szól: a választó marad, a zene szól tovább
-      this._uzen(kiz === "sonos" ? T("A Deezer és a Sonos-kedvencek csak Sonoson szólnak – a(z) {h} szól tovább.", { h: KN(regi) })
+    const regiCid = String(regiAll?.attributes?.media_content_id || "");
+    const dzSor = kiz === "sonos" && /tr(%3a|:|-flac:)\d+/i.test(regiCid) && cel?.entity !== HELYI && !this._nincsIntegracio;
+    // a Sonos saját Spotify-ján szóló sor: átvihető (Spotify Connecttel, vagy a számok a Deezerről)
+    const spSor = kiz === "sonos" && /^x-sonos-spotify:/i.test(regiCid) && cel?.entity !== HELYI && !this._nincsIntegracio;
+    if (((kiz === "sonos" && !dzSor && !spSor && !this._spotifyConnectSzol(regi)) && cel?.mod !== "sonos") || (kiz === "bt" && cel?.entity !== HELYI)) {
+      // ami csak Sonoson szólhat (Sonos-kedvenc, Sonos-rádió…), illetve a telefonos zene csak BT-n: a választó marad, a zene
+      // szól tovább – az üzenet a valóban szóló forrást nevezi meg
+      const forras = /^x-sonos-spotify:/i.test(regiCid) ? "Spotify" : /tr(%3a|:|-flac:)\d+/i.test(regiCid) ? "Deezer"
+        : /^x-sonosapi-(stream|radio|hls)/i.test(regiCid) ? T("a Sonos-rádió") : T("a Sonos-kedvenc");
+      this._uzen(kiz === "sonos" ? T("Ez ({f}) innen nem vihető át: a(z) {u} hangszórón nem szólhat – a(z) {h} szól tovább.", { f: forras, u: KN(cel), h: KN(regi) })
         : T("A telefonról választott zene csak BT-n szól – ott marad."));
       this._frissit();
       return;
@@ -3817,6 +3880,11 @@ class CantabileCard extends HTMLElement {
     if (k === "play") {
       if (SZUNETEL(s)) return this._hiv("media_player", "media_play", e);
       const sz = this._szunetAtvitel;
+      if (sz?.sp && sz.hova === hsz.entity && !SZOL(s)) {
+        this._szunetAtvitel = null;
+        await this._csoportAllit(hsz);
+        return this._sonosSpotifyAtvisz(hsz, sz.sp);
+      }
       if (sz?.dz && sz.hova === hsz.entity && !SZOL(s)) {
         this._szunetAtvitel = null;
         await this._csoportAllit(hsz);

@@ -254,6 +254,100 @@ async def spotify_deezerre(hass: HomeAssistant, cim: str) -> dict[str, Any]:
     return {"deezer": linkek, "talalt": sum(1 for x in linkek if x), "osszes": len(linkek)}
 
 
+# ---- Spotify Connect: lejátszás egy Spotify-eszközön (a HA Spotify-integrációjának fiókjával) ----
+# A Spotify a tétlen eszközök nevét gyakran nem adja meg (csak az azonosítót, pl. a WiiM „AVR”-ként): amikor névvel látjuk,
+# megjegyezzük (azonosító → név), és később ebből ismerjük fel.
+_ESZK_KULCS = "cantabile.spotify_eszkozok"
+
+
+async def _eszk_tar(hass: HomeAssistant) -> tuple[Any, dict[str, str]]:
+    from homeassistant.helpers.storage import Store  # noqa: PLC0415
+
+    adat = hass.data.setdefault(DOMAIN + "_spotify_eszk", {})
+    if "store" not in adat:
+        adat["store"] = Store(hass, 1, _ESZK_KULCS)
+        adat["nevek"] = (await adat["store"].async_load()) or {}
+    return adat["store"], adat["nevek"]
+
+
+async def _spotify_hiv(hass: HomeAssistant, modszer: str, ut: str, json: Any = None) -> Any:
+    """Közvetlen (nem gyorsítótárazott) Spotify-hívás a bejelentkezett fiókkal – eszközlista, lejátszás indítása."""
+    tok = await _spotify_token(hass, True)
+    sess = async_get_clientsession(hass)
+    async with sess.request(modszer, SPOTIFY_API + ut, json=json, headers={"Authorization": f"Bearer {tok}"},
+                            timeout=aiohttp.ClientTimeout(total=12)) as v:
+        if v.status == 401:
+            _token.clear()
+            raise StreamHiba("svc_login_expired")
+        if v.status == 404:
+            raise StreamHiba("spotify_no_device")
+        if v.status >= 400:
+            raise StreamHiba("svc_status", status=v.status)
+        return await v.json(content_type=None) if v.content_length or v.status == 200 else None
+
+
+async def spotify_eszkozok(hass: HomeAssistant) -> list[dict[str, Any]]:
+    """A fiók Spotify Connect-eszközei {id, name, active}; a névtelen (csak azonosítós) eszköz a megjegyzett nevével."""
+    store, nevek = await _eszk_tar(hass)
+    d = await _spotify_hiv(hass, "GET", "/me/player/devices")
+    ki, valtozott = [], False
+    for x in (d or {}).get("devices") or []:
+        did, nev = str(x.get("id") or ""), str(x.get("name") or "")
+        if did and nev and nev != did and nevek.get(did) != nev:
+            nevek[did] = nev
+            valtozott = True
+        ki.append({"id": did, "name": nevek.get(did, nev) if nev in ("", did) else nev, "active": bool(x.get("is_active"))})
+    if valtozott:
+        store.async_delay_save(lambda: nevek, 5)
+    return ki
+
+
+def _nev_norm(t: str) -> str:
+    return re.sub(r"[^\w]+", "", str(t or "").casefold())
+
+
+def eszkoz_valaszt(eszkozok: list[dict[str, Any]], nevek: list[str]) -> dict[str, Any] | None:
+    """A hangszóró Spotify-eszköze a nevei közül (pontos, aztán részleges egyezés)."""
+    keresett = [_nev_norm(n) for n in nevek if n]
+    for e in eszkozok:
+        if _nev_norm(e["name"]) in keresett:
+            return e
+    for e in eszkozok:
+        n = _nev_norm(e["name"])
+        if n and any(k and (k in n or n in k) for k in keresett):
+            return e
+    return None
+
+
+async def spotify_connect(hass: HomeAssistant, nevek: list[str], uris: list[str], offset: int = 0,
+                          position_ms: int = 0) -> dict[str, Any]:
+    """Spotify-számok lejátszása egy Spotify Connect-eszközön (név szerint), a megadott számtól és ponttól."""
+    e = eszkoz_valaszt(await spotify_eszkozok(hass), nevek)
+    if not e:
+        raise StreamHiba("spotify_no_device")
+    uris = [u for u in uris if re.match(r"^spotify:(track|episode):[A-Za-z0-9]+$", u)][:100]
+    if not uris:
+        raise StreamHiba("svc_denied", szolg="Spotify")
+    test = {"uris": uris, "offset": {"position": max(0, min(offset, len(uris) - 1))}, "position_ms": max(0, int(position_ms))}
+    await _spotify_hiv(hass, "PUT", f"/me/player/play?device_id={e['id']}", test)
+    return {"device": e["name"], "tracks": len(uris)}
+
+
+async def cimek_deezerre(hass: HomeAssistant, elemek: list[dict[str, Any]]) -> dict[str, Any]:
+    """Számok (cím, előadó) a Deezeren – pl. a Sonoson szóló Spotify-sor számai más hangszórónak."""
+    sor = asyncio.Semaphore(6)
+
+    async def egy(x: dict[str, Any]) -> str | None:
+        if not x.get("cim"):
+            return None
+        async with sor:
+            t = await _dz_keres(hass, "track", str(x.get("eloado") or ""), str(x["cim"]))
+        return f"https://www.deezer.com/track/{t['id']}" if t else None
+
+    linkek = list(await asyncio.gather(*(egy(x) for x in elemek[:SPOTIFY_TARTALEK_MAX])))
+    return {"deezer": linkek, "talalt": sum(1 for x in linkek if x), "osszes": len(linkek)}
+
+
 async def tidal(hass: HomeAssistant, ut: str) -> Any:
     if not TIDAL_UT.match(ut):
         raise StreamHiba("svc_denied", szolg="Tidal")
@@ -294,3 +388,28 @@ def regisztral(hass: HomeAssistant) -> None:
             connection.send_error(msg["id"], "spotify", szoveg(hass, "svc_down", hiba=e))
 
     websocket_api.async_register_command(hass, ws_deezerre)
+
+    async def _futtat(connection: websocket_api.ActiveConnection, msg: dict[str, Any], coro: Any) -> None:
+        try:
+            connection.send_result(msg["id"], await coro)
+        except StreamHiba as e:
+            connection.send_error(msg["id"], "spotify", e.szoveg(hass))
+        except (aiohttp.ClientError, TimeoutError) as e:
+            connection.send_error(msg["id"], "spotify", szoveg(hass, "svc_down", hiba=e))
+
+    @websocket_api.websocket_command({
+        vol.Required("type"): "cantabile/spotify_connect", vol.Required("names"): [str], vol.Required("uris"): [str],
+        vol.Optional("offset", default=0): vol.Coerce(int), vol.Optional("position_ms", default=0): vol.Coerce(int),
+    })
+    @websocket_api.async_response
+    async def ws_connect(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        await _futtat(connection, msg, spotify_connect(hass, msg["names"], msg["uris"], msg["offset"], msg["position_ms"]))
+
+    @websocket_api.websocket_command({vol.Required("type"): "cantabile/titles_to_deezer",
+                                      vol.Required("items"): vol.All([dict], vol.Length(max=SPOTIFY_TARTALEK_MAX))})
+    @websocket_api.async_response
+    async def ws_cimek(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        await _futtat(connection, msg, cimek_deezerre(hass, msg["items"]))
+
+    websocket_api.async_register_command(hass, ws_connect)
+    websocket_api.async_register_command(hass, ws_cimek)
