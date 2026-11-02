@@ -321,7 +321,7 @@ def sonos_valtozat(albumok: dict[str, list[str]], szamok: list[str], hires: str 
 
 DEEZER = "https://api.deezer.com"
 # a kártya csak ezeket kérdezheti a közvetítőn át (a Deezer API böngészőből nem hívható: nincs CORS-fejléc)
-DEEZER_UT = re.compile(r"^/(search(/(album|artist|track|playlist))?|artist/\d+(/(top|albums|related|radio))?|album/\d+(/tracks)?|playlist/\d+(/tracks)?|track/\d+"
+DEEZER_UT = re.compile(r"^/(search(/(album|artist|track|playlist))?|artist/\d+(/(top|albums|related|radio))?|album/\d+(/tracks)?|playlist/\d+(/tracks)?|track/(\d+|isrc:[A-Z0-9]{12})"
                        r"|chart/\d+(/\w+)?|genre(/\d+(/(artists|radios))?)?|radio/\d+(/tracks)?"
                        r"|user/\d+/(playlists|albums|artists|tracks))(\?[^#]*)?$")
 _deezer_tar: dict[str, tuple[float, Any]] = {}

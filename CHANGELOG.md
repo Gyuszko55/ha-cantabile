@@ -3,6 +3,7 @@
 ## 2.6.0b6 – 2026-11-02
 
 - **MY LIBRARY on the SPOTIFY tab.** With an empty search the SPOTIFY tab now shows your own Spotify library – your playlists, saved albums and followed artists – read with the Home Assistant Spotify integration's signed-in account from the Spotify API (`/me/playlists`, `/me/albums`, `/me/following`; read-only). It works even when nothing is playing (the HA Spotify media browser, used so far, only answered while Spotify was playing; it stays as a fallback).
+- **Spotify on every speaker.** Where the speaker is a Spotify Connect device, Spotify plays it as before; where it isn't (not in the account's Spotify devices, DLNA TV…), the same tracks are looked up on Deezer by their ISRC and play through the Deezer routes (Sonos / WiiM own Deezer, Music Assistant, music folder) – from the same track; the card says how many were found. New websocket command `cantabile/spotify_to_deezer` (up to 100 tracks). The SPOTIFY tab no longer asks to switch speaker, except on BT.
 
 ## 2.6.0b5 – 2026-11-02
 

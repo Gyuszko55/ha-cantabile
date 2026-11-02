@@ -143,6 +143,7 @@ const EN = {
   "WiiM-preset {n}": "WiiM preset {n}",
   "WiiM-preset {n} · Deezer": "WiiM preset {n} · Deezer",
   "A Spotify-könyvtárad üres.": "Your Spotify library is empty.",
+  "A Spotify itt nem szólhat – ugyanazok a számok a Deezerről ({t}/{o}).": "Spotify can't play here – the same tracks from Deezer ({t}/{o}).",
   "Ezen a hangszórón a Deezer-számok a zenemappából szólnak, ha ott megvannak.": "On this speaker Deezer tracks play from the music folder, if they are there.",
   "A BT-n (a telefon / tablet hangja) a Deezer nem szól – válassz hangszórót.": "Deezer doesn't play on BT (the phone / tablet audio) – choose a speaker.",
   "A saját Deezer-könyvtárad (listák, albumok, előadók) itt jelenik meg, ha a Sonos kedvenceiben ott vannak a Deezer-kedvenceid, vagy a kártyán megadod: deezer_user.": "Your own Deezer library (playlists, albums, artists) shows here if your Deezer favourites are among the Sonos favourites, or set deezer_user on the card.",
@@ -3954,7 +3955,13 @@ class CantabileCard extends HTMLElement {
         if (!this._wiim(hsz)) throw Object.assign(new Error(T("A(z) {h} hangszórón ez nem játszható le – lejátszható: {l}.", { h: KN(hsz), l: this._kepesek(kaz, hsz) })), { hely: true });
         await this._hiv("media_player", "play_media", { ...e, media_content_id: kaz.id, media_content_type: "music" });
       } else if (kaz.forras === "stream") {
-        if (hsz.mod !== "sonos" && kaz.tipus === "spotify" && this._stream?.spotify_entity && hsz.entity !== HELYI) return this._spotifyConnect(kaz, hsz);
+        if (hsz.mod !== "sonos" && kaz.tipus === "spotify" && hsz.entity !== HELYI) {
+          // Spotify: ahol a hangszóró Spotify Connect-eszköz, ott a Spotify játssza; ahol nem (nincs a Spotify eszközei
+          // között, DLNA-s TV…), ugyanazok a számok a Deezeren (ISRC szerint), a Deezer-utakon
+          if (this._stream?.spotify_entity && this._spotifyEszkoz(hsz)) return this._spotifyConnect(kaz, hsz);
+          if (!this._nincsIntegracio && await this._spotifyDeezerre(kaz, kezdo, hsz)) return;
+          if (this._stream?.spotify_entity) return this._spotifyConnect(kaz, hsz);
+        }
         // Deezer-album / -lista WiiM-en: a WiiM saját Deezere (a saját integráció a fő út; lossless) – a kért számtól
         const dzl = kaz.tipus === "deezer" && /deezer\.com\/(?:\w+\/)?(album|playlist)\/(\d+)/i.exec(String(kaz.id || ""));
         if (dzl && !this._nincsIntegracio && ["wiim", "linkplay"].includes(this._hass?.entities?.[hsz.entity]?.platform)) {
@@ -4685,6 +4692,19 @@ class CantabileCard extends HTMLElement {
     this._frissit();
   }
 
+  // tartalék: a Spotify-tartalom (szám / album / lista) ugyanazon számai a Deezeren, ISRC szerint – a Deezer-utakon szólnak
+  // (Sonos / WiiM saját Deezere, Music Assistant, zenemappa)
+  async _spotifyDeezerre(kaz, kezdo, hsz) {
+    let r;
+    try { r = await this._hass.callWS({ type: "cantabile/spotify_to_deezer", uri: String(kaz.uri || kaz.id) }); }
+    catch (e) { console.info("Cantabile: a Spotify → Deezer tartalék nem ment:", e?.message || e); return false; }
+    if (!r?.talalt) return false;
+    const k = Math.max(0, Number(kezdo) || 0), elotte = r.deezer.slice(0, k).filter(Boolean).length;
+    const linkek = r.deezer.filter(Boolean);
+    this._uzen(T("A Spotify itt nem szólhat – ugyanazok a számok a Deezerről ({t}/{o}).", { t: r.talalt, o: r.osszes }));
+    return this._helyettesitJatszik({ deezer: linkek }, kaz.cim, r.deezer[k] ? elotte : Math.min(elotte, linkek.length - 1), hsz);
+  }
+
   // szól-e Spotify Connecten ez a hangszóró (akkor a választó a Spotifyval viszi át)
   _spotifyConnectSzol(hsz) {
     const sp = this._stream?.spotify_entity, s = sp && this._hass?.states[sp];
@@ -4698,7 +4718,7 @@ class CantabileCard extends HTMLElement {
     const nev = szolg === "spotify" ? "Spotify" : "Tidal", kerdes = pl.keres || "", hely = pl.ut[pl.ut.length - 1];
     const allapot = JSON.stringify([szolg, kerdes, pl.ut.map((x) => x.id)]), friss = () => this._polc === pl && pl.ful === szolg && allapot === JSON.stringify([szolg, pl.keres || "", pl.ut.map((x) => x.id)]);
     const hsz = this._hangszoro(), connect = szolg === "spotify" && !!this._stream?.spotify_entity;
-    const jo = hsz.mod === "sonos" || (connect && hsz.entity !== HELYI);
+    const jo = hsz.mod === "sonos" || (szolg === "spotify" ? hsz.entity !== HELYI : false) || (connect && hsz.entity !== HELYI);
     const figy = (jo ? "" : `<div class="puzenet">${szolg === "spotify" && connect ? T("A Spotify Sonoson vagy Spotify Connect-hangszórón szól – válts hangszórót.") : T("A(z) {s} Sonoson szól – válts Sonos hangszóróra.", { s: nev })}</div>`)
       + `<div class="puzenet">${T("{s}: kísérleti funkció – élő fiókkal még nincs visszaigazolva.", { s: nev })}</div>`;
     const api = (ut) => this._hass.callWS({ type: `cantabile/${szolg}`, ut });

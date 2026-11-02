@@ -11,6 +11,7 @@ bekötött fiókkal); Spotify Connect-eszközön a kártya a HA Spotify-integrá
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import time
@@ -143,6 +144,72 @@ async def spotify(hass: HomeAssistant, ut: str) -> Any:
     return await _ker(hass, "s" + ut, SPOTIFY_API + ut, tok, {"Accept-Language": str(hass.config.language or "en")})
 
 
+SPOTIFY_LINK = re.compile(r"(?:spotify:|open\.spotify\.com/(?:intl-\w+/)?)(album|playlist|track)[:/]([A-Za-z0-9]+)", re.I)
+ISRC = re.compile(r"^[A-Z]{2}[A-Z0-9]{3}\d{7}$")
+SPOTIFY_TARTALEK_MAX = 100
+
+
+async def _spotify_belso(hass: HomeAssistant, ut: str, sajat: bool) -> Any:
+    """Belső (olvasó) Spotify-kérés a helyettesítéshez – a fiók listáihoz a bejelentkezett fiókkal."""
+    try:
+        tok = await _spotify_token(hass, sajat)
+    except StreamHiba:
+        if not sajat:
+            raise
+        tok = await _spotify_token(hass)
+    return await _ker(hass, ("u" if sajat else "s") + ut, SPOTIFY_API + ut, tok, {})
+
+
+async def spotify_isrc(hass: HomeAssistant, cim: str) -> list[str | None]:
+    """Egy Spotify-szám / -album / -lista számainak ISRC-azonosítói sorrendben (legfeljebb 100)."""
+    m = SPOTIFY_LINK.search(cim or "")
+    if not m:
+        raise StreamHiba("svc_denied", szolg="Spotify")
+    fajta, sid = m.group(1).lower(), m.group(2)
+    if fajta == "track":
+        t = await _spotify_belso(hass, f"/tracks/{sid}", False)
+        return [((t or {}).get("external_ids") or {}).get("isrc")]
+    if fajta == "playlist":
+        ki: list[str | None] = []
+        while len(ki) < SPOTIFY_TARTALEK_MAX:
+            d = await _spotify_belso(hass, f"/playlists/{sid}/tracks?limit=100&offset={len(ki)}", True)
+            elemek = (d or {}).get("items") or []
+            ki += [(((x or {}).get("track") or {}).get("external_ids") or {}).get("isrc") for x in elemek]
+            if not elemek or not (d or {}).get("next"):
+                break
+        return ki[:SPOTIFY_TARTALEK_MAX]
+    # album: a számlistában nincs ISRC – a számok adatai 50-esével
+    d = await _spotify_belso(hass, f"/albums/{sid}/tracks?limit=50", False)
+    ids = [x.get("id") for x in (d or {}).get("items") or [] if x and x.get("id")]
+    ki = []
+    for i in range(0, len(ids), 50):
+        t = await _spotify_belso(hass, f"/tracks?ids={','.join(ids[i:i + 50])}", False)
+        ki += [((x or {}).get("external_ids") or {}).get("isrc") for x in (t or {}).get("tracks") or []]
+    return ki
+
+
+async def spotify_deezerre(hass: HomeAssistant, cim: str) -> dict[str, Any]:
+    """Tartalék ott, ahol a Spotify nem szólhat (nincs Spotify Connect, BT, DLNA-s TV): ugyanazok a számok a Deezeren,
+    az ISRC alapján – a Deezer-utakon (Sonos / WiiM saját Deezere, Music Assistant, zenemappa) szólnak tovább."""
+    from .music import HibaUzenet, deezer  # noqa: PLC0415 – körkörös import nélkül
+
+    isrc = await spotify_isrc(hass, cim)
+    sor = asyncio.Semaphore(6)
+
+    async def egy(kod: str | None) -> str | None:
+        if not kod or not ISRC.match(kod.upper()):
+            return None
+        async with sor:
+            try:
+                d = await deezer(hass, f"/track/isrc:{kod.upper()}")
+            except HibaUzenet:
+                return None
+        return f"https://www.deezer.com/track/{d['id']}" if isinstance(d, dict) and d.get("id") else None
+
+    linkek = list(await asyncio.gather(*(egy(k) for k in isrc)))
+    return {"deezer": linkek, "talalt": sum(1 for x in linkek if x), "osszes": len(linkek)}
+
+
 async def tidal(hass: HomeAssistant, ut: str) -> Any:
     if not TIDAL_UT.match(ut):
         raise StreamHiba("svc_denied", szolg="Tidal")
@@ -171,3 +238,15 @@ def regisztral(hass: HomeAssistant) -> None:
             return ws
 
         websocket_api.async_register_command(hass, keszit())
+
+    @websocket_api.websocket_command({vol.Required("type"): "cantabile/spotify_to_deezer", vol.Required("uri"): str})
+    @websocket_api.async_response
+    async def ws_deezerre(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        try:
+            connection.send_result(msg["id"], await spotify_deezerre(hass, msg["uri"]))
+        except StreamHiba as e:
+            connection.send_error(msg["id"], "spotify", e.szoveg(hass))
+        except (aiohttp.ClientError, TimeoutError) as e:
+            connection.send_error(msg["id"], "spotify", szoveg(hass, "svc_down", hiba=e))
+
+    websocket_api.async_register_command(hass, ws_deezerre)

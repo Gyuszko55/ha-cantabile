@@ -60,3 +60,27 @@ def test_spotify_sajat_konyvtar_utvonalak():
         assert SPOTIFY_SAJAT.match(ut), ut
     assert not SPOTIFY_SAJAT.match("/me/player/play") and not SPOTIFY_SAJAT.match("/me")    # vezérlés / profil nem
     assert SPOTIFY_UT.match("/search?q=x&type=track") and not SPOTIFY_UT.match("/me/playlists")
+
+
+def test_spotify_deezerre_isrc_alapjan(monkeypatch):
+    from custom_components.cantabile import music, streaming as St
+
+    kerdesek = []
+
+    async def belso(hass, ut, sajat):
+        kerdesek.append((ut, sajat))
+        if ut.startswith("/playlists/"):
+            return {"items": [{"track": {"external_ids": {"isrc": "GBAYE0601498"}}}, {"track": {"external_ids": {}}},
+                              {"track": {"external_ids": {"isrc": "USUM70905526"}}}], "next": None}
+        raise AssertionError(ut)
+
+    async def deezer(hass, ut):
+        return {"id": 3135556} if ut == "/track/isrc:GBAYE0601498" else {"error": {}}
+
+    monkeypatch.setattr(St, "_spotify_belso", belso)
+    monkeypatch.setattr(music, "deezer", deezer)
+    r = asyncio.run(St.spotify_deezerre(None, "spotify:playlist:37i9dQZF1DWYswQNicx0dy"))
+    assert r == {"deezer": ["https://www.deezer.com/track/3135556", None, None], "talalt": 1, "osszes": 3}
+    assert kerdesek[0][1] is True                              # a lista a bejelentkezett fiókkal (privát listák is)
+    assert St.SPOTIFY_LINK.search("https://open.spotify.com/intl-hu/album/4aawyAB9vmqN3uQ7FjRGTy").groups() == ("album", "4aawyAB9vmqN3uQ7FjRGTy")
+    assert music.DEEZER_UT.match("/track/isrc:GBAYE0601498") and not music.DEEZER_UT.match("/track/isrc:bad")
