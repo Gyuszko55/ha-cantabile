@@ -152,3 +152,12 @@ def test_deezer_felhasznalo_a_sonos_kedvencekbol(monkeypatch):
     monkeypatch.setattr(W, "_sonos_kedvencek", kedvencek)
     W._felh_tar.clear()
     assert asyncio.run(W.deezer_felhasznalo(None)) == "561711861"
+
+
+def test_deezer_kozvetito_engedi_a_felhasznaloi_konyvtarat():
+    from custom_components.cantabile.music import DEEZER_UT
+
+    for ut in ("/user/561711861/playlists?limit=100", "/user/1/albums?limit=100", "/user/1/artists", "/user/1/tracks",
+               "/playlist/989611251/tracks?limit=100&index=200"):
+        assert DEEZER_UT.match(ut), ut
+    assert not DEEZER_UT.match("/user/1/flow") and not DEEZER_UT.match("/user/me/playlists")
