@@ -105,3 +105,15 @@ def test_wiim_preset_modja_a_mogotte_levo_cellabol():
     m = U.epit(_be2())
     assert m["cellak"]["wiim_preset"]["media_player.sonos"]["allapot"] == "ok"               # Sonos saját Deezere
     assert m["cellak"]["wiim_preset"]["media_player.cast_tv"]["allapot"] == "helyettesites"  # TV: Deezer helyettesítve
+
+
+def test_nem_szolo_ut_egy_oraig_kimarad():
+    m = U.epit(_be())
+    hibak = {("deezer", "media_player.wiim", "wiim_deezer"): 100.0}
+    U.hibat_ralo(m, hibak, 200.0)
+    c = m["cellak"]["deezer"]["media_player.wiim"]
+    assert c["utak"][0]["allapot"] == "hianyzik" and c["utak"][c["elso"]]["ut"] == "ma_deezer"
+    assert c["utak"][0]["feltetelek"][-1]["k"] == "lejatszas"
+    m2 = U.epit(_be())
+    U.hibat_ralo(m2, hibak, 100.0 + U.HIBA_IDO + 1)                       # egy óra után újra az első
+    assert m2["cellak"]["deezer"]["media_player.wiim"]["elso"] == 0 and not hibak

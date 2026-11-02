@@ -10,7 +10,8 @@ Egy cella (egy forrás egy hangszórón) az utak listája; egy út:
 A mátrix a beállításból és a HA-ból épül (`bemenetek` → `epit`), a HA tárolójában megmarad (minden indításkor azonnal
 megvan), és frissül: indításkor, ha a lejátszók vagy a vezérlőpultok (a kártya beállítása) változnak, óránként, és kérésre.
 
-2.7.0b1: a mátrix csak megfigyel – a kártya még a régi úton dönt; a `cantabile/matrix` paranccsal lekérdezhető.
+2.7.0b1: a mátrix megfigyel; `cantabile/matrix` (lekérdezés), `cantabile/matrix/fail` (egy út nem szólt).
+2.7.0b3: a kártya a Deezert és a Spotifyt a mátrixból indítja (a cella első élő útja, vagy a hangszórón választott út).
 """
 from __future__ import annotations
 
@@ -38,6 +39,7 @@ _LOGGER = logging.getLogger(__name__)
 TAR_KULCS = f"{DOMAIN}.matrix"
 TAR_VERZIO = 1
 FRISSITES = timedelta(hours=1)
+HIBA_IDO = 3600                  # a lejátszáskor nem szóló út ennyi ideig marad „nem szól” (a következő út indul helyette)
 KESLELTETES = 60                 # registry- / vezérlőpult-változás után ennyi mp múlva (a sorozatos változások egybe)
 
 WIIM = ("wiim", "linkplay")
@@ -63,6 +65,7 @@ FELTETELEK: dict[str, str] = {
     "tidal": "Tidal-hozzáférés",
     "deezer_cella": "a Deezer szól ezen a hangszórón",
     "preset_cella": "a preset tartalma (Deezer / rádió) szól ezen a hangszórón",
+    "lejatszas": "legutóbb nem szólt (egy óráig kimarad)",
 }
 
 # út: (kulcs, név, kimenet: "fo" | "ma", mód: "kozvetlen" | "helyettesites", platformok (None = bármelyik), feltételek)
@@ -163,6 +166,30 @@ def _feltetel(k: str, h: dict[str, Any], be: dict[str, Any], kesz: dict[str, dic
     return None
 
 
+def osszegez(lista: list[dict[str, Any]]) -> dict[str, Any]:
+    """A cella első élő útja és állapota: „ok” (közvetlen), „helyettesites”, „?” (nem ellenőrizhető), „nem”."""
+    elso = next((i for i, u in enumerate(lista) if u["allapot"] == "ok"), None)
+    if elso is not None:
+        return {"elso": elso, "allapot": "ok" if lista[elso]["mod"] == "kozvetlen" else "helyettesites"}
+    return {"elso": None, "allapot": "?" if any(u["allapot"] == "?" for u in lista) else "nem"}
+
+
+def hibat_ralo(m: dict[str, Any], hibak: dict[tuple[str, str, str], float], most: float) -> None:
+    """A lejátszáskor nem szóló utak (forrás, hangszóró, út → mikor) a mátrixban „hianyzik”-ként, HIBA_IDO-ig."""
+    for (f, e, ut), mikor in list(hibak.items()):
+        if most - mikor > HIBA_IDO:
+            del hibak[(f, e, ut)]
+            continue
+        cella = (m.get("cellak") or {}).get(f, {}).get(e)
+        if not cella:
+            continue
+        for u in cella["utak"]:
+            if u["ut"] == ut and not any(x["k"] == "lejatszas" for x in u["feltetelek"]):
+                u["feltetelek"].append({"k": "lejatszas", "nev": FELTETELEK["lejatszas"], "ok": False})
+                u["allapot"] = "hianyzik"
+        cella.update(osszegez(cella["utak"]))
+
+
 def epit(be: dict[str, Any]) -> dict[str, Any]:
     """A mátrix a bemenetekből (tiszta függvény: tesztelhető, a HA-tól független).
 
@@ -194,12 +221,7 @@ def epit(be: dict[str, Any]) -> dict[str, Any]:
                 })
             if h.get("tv"):
                 lista.sort(key=lambda u: u["ut"] not in TV_ELORE)          # stabil: a többi sorrendje marad
-            elso = next((i for i, u in enumerate(lista) if u["allapot"] == "ok"), None)
-            if elso is not None:
-                allapot = "ok" if lista[elso]["mod"] == "kozvetlen" else "helyettesites"
-            else:
-                allapot = "?" if any(u["allapot"] == "?" for u in lista) else "nem"
-            sor[h["entity_id"]] = {"utak": lista, "elso": elso, "allapot": allapot, "elerheto": h.get("elerheto", True)}
+            sor[h["entity_id"]] = {"utak": lista, **osszegez(lista), "elerheto": h.get("elerheto", True)}
         cellak[fk] = sor
     return {
         "forrasok": [{"k": k, "nev": n} for k, n, _ in FORRASOK],
@@ -340,6 +362,7 @@ class UtMatrix:
         self._zar = asyncio.Lock()
         self._kesleltetett: Any = None
         self._leiratkozas: list[Any] = []
+        self.hibak: dict[tuple[str, str, str], float] = {}
 
     async def betolt(self) -> None:
         """A tárolt mátrix (az előző futásból): induláskor azonnal megvan, a friss a HA elindulása után készül."""
@@ -350,6 +373,7 @@ class UtMatrix:
             t0 = time.monotonic()
             be = await bemenetek(self.hass)
             m = epit(be)
+            hibat_ralo(m, self.hibak, time.monotonic())
             m.update({
                 "verzio": VERSION, "ido": dt_util.utcnow().isoformat(), "ok": ok, "tartam": round(time.monotonic() - t0, 1),
                 "feltetelek": FELTETELEK,
@@ -359,6 +383,15 @@ class UtMatrix:
             await self.store.async_save(m)
             _LOGGER.debug("Útmátrix frissítve (%s, %.1f mp)", ok, m["tartam"])
             return m
+
+    async def hiba(self, forras: str, entity_id: str, ut: str) -> dict[str, Any] | None:
+        """Egy út lejátszáskor nem szólt: HIBA_IDO-ig „nem szól”, a cella következő útja az első."""
+        self.hibak[(forras, entity_id, ut)] = time.monotonic()
+        if self.adat:
+            hibat_ralo(self.adat, self.hibak, time.monotonic())
+            await self.store.async_save(self.adat)
+        _LOGGER.info("Cantabile útmátrix: %s / %s / %s nem szólt – egy óráig a következő út indul", forras, entity_id, ut)
+        return ((self.adat or {}).get("cellak") or {}).get(forras, {}).get(entity_id)
 
     @callback
     def kesobb(self, ok: str) -> None:
@@ -428,3 +461,11 @@ async def regisztral(hass: HomeAssistant) -> None:
         conn.send_result(msg["id"], adat)
 
     websocket_api.async_register_command(hass, ws_matrix)
+
+    @websocket_api.websocket_command({vol.Required("type"): "cantabile/matrix/fail", vol.Required("source"): str,
+                                      vol.Required("speaker"): str, vol.Required("route"): str})
+    @websocket_api.async_response
+    async def ws_fail(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        conn.send_result(msg["id"], {"cell": await matrix(hass).hiba(msg["source"], msg["speaker"], msg["route"])})
+
+    websocket_api.async_register_command(hass, ws_fail)

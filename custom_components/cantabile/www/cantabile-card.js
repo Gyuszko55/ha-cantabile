@@ -291,6 +291,9 @@ const EN = {
   "WiiM saját Deezer": "WiiM's own Deezer",
   "Zenemappa": "Music folder",
   "MÁSIK ÚT": "OTHER ROUTE",
+  "Music Assistant (csak hang)": "Music Assistant (sound only)",
+  "Zenemappa (TV-oldal)": "Music folder (TV page)",
+  "„{c}” a(z) {h} hangszórón nem szólt ezen az úton: {u} – próbálom: {k}.": "“{c}” didn't play on {h} via {u} – trying: {k}.",
   "„{c}” – honnan szóljon a(z) {h} hangszórón?": "“{c}” – which route should {h} play it from?",
   "„{c}” – melyik úton szóljon inkább a(z) {h} hangszórón?": "“{c}” – which route should {h} use instead?",
   "„{c}” a(z) {h} hangszórón nem szólt ezen az úton: {u}. Melyiken próbáljam?": "“{c}” didn't play on {h} via {u}. Which route should I try?",
@@ -607,6 +610,10 @@ let MA_PAROK = null;
 // készülékenként egy hangszóró (cantabile/info „devices”): fo = lejátszó → a készülék fő (saját integrációs) lejátszója,
 // ma = a fő lejátszó Music Assistant-útja; null: még nincs adat (vagy régi integráció) – akkor a régi MA-párosítás
 let KESZ = null;   // a TAR betöltése után a böngészőben megjegyzett térképpel indul (lent)
+// az útmátrix (forrás × hangszóró → utak sorrendben, az integráció építi és tárolja): a Deezer és a Spotify ebből indul
+let MATRIX = null, MATRIX_IDO = 0;
+const MATRIX_ERVENY = 10 * 60 * 1000;
+const MATRIX_MULTIROOM = "cantabile:multiroom";
 const RB_SZERVEREK = () => (RB_LISTA ||= (async () => {
   const ctl = new AbortController(), ido = setTimeout(() => ctl.abort(), 5000);
   try {
@@ -869,7 +876,42 @@ class CantabileCard extends HTMLElement {
     }
     if (kellUjra && this._eredetiCfg) this.setConfig(this._eredetiCfg);
     this._foglalasFeliratkozas();
+    this._matrixKer();
     this._frissit();
+  }
+
+  // ---- útmátrix ----
+  async _matrixKer(friss = false) {
+    if (this._nincsIntegracio || !this._hass) return MATRIX;
+    if (!friss && MATRIX && Date.now() - MATRIX_IDO < MATRIX_ERVENY) return MATRIX;
+    try { const m = await this._hass.callWS({ type: "cantabile/matrix" }); if (m?.cellak) { MATRIX = m; MATRIX_IDO = Date.now(); } }
+    catch (_) { /* régebbi integráció: mátrix nélkül, a régi úton */ }
+    return MATRIX;
+  }
+
+  // a kártya hangszórójának oszlopa a mátrixban (a TV gombja a Cantabile TV-lejátszó; a Multiroom a Sonos-csoport)
+  _matrixOszlop(hsz) {
+    const hs = MATRIX?.hangszorok;
+    if (!hs || !hsz) return null;
+    if (hsz.tagok) return MATRIX_MULTIROOM;
+    if (hsz.entity === HELYI) return HELYI;
+    const fo = KESZ?.fo?.[hsz.entity] || hsz.entity, tvFo = KESZ?.fo?.[this._tvMap?.[hsz.entity]] || this._tvMap?.[hsz.entity];
+    return (hs.find((h) => h.entity_id === hsz.entity || h.tv === hsz.entity) || hs.find((h) => h.entity_id === fo || h.entity_id === tvFo))?.entity_id || null;
+  }
+
+  _matrixCella(forras, hsz) {
+    const o = this._matrixOszlop(hsz);
+    return o ? MATRIX?.cellak?.[forras]?.[o] || null : null;
+  }
+
+  // egy út nem szólt: az integráció egy óráig „nem szól”-nak jelöli (a cella következő útja lesz az első)
+  async _matrixHiba(forras, hsz, ut) {
+    const o = this._matrixOszlop(hsz);
+    if (!o) return;
+    try {
+      const r = await this._hass.callWS({ type: "cantabile/matrix/fail", source: forras, speaker: o, route: ut });
+      if (r?.cell && MATRIX?.cellak?.[forras]) MATRIX.cellak[forras][o] = r.cell;
+    } catch (_) { /* régebbi integráció */ }
   }
 
   static getConfigElement() { return document.createElement("cantabile-card-editor"); }
@@ -3064,6 +3106,16 @@ class CantabileCard extends HTMLElement {
   // a Deezer-kazetta útjai egy nem Sonos hangszórón: a WiiM saját Deezere (album / lista, WiiM-en), a gomb mögötti
   // MA-lejátszó (az MA Deezere), a zenemappa
   _dzUtak(kaz, hsz) {
+    // az útmátrixból: a cella útjai a mátrix sorrendjében, a biztosan nem szólók nélkül
+    const forras = /deezer\.com\/(?:\w+\/)?(album|playlist)\/\d+/i.test(String(kaz.id || "")) ? "deezer" : "deezer_szamok";
+    const cella = this._matrixCella(forras, hsz);
+    if (cella) {
+      const tv = !!this._tvMap?.[hsz.entity];
+      const UT = { wiim_deezer: ["wiim", T("WiiM saját Deezer")], ma_deezer: ["ma", tv ? T("Music Assistant (csak hang)") : "Music Assistant"],
+        nas_helyett: ["nas", tv ? T("Zenemappa (TV-oldal)") : T("Zenemappa")] };
+      return cella.utak.filter((u) => UT[u.ut] && u.allapot !== "hianyzik")
+        .map((u) => ({ k: UT[u.ut][0], szoveg: UT[u.ut][1], ut: u.ut, forras, ma: u.ut === "ma_deezer" ? u.kimenet : null }));
+    }
     const u = [];
     if (/deezer\.com\/(?:\w+\/)?(album|playlist)\/\d+/i.test(String(kaz.id || "")) && ["wiim", "linkplay"].includes(this._hass?.entities?.[hsz.entity]?.platform)) {
       u.push({ k: "wiim", szoveg: T("WiiM saját Deezer") });
@@ -3080,15 +3132,19 @@ class CantabileCard extends HTMLElement {
     } })));
   }
 
-  async _dzUtonJatszik(kaz, kezdo, hsz, ut = null) {
+  async _dzUtonJatszik(kaz, kezdo, hsz, ut = null, probalt = []) {
+    await this._matrixKer();
     const utak = this._dzUtak(kaz, hsz), c = kaz.cim || "Deezer", h = KN(hsz);
     if (!ut) {
+      // a hangszórón választott út, ha él; különben a mátrix szerinti első (mátrix nélkül: kérdez, ha több út van)
       const m = TAR.olvas(`cantabile-deezer-ut:${hsz.entity}`);
       if (utak.some((u) => u.k === m)) ut = m;
-      else if (utak.length === 1) ut = utak[0].k;
-      else return this._dzUtValaszt(kaz, kezdo, hsz, utak, T("„{c}” – honnan szóljon a(z) {h} hangszórón?", { c, h }));
+      else if (utak.length === 1 || (utak.length && utak[0].ut)) ut = utak[0].k;
+      else if (utak.length) return this._dzUtValaszt(kaz, kezdo, hsz, utak, T("„{c}” – honnan szóljon a(z) {h} hangszórón?", { c, h }));
+      else return this._uzen(T("„{c}” a(z) {h} hangszórón nem szólhat, és máshonnan sem találtam meg.", { c, h }));
     }
-    const tobbi = utak.filter((u) => u.k !== ut), nev = utak.find((u) => u.k === ut)?.szoveg || ut;
+    const ez = utak.find((u) => u.k === ut);
+    const tobbi = utak.filter((u) => u.k !== ut), nev = ez?.szoveg || ut;
     const masik = tobbi.length ? { szoveg: T("MÁSIK ÚT"), fn: () => this._dzUtValaszt(kaz, kezdo, hsz, tobbi, T("„{c}” – melyik úton szóljon inkább a(z) {h} hangszórón?", { c, h })) } : null;
     if (ut === "wiim") {
       // a WiiM saját Deezere (lossless) a kért számtól; az integráció csak akkor jelez sikert, ha a WiiM meg is szólalt
@@ -3100,11 +3156,20 @@ class CantabileCard extends HTMLElement {
         TAR.ir("tablet-magno-kazetta", JSON.stringify({ ...kaz, entity: hsz.entity }));
         return this._frissit();
       } catch (_) { /* nem szólt: lent a többi út */ }
-    } else if (await this._helyettesitJatszik({ deezer: kaz.szamok?.length ? kaz.szamok : [kaz.id] }, kaz.cim, kezdo, hsz, 0, null, { ut, gomb: masik })) {
+    } else if (await this._helyettesitJatszik({ deezer: kaz.szamok?.length ? kaz.szamok : [kaz.id] }, kaz.cim, kezdo, hsz, 0, null, { ut, gomb: masik, ma: ez?.ma })) {
       return;
     }
-    // ezen az úton nem szólt: a kártya kiírja, és felajánlja a többit
-    if (tobbi.length) return this._dzUtValaszt(kaz, kezdo, hsz, tobbi, T("„{c}” a(z) {h} hangszórón nem szólt ezen az úton: {u}. Melyiken próbáljam?", { c, h, u: nev }));
+    // ezen az úton nem szólt: a mátrixban egy óráig „nem szól”, és a cella következő útja indul (mátrix nélkül: kérdez)
+    if (ez?.ut) {
+      this._matrixHiba(ez.forras, hsz, ez.ut);
+      const kov = tobbi.filter((u) => !probalt.includes(u.k));
+      if (kov.length) {
+        this._uzen(T("„{c}” a(z) {h} hangszórón nem szólt ezen az úton: {u} – próbálom: {k}.", { c, h, u: nev, k: kov[0].szoveg }));
+        return this._dzUtonJatszik(kaz, kezdo, hsz, kov[0].k, [...probalt, ut]);
+      }
+    } else if (tobbi.length) {
+      return this._dzUtValaszt(kaz, kezdo, hsz, tobbi, T("„{c}” a(z) {h} hangszórón nem szólt ezen az úton: {u}. Melyiken próbáljam?", { c, h, u: nev }));
+    }
     this._uzen(T("„{c}” a(z) {h} hangszórón nem szólt ezen az úton: {u}.", { c, h, u: nev }));
   }
 
@@ -3112,7 +3177,7 @@ class CantabileCard extends HTMLElement {
   async _helyettesitJatszik(bem, cim, kezdo, hsz, poz = 0, t0 = null, opt = {}) {
     let r = null;
     try {
-      r = await this._hass.callWS({ type: "cantabile/substitute", entity_id: hsz.entity, ma_entity: opt.ut === "nas" ? null : this._maE(hsz),
+      r = await this._hass.callWS({ type: "cantabile/substitute", entity_id: hsz.entity, ma_entity: opt.ut === "nas" ? null : (opt.ma || this._maE(hsz)),
         mappa: opt.ut === "ma" ? null : String(this._config.magno?.nas || "").replace(/\/$/, "") || null, ...bem });
     } catch (_) { /* régebbi integráció */ }
     if (!r?.mod) { this._uzen(T("„{c}” a(z) {h} hangszórón nem szólhat, és máshonnan sem találtam meg.", { c: cim || "", h: KN(hsz) })); return false; }
@@ -3123,7 +3188,7 @@ class CantabileCard extends HTMLElement {
     this._uzen(T("A(z) {h} hangszórón innen szól: {f}.", { h: KN(hsz), f: { sonos: "Deezer (Sonos)", ma: "Music Assistant", nas: T("zenemappa") }[r.mod] })
       + (hiany ? " " + T("{n} szám nincs meg, kimarad.", { n: hiany }) : ""), opt.gomb || null);
     if (r.mod === "ma") {
-      const e = this._maE(hsz);
+      const e = opt.ma || this._maE(hsz);
       try { await this._hass.callWS({ type: "cantabile/ma/play", entity_id: e, uri: lista.slice(i), media_type: "track", enqueue: "replace", device: ESZKOZ() }); }
       catch (err) { this._maHiba(e, err); return false; }
       const ok = await this._szolMar({ entity: e }, () => true);
@@ -4083,7 +4148,10 @@ class CantabileCard extends HTMLElement {
         if (hsz.mod !== "sonos" && kaz.tipus === "spotify" && hsz.entity !== HELYI) {
           // Spotify: ahol a hangszóró Spotify Connect-eszköz, ott a Spotify játssza; ahol nem (nincs a Spotify eszközei
           // között, DLNA-s TV…), ugyanazok a számok a Deezeren (ISRC szerint), a Deezer-utakon
-          if (this._stream?.spotify_entity && this._spotifyEszkoz(hsz)) return this._spotifyConnect(kaz, hsz);
+          // az útmátrix szerint: ha a Spotify Connect itt biztosan nem él, egyből a Deezer-tartalék
+          await this._matrixKer();
+          const spc = this._matrixCella("spotify", hsz)?.utak?.find((u) => u.ut === "spotify_connect");
+          if (this._stream?.spotify_entity && this._spotifyEszkoz(hsz) && spc?.allapot !== "hianyzik") return this._spotifyConnect(kaz, hsz);
           if (!this._nincsIntegracio && await this._spotifyDeezerre(kaz, kezdo, hsz)) return;
           if (this._stream?.spotify_entity) return this._spotifyConnect(kaz, hsz);
         }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0b3 – 2026-11-02
+
+- **Route matrix, step 2: Deezer and Spotify play from the matrix.** On a non-Sonos speaker a Deezer album, playlist or track list starts on the cell's first live route (or the route you chose on that speaker) – no question any more; **OTHER ROUTE** offers the cell's other live routes. If a route doesn't play, the card tells the integration (`cantabile/matrix/fail`): for an hour that route counts as not playing, and the next route of the cell starts right away. On a TV the music folder on the TV page comes first and Music Assistant (sound only) after it. Spotify goes straight to the Deezer fallback where the matrix knows Spotify Connect can't play.
+
 ## 2.7.0b2 – 2026-11-02
 
 - Route matrix, after comparing it with the real behaviour:
