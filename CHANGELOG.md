@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0b1 – 2026-11-02
+
+- **Route matrix (step 1 – observing only).** Cantabile now builds a matrix of every source × every speaker: each cell lists the routes in order, each route with its inputs (what it needs: e.g. a Deezer account in the WiiM, a Music Assistant player, the music folder, a known Spotify Connect device – each true / false / unknown), its output (the device's own player or its Music Assistant player; direct or substitution) and its state. It is built from the setup and Home Assistant, kept in storage (`cantabile.matrix`, available right at start-up) and refreshed after start-up, when media players or dashboards change, hourly and on request. Websocket: `cantabile/matrix` (`refresh: true` rebuilds it). The card doesn't use it yet – it still decides as before; this step is for comparing.
+
 ## 2.6.3 – 2026-11-02
 
 - **Fix: Deezer albums and playlists didn't start on a WiiM from the library** (e.g. MY LIBRARY → the Technics): the card sent the album / playlist id in a field called `id`, which Home Assistant's websocket reserves for the message number – the WiiM got a queue that doesn't exist, stayed silent, and the card showed no message. The field is now `item`, and `cantabile/wiim_deezer/play` only reports success once the WiiM is really playing (otherwise `not_playing`).
