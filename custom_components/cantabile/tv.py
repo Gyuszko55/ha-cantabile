@@ -100,6 +100,9 @@ ALAIRAS = timedelta(hours=8)
 KEP_URL = "/api/cantabile/tv/image"
 VIDEO_URL = "/api/cantabile/tv/video"
 ELO_URL = "/api/cantabile/tv/live"
+HANG_URL = "/api/cantabile/tv/audio"
+# a böngészőben nem minden TV-oldal tud minden formátumot: amit egyszer nem tudott megnyitni, azt menet közben MP3-ra kódolva kapja
+ATKODOLANDO = (".flac",)
 MAPPAKEPEK = ("cover", "folder", "front", "album", "albumart", "albumartsmall")
 KEPKITERJ = (".jpg", ".jpeg", ".png", ".webp")
 DEEZER = "https://api.deezer.com"
@@ -124,6 +127,8 @@ class TvKozpont:
         self._adb: dict[str, tuple[float, list[str]]] = {}
         self._video_zar: dict[str, asyncio.Lock] = {}
         self.elo: dict[str, tuple[str, str, float, float]] = {}   # élő DLNA-videó: kulcs → (adatlap képe, cím, kezdet, hossz)
+        self.hang: dict[str, tuple[str, float]] = {}               # átkódolt hang: kulcs → (fájl, kezdet)
+        self.nem_flac: set[str] = set()                            # a TV-lejátszók, amelyek oldala a FLAC-ot nem nyitja meg
         # melyik TV melyik hangszórót tükrözi – újraindítás után, amikor a TV-oldal visszajelentkezik, onnan folytatja
         self._tukor_tar = Store(hass, 1, "cantabile_tv_tukor")
         self.tukrok: dict[str, dict[str, Any]] = {}
@@ -262,6 +267,14 @@ class TvKozpont:
                 self._var = None
 
     # ---- hang címe a TV-oldalnak ----
+    def hang_cim(self, fajl: str, kezdet: float = 0) -> str:
+        """A zenemappás fájl menet közben MP3-ra kódolva (a `kezdet` másodperctől); aláírt relatív cím."""
+        kulcs = hashlib.sha1(f"{fajl}|{round(kezdet, 1)}".encode()).hexdigest()[:20]
+        if len(self.hang) > 100:
+            self.hang.clear()
+        self.hang[kulcs] = (fajl, round(kezdet, 1))
+        return async_sign_path(self.hass, f"{HANG_URL}/{kulcs}.mp3", ALAIRAS)
+
     def forras(self, mcid: str) -> tuple[str, str | None]:
         """(aláírt relatív cím, helyi fájl vagy None) egy lejátszandó azonosítóhoz / URL-hez."""
         ut, fajl = mcid, None
@@ -877,6 +890,45 @@ class TvElo(HomeAssistantView):
         return ki
 
 
+class TvHang(HomeAssistantView):
+    """Zenemappás fájl menet közben MP3-ra kódolva – annak a TV-oldalnak, amelyik az eredeti formátumot (pl. FLAC) nem
+    tudja megnyitni (pl. Android TV-s Cast-vevő)."""
+
+    url = HANG_URL + "/{v}"
+    name = "api:cantabile:tv:audio"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def get(self, request: web.Request, v: str) -> web.StreamResponse:
+        m = re.fullmatch(r"([0-9a-f]{20})\.mp3", v)
+        cel = kozpont(self.hass).hang.get(m.group(1)) if m else None
+        if not cel:
+            return web.Response(status=404)
+        fajl, kezdet = cel
+        try:
+            p = await asyncio.create_subprocess_exec(
+                "ffmpeg", "-v", "error", *(["-ss", str(kezdet)] if kezdet else []), "-i", fajl, "-vn", "-map", "0:a:0",
+                "-c:a", "libmp3lame", "-b:a", "320k", "-f", "mp3", "pipe:1",
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        except OSError:
+            return web.Response(status=503)
+        ki = web.StreamResponse(status=200, headers={"Content-Type": "audio/mpeg", "Cache-Control": "no-cache"})
+        await ki.prepare(request)
+        try:
+            while darab := await p.stdout.read(32768):
+                await ki.write(darab)
+        except ConnectionResetError:
+            pass                                # a TV leállt / másra váltott
+        finally:
+            if p.returncode is None:
+                p.kill()
+                with contextlib.suppress(Exception):
+                    await p.wait()
+        return ki
+
+
 @websocket_api.websocket_command({vol.Required("type"): "cantabile/tv/subscribe", vol.Optional("tv"): str, vol.Optional("features"): [str]})
 @callback
 def ws_subscribe(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
@@ -1012,6 +1064,7 @@ def regisztral(hass: HomeAssistant) -> None:
     hass.http.register_view(TvBetu())
     hass.http.register_view(TvVideo(hass))
     hass.http.register_view(TvElo(hass))
+    hass.http.register_view(TvHang(hass))
     websocket_api.async_register_command(hass, ws_subscribe)
     websocket_api.async_register_command(hass, ws_report)
     websocket_api.async_register_command(hass, ws_follow)

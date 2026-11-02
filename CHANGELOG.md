@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0b6 – 2026-11-02
+
+- **Fix: FLAC on a TV page that can't open it.** Some Cast receivers (e.g. an Android TV's built-in Chromecast) can't open FLAC in the TV page (`DEMUXER_ERROR_COULD_NOT_OPEN`) – the track stopped after a second. Now, when a TV page reports that it can't open a FLAC, Cantabile remembers it for that TV and plays the same track from the same point again, converted to MP3 on the fly (ffmpeg, 320 kbit/s); from then on FLAC goes to that TV converted right away. (Seeking within a converted track isn't possible.)
+
 ## 2.7.0b5 – 2026-11-02
 
 - **Route matrix, step 3: every source asks the matrix.** Where a source can play (the “plays on: …” list in messages, the switch buttons, the KERESÉS tab's source chips) now comes from the matrix for all sources – it used to say Deezer plays only on Sonos, though since 2.6 the WiiM and the TVs play it too. The Music Assistant library starts on the cell's first live route (the MA's own queue, or for a single track the Sonos' Deezer / the music folder), and goes on to the next one if a route doesn't play.
