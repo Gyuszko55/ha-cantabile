@@ -143,6 +143,7 @@ const EN = {
   "WiiM-preset {n}": "WiiM preset {n}",
   "WiiM-preset {n} · Deezer": "WiiM preset {n} · Deezer",
   "Ezen a hangszórón a Deezer-számok a zenemappából szólnak, ha ott megvannak.": "On this speaker Deezer tracks play from the music folder, if they are there.",
+  "A BT-n (a telefon / tablet hangja) a Deezer nem szól – válassz hangszórót.": "Deezer doesn't play on BT (the phone / tablet audio) – choose a speaker.",
   "A saját Deezer-könyvtárad (listák, albumok, előadók) itt jelenik meg, ha a Sonos kedvenceiben ott vannak a Deezer-kedvenceid, vagy a kártyán megadod: deezer_user.": "Your own Deezer library (playlists, albums, artists) shows here if your Deezer favourites are among the Sonos favourites, or set deezer_user on the card.",
   "WiiM-preset {n} · rádió": "WiiM preset {n} · radio",
   "A Deezer- és a rádió-presetek itt is szólnak; a többi (pl. Tidal) csak a(z) {h} hangszórón – ahhoz válts rá.": "Deezer and radio presets play here too; the others (e.g. Tidal) only on {h} – switch to it for those.",
@@ -4802,7 +4803,9 @@ class CantabileCard extends HTMLElement {
     const hsz = this._hangszoro(), hs = this._hass?.states[hsz.entity]?.attributes || {};
     // a Deezer a Sonoson a Sonos saját Deezerén, WiiM-en a WiiM saját Deezerén, MA-tartalékúttal az MA Deezerén szól;
     // ahol egyik sincs (TV, BT), csak a zenemappából, ha ott megvan
-    const figy = hsz.mod === "sonos" || this._wiim(hsz) || this._maE(hsz) ? "" : `<div class="puzenet">${T("Ezen a hangszórón a Deezer-számok a zenemappából szólnak, ha ott megvannak.")}</div>`;
+    const figy = hsz.mod === "sonos" || this._wiim(hsz) || this._maE(hsz) ? ""
+      : hsz.entity === HELYI ? `<div class="puzenet">${T("A BT-n (a telefon / tablet hangja) a Deezer nem szól – válassz hangszórót.")}</div>`
+      : `<div class="puzenet">${T("Ezen a hangszórón a Deezer-számok a zenemappából szólnak, ha ott megvannak.")}</div>`;
     lista.innerHTML = `<div class="puzenet">${eloado ? T("Betöltés…") : KERES_NORM(kerdes).length >= 2 ? T("Keresés a Deezeren…") : T("Deezer toplista…")}</div>`;
     const kazLista = (kaz) => {
       lista.innerHTML = figy + (kaz.length ? `<div class="kazettak">${kaz.map((k, i) => this._kazettaCsempe(k, i)).join("")}</div>` : `<div class="puzenet">${T("Nincs találat.")}</div>`);
