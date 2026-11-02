@@ -142,6 +142,7 @@ const EN = {
   "WiiM-presetek": "WiiM presets",
   "WiiM-preset {n}": "WiiM preset {n}",
   "WiiM-preset {n} · Deezer": "WiiM preset {n} · Deezer",
+  "A Spotify-könyvtárad üres.": "Your Spotify library is empty.",
   "Ezen a hangszórón a Deezer-számok a zenemappából szólnak, ha ott megvannak.": "On this speaker Deezer tracks play from the music folder, if they are there.",
   "A BT-n (a telefon / tablet hangja) a Deezer nem szól – válassz hangszórót.": "Deezer doesn't play on BT (the phone / tablet audio) – choose a speaker.",
   "A saját Deezer-könyvtárad (listák, albumok, előadók) itt jelenik meg, ha a Sonos kedvenceiben ott vannak a Deezer-kedvenceid, vagy a kártyán megadod: deezer_user.": "Your own Deezer library (playlists, albums, artists) shows here if your Deezer favourites are among the Sonos favourites, or set deezer_user on the card.",
@@ -4710,7 +4711,28 @@ class CantabileCard extends HTMLElement {
     const kaz = (cim, alcim, tip, id, kep, extra = {}) => ({ cim, alcim, forras: "stream", tipus: szolg, id: link(tip, id), uri: szolg === "spotify" ? `spotify:${tip}:${id}` : undefined, mtype: tip, kep: kep || null, ...extra });
     lista.innerHTML = `<div class="puzenet">${T("Betöltés…")}</div>`;
     try {
-      // a Spotify saját könyvtára (HA Spotify-integráció): mappák a HA médiaböngészőjéből
+      // MY LIBRARY: a Spotify-fiók listái, mentett albumai és követett előadói (a HA Spotify-integrációjának
+      // bejelentkezett fiókjával, a Spotify API-ból – akkor is, ha épp nem szól semmi); alatta a keresés
+      if (szolg === "spotify" && !hely && KERES_NORM(kerdes).length < 2 && connect) {
+        const [ul, ua, ue] = await Promise.all(["/me/playlists?limit=50", "/me/albums?limit=50", "/me/following?type=artist&limit=50"].map((u) => api(u).catch(() => null)));
+        if (!friss()) return;
+        if (ul || ua || ue) {
+          const lap = [
+            ...(ul?.items || []).filter(Boolean).map((x) => kaz(x.name, T("lista · {o}", { o: x.owner?.display_name || "Spotify" }), "playlist", x.id, x.images?.[0]?.url)),
+            ...(ua?.items || []).map((x) => x?.album).filter(Boolean).map((x) => kaz(x.name, (x.artists || []).map((a) => a.name).join(", "), "album", x.id, x.images?.[1]?.url || x.images?.[0]?.url)),
+          ];
+          const eloadok = (ue?.artists?.items || []).filter(Boolean);
+          lista.innerHTML = figy + `<h5 class="kcsop">MY LIBRARY<span>${lap.length + eloadok.length}</span></h5>`
+            + (lap.length ? `<div class="kazettak">${lap.map((k, i) => this._kazettaCsempe(k, i)).join("")}</div>` : "")
+            + (eloadok.length ? `<div class="eloadok">${eloadok.map((x, i) => `<button data-e="${i}">${ESC(x.name)}</button>`).join("")}</div>` : "")
+            + (lap.length + eloadok.length ? "" : `<div class="puzenet">${T("A Spotify-könyvtárad üres.")}</div>`)
+            + `<div class="puzenet">${T("Írd be, mit keresel: előadó, album, szám vagy lista.")}</div>`;
+          lista.querySelectorAll(".kt").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._betolt(lap[Number(b.dataset.i)]); }));
+          lista.querySelectorAll("[data-e]").forEach((b) => b.addEventListener("click", () => { const x = eloadok[Number(b.dataset.e)]; pl.ut = [{ id: x.id, cim: x.name }]; pl.dzKeres = ""; pl.keres = ""; this._polcRajz(); }));
+          return;
+        }
+      }
+      // a Spotify saját könyvtára (HA Spotify-integráció): mappák a HA médiaböngészőjéből (tartalék, ha az API nem válaszol)
       if (hely?.konyvtar || (!hely && KERES_NORM(kerdes).length < 2 && connect)) {
         let r;
         try {

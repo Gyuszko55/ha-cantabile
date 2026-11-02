@@ -33,6 +33,9 @@ SPOTIFY_TOKEN = "https://accounts.spotify.com/api/token"
 TIDAL_API = "https://openapi.tidal.com/v2"
 TIDAL_TOKEN = "https://auth.tidal.com/v1/oauth2/token"
 _AZON = r"[A-Za-z0-9_-]+"
+# a saját könyvtár (listák, mentett albumok, követett előadók, kedvelt dalok): csak a HA Spotify-integrációjának
+# bejelentkezett fiókjával (a fejlesztői kulcs nem fér hozzá egy felhasználó könyvtárához)
+SPOTIFY_SAJAT = re.compile(r"^/me/(playlists|albums|tracks|following)(\?[^#]*)?$")
 SPOTIFY_UT = re.compile(rf"^/(search|artists/{_AZON}(/(albums|top-tracks))?|albums/{_AZON}(/tracks)?|playlists/{_AZON}(/tracks)?)(\?[^#]*)?$")
 TIDAL_UT = re.compile(
     rf"^/(searchResults/[^/?#]+(/relationships/(albums|artists|tracks|playlists))?|albums/{_AZON}(/relationships/items)?"
@@ -95,11 +98,11 @@ async def _ugyfel_token(hass: HomeAssistant, nev: str, cim: str, azon: str, tito
     return j["access_token"]
 
 
-async def _spotify_token(hass: HomeAssistant) -> str:
+async def _spotify_token(hass: HomeAssistant, sajat: bool = False) -> str:
     o = _opciok(hass)
-    if o.get(CONF_SPOTIFY_ID) and o.get(CONF_SPOTIFY_SECRET):
+    if not sajat and o.get(CONF_SPOTIFY_ID) and o.get(CONF_SPOTIFY_SECRET):
         return await _ugyfel_token(hass, "spotify", SPOTIFY_TOKEN, o[CONF_SPOTIFY_ID], o[CONF_SPOTIFY_SECRET])
-    # tartalék: a HA Spotify-integrációjának bejelentkezett munkamenete
+    # a HA Spotify-integrációjának bejelentkezett munkamenete (a saját könyvtárhoz mindig ez)
     for bej in hass.config_entries.async_loaded_entries("spotify"):
         sess = getattr(getattr(bej, "runtime_data", None), "session", None)
         if sess is not None:
@@ -133,9 +136,10 @@ async def _ker(hass: HomeAssistant, kulcs: str, url: str, token: str, fej: dict[
 
 
 async def spotify(hass: HomeAssistant, ut: str) -> Any:
-    if not SPOTIFY_UT.match(ut):
+    sajat = bool(SPOTIFY_SAJAT.match(ut))
+    if not sajat and not SPOTIFY_UT.match(ut):
         raise StreamHiba("svc_denied", szolg="Spotify")
-    tok = await _spotify_token(hass)
+    tok = await _spotify_token(hass, sajat)
     return await _ker(hass, "s" + ut, SPOTIFY_API + ut, tok, {"Accept-Language": str(hass.config.language or "en")})
 
 

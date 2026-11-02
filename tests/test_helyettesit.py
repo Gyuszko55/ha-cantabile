@@ -51,3 +51,12 @@ def test_ma_deezer_peldany_a_szolgaltatolistabol(monkeypatch):
     monkeypatch.setattr(H.ma, "bejegyzes", lambda hass: N(runtime_data=N(mass=N(providers=prov))))
     H._ma_dz.clear()
     assert asyncio.run(H._ma_deezer_peldany(None, {})) == "deezer--GFiGB9Sm"
+
+
+def test_spotify_sajat_konyvtar_utvonalak():
+    from custom_components.cantabile.streaming import SPOTIFY_SAJAT, SPOTIFY_UT
+
+    for ut in ("/me/playlists?limit=50", "/me/albums?limit=50", "/me/following?type=artist&limit=50", "/me/tracks"):
+        assert SPOTIFY_SAJAT.match(ut), ut
+    assert not SPOTIFY_SAJAT.match("/me/player/play") and not SPOTIFY_SAJAT.match("/me")    # vezérlés / profil nem
+    assert SPOTIFY_UT.match("/search?q=x&type=track") and not SPOTIFY_UT.match("/me/playlists")
