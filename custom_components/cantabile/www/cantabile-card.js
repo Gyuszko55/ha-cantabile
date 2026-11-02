@@ -3878,8 +3878,9 @@ class CantabileCard extends HTMLElement {
       if (await this._ujratoltElavult(hsz, k === "ff" ? sorHely + 1 : k === "rew" ? sorHely - 1 : sorHely)) return;
     }
     if (k === "play") {
-      if (SZUNETEL(s)) return this._hiv("media_player", "media_play", e);
+      // a választóval ide hozott (szünetelő) sor elsőbbséget kap a hangszóró saját, szüneteltetett tartalmával szemben
       const sz = this._szunetAtvitel;
+      if (SZUNETEL(s) && !(sz && sz.hova === hsz.entity)) return this._hiv("media_player", "media_play", e);
       if (sz?.sp && sz.hova === hsz.entity && !SZOL(s)) {
         this._szunetAtvitel = null;
         await this._csoportAllit(hsz);

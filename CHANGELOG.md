@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.6.2 – 2026-11-02
+
+- **Fix:** after switching a paused queue to a speaker that was itself paused, PLAY resumed that speaker's own old content instead of the queue brought over. The pending transfer now comes first. Tested live: a Sonos Spotify queue (paused) → the WiiM: PLAY continues it there with Spotify Connect.
+
 ## 2.6.1 – 2026-11-02
 
 - **Spotify playing on a Sonos moves to other speakers.** A Sonos playing Spotify through its own Spotify service (`x-sonos-spotify`) can now be switched to another speaker: on a Spotify Connect device (e.g. a WiiM) Spotify continues the same queue from the same track and position (Spotify API, the Home Assistant Spotify account); elsewhere the same tracks come from Deezer (by artist and title) through the Deezer routes. Works from a paused Sonos too (PLAY on the new speaker). It used to be refused.
