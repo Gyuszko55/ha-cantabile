@@ -42,8 +42,10 @@ class _WiiM:
         if akcio == "BrowseQueue":
             self.bongeszve += 1
             if self.bongeszve < 2:
-                return "<Tracks></Tracks>"
-            return "".join(f"<Track{n}><Id>{i}</Id></Track{n}>" for n, i in enumerate(self.szamok, 1))
+                return "<TrackNumber>0</TrackNumber><Tracks></Tracks>"
+            if self.bongeszve < 3:                      # első oldal: még nincs a kért helyig
+                return "<TrackNumber>1</TrackNumber><Tracks><Track1><Id>1</Id></Track1></Tracks>"
+            return f"<TrackNumber>{len(self.szamok)}</TrackNumber>" + "".join(f"<Track{n}><Id>{i}</Id></Track{n}>" for n, i in enumerate(self.szamok, 1))
         return "ok"
 
     async def api(self, hass, host, parancs):
@@ -79,6 +81,7 @@ def test_lejatszik_a_kert_szamtol_nemitva_es_tekerve(wiim):
     parancsok = [t for a, t in wiim.naplo if a == "api"]
     assert parancsok[1] == "setPlayerCmd:mute:1" and parancsok[-1] == "setPlayerCmd:mute:0"     # némítva ugrik
     assert akciok.count("PlayQueueWithIndex") == 2 and wiim.naplo[akciok.index("PlayQueueWithIndex", akciok.index("BrowseQueue"))][1].endswith("<Index>3</Index>")
+    assert akciok.count("BrowseQueue") == 3                                       # megvárta, míg a 3. helyig betöltött
     assert "setPlayerCmd:seek:60" in parancsok
 
 
@@ -161,3 +164,8 @@ def test_deezer_kozvetito_engedi_a_felhasznaloi_konyvtarat():
                "/playlist/989611251/tracks?limit=100&index=200"):
         assert DEEZER_UT.match(ut), ut
     assert not DEEZER_UT.match("/user/1/flow") and not DEEZER_UT.match("/user/me/playlists")
+
+
+def test_sor_betoltve():
+    assert W.sor_betoltve("<TotalNumber>315</TotalNumber><TrackNumber>40</TrackNumber>") == 40     # az összlétszám nem számít
+    assert W.sor_betoltve("<Tracks></Tracks>") == 0

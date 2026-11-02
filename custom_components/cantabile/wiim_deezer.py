@@ -134,6 +134,13 @@ def sor_tartalom(nev: str, kereso: str) -> str:
             "<TotalPages>0</TotalPages></ListInfo><Tracks></Tracks></PlayList>")
 
 
+def sor_betoltve(valasz: str) -> int:
+    """A BrowseQueue válaszából: hány számot töltött be már a WiiM a sorba. A TotalNumber (a lista hossza) azonnal ott
+    van, a TrackNumber és a számok listája másodpercenként kb. 40-nel nő – a betöltöttséget ezek mutatják."""
+    m = re.search(r"<TrackNumber>(\d+)</", valasz)
+    return max(int(m.group(1)) if m else 0, len(sor_szamai(valasz)))
+
+
 def sor_szamai(valasz: str) -> list[str]:
     """A BrowseQueue válaszából a sor számainak Deezer-azonosítói, sorrendben."""
     return re.findall(r"<Track\d+>\s*<Id>(\d+)</Id>", valasz)
@@ -184,9 +191,12 @@ async def lejatszik(hass: HomeAssistant, entity_id: str, fajta: str, did: str, s
         await _pq(hass, host, "CreateQueue", f"<QueueContext>{html.escape(sor_tartalom(SOR_NEV, f'{alap}/deezer/{fajta}/{did}'))}</QueueContext>")
         await _pq(hass, host, "PlayQueueWithIndex", f"<QueueName>{SOR_NEV}</QueueName><Index>1</Index>")
         if index > 1:
-            # a sor betöltése (a WiiM a keresőcímről tölti), aztán a kért számra ugrás
-            hatar = time.monotonic() + 15
-            while time.monotonic() < hatar and not sor_szamai(await _pq(hass, host, "BrowseQueue", f"<QueueName>{SOR_NEV}</QueueName>")):
+            # a sor betöltése (a WiiM a keresőcímről, lapozva tölti): a kért helyig be kell töltenie, különben az ugrás
+            # elvész, és a lista elejéről szól tovább
+            hatar = time.monotonic() + 25
+            while time.monotonic() < hatar:
+                if sor_betoltve(await _pq(hass, host, "BrowseQueue", f"<QueueName>{SOR_NEV}</QueueName>")) >= index:
+                    break
                 await asyncio.sleep(0.7)
             await _pq(hass, host, "PlayQueueWithIndex", f"<QueueName>{SOR_NEV}</QueueName><Index>{index}</Index>")
         if ugrik:
