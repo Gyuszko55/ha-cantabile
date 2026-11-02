@@ -615,6 +615,8 @@ let KESZ = null;   // a TAR betöltése után a böngészőben megjegyzett térk
 let MATRIX = null, MATRIX_IDO = 0;
 const MATRIX_ERVENY = 10 * 60 * 1000;
 const MATRIX_MULTIROOM = "cantabile:multiroom";
+// a KERESÉS fül forráscímkéi a mátrix soraiban
+const MATRIX_SOR = { nas: "nas", radio: "radio", deezer: "deezer", spotify: "spotify", sonos: "sonos_kedvenc" };
 const RB_SZERVEREK = () => (RB_LISTA ||= (async () => {
   const ctl = new AbortController(), ido = setTimeout(() => ctl.abort(), 5000);
   try {
@@ -903,6 +905,25 @@ class CantabileCard extends HTMLElement {
   _matrixCella(forras, hsz) {
     const o = this._matrixOszlop(hsz);
     return o ? MATRIX?.cellak?.[forras]?.[o] || null : null;
+  }
+
+  // a kazetta forrása a mátrix sorában (null: a mátrix nem ismeri)
+  _matrixForras(kaz) {
+    if (!kaz) return null;
+    if (kaz.forras === "nas") return "nas";
+    if (kaz.forras === "tel") return "telefon";
+    if (kaz.forras === "lista") return "sajat_lista";
+    if (kaz.forras !== "stream") return null;
+    if (kaz.tipus === "deezer") return /deezer\.com\/(?:\w+\/)?(album|playlist)\/\d+/i.test(String(kaz.id || "")) ? "deezer" : "deezer_szamok";
+    if (kaz.tipus === "wiim_preset") return "wiim_preset";
+    if (kaz.tipus === "preset_radio") return "radio";
+    return { spotify: "spotify", tidal: "tidal" }[kaz.tipus] || "sonos_kedvenc";
+  }
+
+  // szólhat-e itt a forrás a mátrix szerint (a „?” – nem ellenőrizhető – nem tilt); null: a mátrix nem tudja
+  _matrixSzol(forras, h) {
+    const c = this._matrixCella(forras, h);
+    return c ? c.allapot !== "nem" : null;
   }
 
   // egy út nem szólt: az integráció egy óráig „nem szól”-nak jelöli (a cella következő útja lesz az első)
@@ -2525,9 +2546,13 @@ class CantabileCard extends HTMLElement {
   }
 
   _kepesLista(kaz, kiveve = null) {
+    const mf = this._matrixForras(kaz);
     const ok = (h) => {
       if (h.tagok || (kiveve && h.entity === kiveve.entity)) return false;
       if (h.entity !== HELYI && this._hass?.states[h.entity]?.state === "unavailable") return false;
+      // az útmátrixból, ha megvan (a régi szabályok csak mátrix nélkül)
+      const mx = mf ? this._matrixSzol(mf, h) : null;
+      if (mx !== null) return mx;
       if (kaz?.forras !== "stream") return true;
       if (h.entity === HELYI) return false;
       if (kaz.tipus === "wiim_preset") return this._wiim(h);
@@ -5162,6 +5187,14 @@ class CantabileCard extends HTMLElement {
   // Az azonos album / szám egy sorba kerül, címkékkel, hogy honnan érhető el; koppintásra az ezen a hangszórón szóló
   // legjobb forrásból indul (a NAS mindenhol szól), a címkére koppintva abból; ha sehol nem szól itt, megmondja, hol igen.
   _forrasSzol(forras, hsz) {
+    // az útmátrixból, ha megvan: a WiiM-preset itt a WiiM saját presetje (a fordított preset a Deezer / rádió útján megy)
+    if (forras === "wiim") {
+      const c = this._matrixCella("wiim_preset", hsz);
+      if (c) return c.utak.some((u) => u.ut === "wiim_preset" && u.allapot !== "hianyzik");
+    } else if (MATRIX_SOR[forras]) {
+      const v = this._matrixSzol(MATRIX_SOR[forras], hsz);
+      if (v !== null) return v;
+    }
     if (forras === "nas" || forras === "radio") return true;
     if (!hsz || hsz.entity === HELYI) return false;
     if (forras === "wiim") return this._wiim(hsz);
@@ -6720,9 +6753,38 @@ class CantabileCard extends HTMLElement {
   }
 
   // MA-tartalom indítása: csak MA-lejátszón (a sor az MA-é); máshol felajánlja a kártya MA-lejátszóit
-  async _maJatszik(x, cel = null) {
+  async _maJatszik(x, cel = null, probalt = []) {
     if (!x) return;
-    const hsz = cel || this._hangszoro(), e = this._maE(hsz);
+    const hsz = cel || this._hangszoro();
+    // az útmátrix cellája szerint: az MA saját sora (a gomb mögötti MA-lejátszón), vagy egyes számnál a helyettesítés
+    // (Sonos Deezere / zenemappa); ha egy út nem szól, egy óráig kimarad, és a következő indul
+    if (hsz.entity !== HELYI && !this._nincsIntegracio) {
+      await this._matrixKer();
+      const cella = this._matrixCella("ma_konyvtar", hsz);
+      const u = cella?.utak.find((v) => v.allapot !== "hianyzik" && !probalt.includes(v.ut) && (v.ut === "ma_sajat" || x.type === "track"));
+      if (u?.ut === "ma_sajat" && u.kimenet) {
+        const fr = this._foglaloIds([u.kimenet]);
+        if (fr) return this._foglaltUzen(fr);
+        this._polcZar();
+        try { await this._hass.callWS({ type: "cantabile/ma/play", entity_id: u.kimenet, uri: x.uri, ...(x.type ? { media_type: x.type } : {}), enqueue: "replace", device: ESZKOZ() }); return; }
+        catch (err) {
+          this._matrixHiba("ma_konyvtar", hsz, u.ut);
+          if (cella.utak.some((v) => v.ut !== u.ut && v.allapot !== "hianyzik" && x.type === "track")) return this._maJatszik(x, hsz, [...probalt, u.ut]);
+          return this._maHiba(u.kimenet, err);
+        }
+      }
+      if (u) {
+        this._polcZar();
+        const ok = await this._helyettesitJatszik({ ma: [{ uri: x.uri, cim: x.name, eloado: x.artist || "", album: x.album || "" }] }, x.name, 0, hsz, 0, null,
+          { ut: u.ut === "nas_helyett" ? "nas" : undefined, csendes: true });
+        if (ok) return;
+        if (this._helyettesitOk === "lejatszas") this._matrixHiba("ma_konyvtar", hsz, u.ut);
+        if (cella.utak.some((v) => v.ut !== u.ut && !probalt.includes(v.ut) && v.allapot !== "hianyzik" && (v.ut === "ma_sajat" || x.type === "track"))) return this._maJatszik(x, hsz, [...probalt, u.ut]);
+        return this._uzen(T("„{c}” a(z) {h} hangszórón nem szólhat, és máshonnan sem találtam meg.", { c: x.name, h: KN(hsz) }));
+      }
+      if (cella) probalt = [...probalt, "matrix"];       // a mátrix szerint itt nincs út: a régi választó (hol szóljon)
+    }
+    const e = probalt.includes("matrix") ? null : this._maE(hsz);
     if (!e && x.type === "track" && hsz.entity !== HELYI && !this._nincsIntegracio) {
       this._polcZar();
       if (await this._helyettesitJatszik({ ma: [{ uri: x.uri, cim: x.name, eloado: x.artist || "", album: x.album || "" }] }, x.name, 0, hsz)) return;

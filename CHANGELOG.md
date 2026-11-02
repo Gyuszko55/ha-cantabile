@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.0b5 – 2026-11-02
+
+- **Route matrix, step 3: every source asks the matrix.** Where a source can play (the “plays on: …” list in messages, the switch buttons, the KERESÉS tab's source chips) now comes from the matrix for all sources – it used to say Deezer plays only on Sonos, though since 2.6 the WiiM and the TVs play it too. The Music Assistant library starts on the cell's first live route (the MA's own queue, or for a single track the Sonos' Deezer / the music folder), and goes on to the next one if a route doesn't play.
+- The matrix only lists routes the card really takes: the Music Assistant fallback for the music folder and the radio is gone from it (the card doesn't use it).
+
 ## 2.7.0b4 – 2026-11-02
 
 - Route matrix: only a real playback failure marks a route as not playing – when the content itself can't be found on a route (e.g. a Deezer album that is no longer available), the next route is tried without marking, and if none has it, one clear message says so. New websocket `cantabile/matrix/reset` clears the marks. The stored matrix drops the previous run's marks at start-up.

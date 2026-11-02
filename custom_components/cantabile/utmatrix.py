@@ -74,11 +74,9 @@ _SAJAT = ("sajat", "a készülék saját lejátszója", "fo", "kozvetlen", None)
 FORRASOK: list[tuple[str, str, list[tuple[Any, ...]]]] = [
     ("nas", "Zenemappa", [
         (*_SAJAT, ["url", "zenemappa"]),
-        ("ma_url", "Music Assistant (a fájl címével)", "ma", "kozvetlen", None, ["ma", "zenemappa"]),
     ]),
     ("radio", "Rádió", [
         (*_SAJAT, ["url"]),
-        ("ma_url", "Music Assistant (az adó címével)", "ma", "kozvetlen", None, ["ma"]),
     ]),
     ("deezer", "Deezer-album / -lista", [
         ("sonos_deezer", "a Sonos saját Deezere", "fo", "kozvetlen", SONOS, ["sonos_deezer"]),
