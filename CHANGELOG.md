@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0b10 – 2026-11-03
+
+- The STREAMING tab no longer says Sonos favourites only play on Sonos: off a Sonos it says the favourite's content plays there (Deezer, Spotify, radio), as it does since 2.7.0b8.
+
 ## 2.7.0b9 – 2026-11-02
 
 - **The room's TV follows by itself.** When any speaker in an area starts playing – from the card, its own app, by voice, an automation – a TV in the same area shows it silently (track details, lyrics), if its Cantabile TV page is open and the TV isn't playing anything itself or already showing another speaker that plays. Before, the TV followed only when you switched speakers on the card. (A DLNA TV can't mirror; the TV and the speaker need an area.)

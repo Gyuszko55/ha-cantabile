@@ -365,6 +365,7 @@ const EN = {
   "TELEFON": "PHONE",
   "SOR": "QUEUE",
   "A streaming kazetták csak Sonos hangszórón szólnak – válts Sonos hangszóróra.": "Streaming tapes only play on Sonos speakers – switch to a Sonos speaker.",
+  "A(z) {h} hangszórón a kedvenc tartalma szól (Deezer-album / -lista, Spotify vagy rádió); ami csak a Sonos saját szolgáltatásából érhető el, az Sonoson szól.": "On {h} the favourite's content plays (a Deezer album / playlist, Spotify or radio); what is only available from a Sonos service plays on a Sonos.",
   "Nincs Sonos-kedvenc lista vagy album.": "No Sonos favourite playlists or albums.",
   "Nincs megadva zenemappa (⚙ → Tape deck → Zenemappa).": "No music folder set (⚙ → Tape deck → Music folder).",
   "Üres mappa.": "Empty folder.",
@@ -5692,8 +5693,12 @@ class CantabileCard extends HTMLElement {
       if (pl.ful === "stream") {
         const kaz = await this._streamKazettak();
         if (allapot !== kulcs(this._polc)) return;
-        const sonos = this._hangszoro().mod === "sonos";
-        lista.innerHTML = (sonos ? "" : `<div class="puzenet">${T("A streaming kazetták csak Sonos hangszórón szólnak – válts Sonos hangszóróra.")}</div>`)
+        const hsz = this._hangszoro(), sonos = hsz.mod === "sonos";
+        // nem Sonoson: a mátrix szerint a kedvenc tartalma (Deezer, Spotify, rádió) szólhat itt (2.7.0b8 óta)
+        const mx = sonos ? null : this._matrixSzol("sonos_kedvenc", hsz);
+        const megj = sonos ? "" : mx ? T("A(z) {h} hangszórón a kedvenc tartalma szól (Deezer-album / -lista, Spotify vagy rádió); ami csak a Sonos saját szolgáltatásából érhető el, az Sonoson szól.", { h: KN(hsz) })
+          : T("A streaming kazetták csak Sonos hangszórón szólnak – válts Sonos hangszóróra.");
+        lista.innerHTML = (megj ? `<div class="puzenet">${ESC(megj)}</div>` : "")
           + (kaz.length ? `<div class="kazettak">${kaz.map((k, i) => this._kazettaCsempe(k, i)).join("")}</div>` : `<div class="puzenet">${T("Nincs Sonos-kedvenc lista vagy album.")}</div>`);
         lista.querySelectorAll(".kt").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._betolt(kaz[Number(b.dataset.i)]); }));
         return;
