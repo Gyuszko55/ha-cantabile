@@ -31,6 +31,7 @@
 //   display: vu                                  # (vu_kijelzo) vu = két mutatós VU-műszer (deprez) | vfd = fluoreszcens (fluor)
 //   vu_delay: 0                                  # (vu_kesleltetes_mp) a valódi jel ennyivel később (a hangszóró pufferel)
 // deezer: true                                   # false = nincs DEEZER fül
+// deezer_user: 123456789                         # a Deezer-fiók azonosítója a DEEZER fül MY LIBRARY részéhez (alapból a Sonos kedvenceiből)
 // multiroom: true                                # két Sonos esetén „Mindkettő” állás a hangszóró-választón
 
 // angol feliratok (kulcs: a magyar forrásszöveg)
@@ -141,6 +142,8 @@ const EN = {
   "WiiM-presetek": "WiiM presets",
   "WiiM-preset {n}": "WiiM preset {n}",
   "WiiM-preset {n} · Deezer": "WiiM preset {n} · Deezer",
+  "Ezen a hangszórón a Deezer-számok a zenemappából szólnak, ha ott megvannak.": "On this speaker Deezer tracks play from the music folder, if they are there.",
+  "A saját Deezer-könyvtárad (listák, albumok, előadók) itt jelenik meg, ha a Sonos kedvenceiben ott vannak a Deezer-kedvenceid, vagy a kártyán megadod: deezer_user.": "Your own Deezer library (playlists, albums, artists) shows here if your Deezer favourites are among the Sonos favourites, or set deezer_user on the card.",
   "WiiM-preset {n} · rádió": "WiiM preset {n} · radio",
   "A Deezer- és a rádió-presetek itt is szólnak; a többi (pl. Tidal) csak a(z) {h} hangszórón – ahhoz válts rá.": "Deezer and radio presets play here too; the others (e.g. Tidal) only on {h} – switch to it for those.",
   "Nincs WiiM a hangszórók között.": "There is no WiiM among the speakers.",
@@ -4638,6 +4641,15 @@ class CantabileCard extends HTMLElement {
   // játssza a linkeket (album, lista, szám), sorba is tehetők. Üres keresőnél a Deezer toplistája, előadóra koppintva az oldala.
   _dz(ut) { return this._hass.callWS({ type: "cantabile/deezer", ut }); }
 
+  // a Deezer-fiók azonosítója a „My Library”-hez: a kártya deezer_user beállítása, különben a Sonos kedvenceiből (szerver)
+  async _dzFelhasznalo() {
+    if (this._config.deezer_user) return String(this._config.deezer_user);
+    if (this._dzUid === undefined && !this._nincsIntegracio) {
+      try { this._dzUid = (await this._hass.callWS({ type: "cantabile/deezer_user" })).user || null; } catch (_) { this._dzUid = null; }
+    }
+    return this._dzUid || null;
+  }
+
   // a SPOTIFY / TIDAL fül akkor látszik, ha a szolgáltatás használható (kulcs vagy HA Spotify-integráció) és van hol szólnia
   _szolgLatszik(szolg) {
     const s = this._stream || {};
@@ -4785,7 +4797,9 @@ class CantabileCard extends HTMLElement {
     const kerdes = pl.keres || "", eloado = pl.ut[pl.ut.length - 1];
     const allapot = JSON.stringify([kerdes, pl.ut.map((x) => x.id)]), friss = () => this._polc === pl && pl.ful === "deezer" && allapot === JSON.stringify([pl.keres || "", pl.ut.map((x) => x.id)]);
     const hsz = this._hangszoro(), hs = this._hass?.states[hsz.entity]?.attributes || {};
-    const figy = hsz.mod === "sonos" ? "" : `<div class="puzenet">${T("A Deezer csak Sonos hangszórón szól – válts Sonos hangszóróra.")}</div>`;
+    // a Deezer a Sonoson a Sonos saját Deezerén, WiiM-en a WiiM saját Deezerén, MA-tartalékúttal az MA Deezerén szól;
+    // ahol egyik sincs (TV, BT), csak a zenemappából, ha ott megvan
+    const figy = hsz.mod === "sonos" || this._wiim(hsz) || this._maE(hsz) ? "" : `<div class="puzenet">${T("Ezen a hangszórón a Deezer-számok a zenemappából szólnak, ha ott megvannak.")}</div>`;
     lista.innerHTML = `<div class="puzenet">${eloado ? T("Betöltés…") : KERES_NORM(kerdes).length >= 2 ? T("Keresés a Deezeren…") : T("Deezer toplista…")}</div>`;
     const kazLista = (kaz) => {
       lista.innerHTML = figy + (kaz.length ? `<div class="kazettak">${kaz.map((k, i) => this._kazettaCsempe(k, i)).join("")}</div>` : `<div class="puzenet">${T("Nincs találat.")}</div>`);
@@ -4804,9 +4818,27 @@ class CantabileCard extends HTMLElement {
         return kazLista(kaz);
       }
       if (KERES_NORM(kerdes).length < 2) {
-        const c = await this._dz("/chart/0");
+        // MY LIBRARY: a Deezer-fiók listái (elöl a kedvencek), albumai, előadói – ugyanaz, mint a WiiM „My Library”-je;
+        // a fiók a Sonos kedvenceiből (vagy a kártya deezer_user beállításából); alatta a Deezer toplistája
+        const uid = await this._dzFelhasznalo();
+        const [c, ul, ua, ue] = await Promise.all([this._dz("/chart/0"), ...(uid ? ["playlists?limit=100", "albums?limit=100", "artists?limit=50"].map((t) => this._dz(`/user/${uid}/${t}`).catch(() => ({}))) : [{}, {}, {}])]);
         if (!friss()) return;
-        return kazLista([...(c.playlists?.data || []).map(listaKaz), ...(c.albums?.data || []).map((x) => albumKaz(x))]);
+        const sajatListak = (ul.data || []).sort((x, y) => (y.is_loved_track ? 1 : 0) - (x.is_loved_track ? 1 : 0));
+        const kaz = [...sajatListak.map(listaKaz), ...(ua.data || []).map((x) => albumKaz(x))], n1 = kaz.length;
+        kaz.push(...(c.playlists?.data || []).map(listaKaz), ...(c.albums?.data || []).map((x) => albumKaz(x)));
+        const eloadok = ue.data || [];
+        const csempe = (tol, ig) => `<div class="kazettak">${kaz.slice(tol, ig).map((k, i) => this._kazettaCsempe(k, tol + i)).join("")}</div>`;
+        const fej = (cim, db) => `<h5 class="kcsop">${cim}<span>${db}</span></h5>`;
+        lista.innerHTML = figy
+          + (n1 || eloadok.length ? fej("MY LIBRARY", n1 + eloadok.length) + (n1 ? csempe(0, n1) : "")
+            + (eloadok.length ? `<div class="eloadok">${eloadok.map((x, i) => `<button data-e="${i}">${ESC(x.name)}</button>`).join("")}</div>` : "") : "")
+          + (uid ? "" : `<div class="puzenet">${T("A saját Deezer-könyvtárad (listák, albumok, előadók) itt jelenik meg, ha a Sonos kedvenceiben ott vannak a Deezer-kedvenceid, vagy a kártyán megadod: deezer_user.")}</div>`)
+          + fej("DEEZER CHART", kaz.length - n1) + csempe(n1, kaz.length);
+        lista.querySelectorAll(".kt").forEach((b) => b.addEventListener("click", () => { this._polcZar(); this._betolt(kaz[Number(b.dataset.i)]); }));
+        lista.querySelectorAll("[data-e]").forEach((b) => b.addEventListener("click", () => {
+          const x = eloadok[Number(b.dataset.e)]; pl.ut = [{ id: String(x.id), cim: x.name, kep: x.picture_medium }]; pl.dzKeres = ""; pl.keres = ""; this._polcRajz();
+        }));
+        return;
       }
       const q = encodeURIComponent(kerdes.trim());
       const [ea, aa, sa, la] = await Promise.all(["artist&limit=8", "album&limit=20", "track&limit=25", "playlist&limit=10"].map((t) => this._dz(`/search/${t.split("&")[0]}?q=${q}&${t.split("&")[1]}`)));
@@ -5269,7 +5301,7 @@ class CantabileCard extends HTMLElement {
       </div>
       ${forrasban ? `<div class="pforras">
         ${this._vanSonos() ? `<button class="pful ${pl.ful === "stream" ? "akt" : ""}" data-ful="stream">STREAMING</button>` : ""}
-        ${this._config.deezer !== false && this._vanSonos() ? `<button class="pful ${pl.ful === "deezer" ? "akt" : ""}" data-ful="deezer">DEEZER</button>` : ""}
+        ${this._config.deezer !== false && (this._vanSonos() || this._kimenetek.some((h) => this._wiim(h) || h.ma)) ? `<button class="pful ${pl.ful === "deezer" ? "akt" : ""}" data-ful="deezer">DEEZER</button>` : ""}
         ${this._szolgLatszik("spotify") ? `<button class="pful ${pl.ful === "spotify" ? "akt" : ""}" data-ful="spotify" title="${T("kísérleti")}">SPOTIFY<sup>β</sup></button>` : ""}
         ${this._szolgLatszik("tidal") ? `<button class="pful ${pl.ful === "tidal" ? "akt" : ""}" data-ful="tidal" title="${T("kísérleti")}">TIDAL<sup>β</sup></button>` : ""}
         ${this._kimenetek.some((h) => this._wiim(h)) ? `<button class="pful ${pl.ful === "wiim" ? "akt" : ""}" data-ful="wiim">WIIM</button>` : ""}

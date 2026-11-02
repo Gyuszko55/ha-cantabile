@@ -325,7 +325,36 @@ async def presetek(hass: HomeAssistant, entity_id: str) -> list[dict[str, Any]]:
     return ki
 
 
+_felh_tar: dict[str, Any] = {}
+
+
+async def deezer_felhasznalo(hass: HomeAssistant) -> str | None:
+    """A Deezer-fiók (felhasználó) azonosítója a Sonos kedvenceiből (a Deezer-kedvencek: `user-tracks-<id>`) – a
+    zenetár „My Library” része ebből a nyilvános Deezer API-n olvassa a listákat, albumokat, előadókat."""
+    if (t := _felh_tar.get("v")) and time.monotonic() - t[0] < (3600 if t[1] else 300):
+        return t[1]
+    uid = None
+    for e in er.async_get(hass).entities.values():
+        if e.domain != "media_player" or e.platform != "sonos" or e.disabled_by:
+            continue
+        try:
+            kedvencek = await _sonos_kedvencek(hass, e.entity_id)
+        except Exception:  # noqa: BLE001 – ez a Sonos nem érhető el: a következő
+            continue
+        uid = next((f[1] for _, uri in kedvencek if (f := kedvencbol(uri)) and f[0] == "kedvenc"), None)
+        break                                   # a kedvencek a háztartás minden Sonosán ugyanazok
+    _felh_tar["v"] = (time.monotonic(), uid)
+    return uid
+
+
 def regisztral(hass: HomeAssistant) -> None:
+    @websocket_api.websocket_command({vol.Required("type"): "cantabile/deezer_user"})
+    @websocket_api.async_response
+    async def ws_user(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        conn.send_result(msg["id"], {"user": await deezer_felhasznalo(hass)})
+
+    websocket_api.async_register_command(hass, ws_user)
+
     @websocket_api.websocket_command({vol.Required("type"): "cantabile/wiim_presets", vol.Required("entity_id"): str})
     @websocket_api.async_response
     async def ws_presets(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:

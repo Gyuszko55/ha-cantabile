@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.6.0b5 – 2026-11-02
+
+- **MY LIBRARY on the DEEZER tab.** With an empty search the DEEZER tab now starts with your own Deezer library – your playlists (Deezer favourites first), albums and artists, the same as the WiiM's “My Library” – above the Deezer chart. Everything plays on any speaker through the usual routes (Sonos: its own Deezer; WiiM: its own Deezer; others: Music Assistant or the music folder). The Deezer account is found in the Sonos favourites (your Deezer favourites, `user-tracks-<id>`), or set `deezer_user` on the card. New websocket command `cantabile/deezer_user`.
+- **The DEEZER tab no longer needs a Sonos:** it shows when there is a Sonos, a WiiM or a speaker with a Music Assistant fallback; the “Deezer only plays on Sonos” warning is gone – only where Deezer can come solely from the music folder (TV, BT) a short note says so.
+
 ## 2.6.0b4 – 2026-11-02
 
 - **WiiM presets play on any speaker.** The library's WIIM tab and SEARCH now read what is behind each preset (the WiiM's play queue): a Deezer album or playlist preset becomes a Deezer cassette – it plays on every speaker through the usual routes (Sonos: its own Deezer; WiiM: its own Deezer; others: Music Assistant or the music folder); a TuneIn radio preset becomes a radio station (its stream address from TuneIn) and plays on any speaker, BT included. Presets from other services (Tidal, Qobuz…) still play only on the WiiM. New websocket command `cantabile/wiim_presets`; without it the card falls back to the HA WiiM integration's preset list.

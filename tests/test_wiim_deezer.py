@@ -136,3 +136,19 @@ def test_presetek(monkeypatch):
     assert p[0]["deezer"] == "https://www.deezer.com/album/1950311" and p[0]["image"] == "k1"
     assert p[1]["radio"] == "http://192.0.2.5:7040/;stream" and "deezer" not in p[1]
     assert "deezer" not in p[2] and "radio" not in p[2] and p[2]["number"] == 3     # Tidal: csak a WiiM-en
+
+
+def test_deezer_felhasznalo_a_sonos_kedvencekbol(monkeypatch):
+    from types import SimpleNamespace as N
+
+    ent = [N(domain="media_player", platform="wiim", disabled_by=None, entity_id="media_player.wiim"),
+           N(domain="media_player", platform="sonos", disabled_by=None, entity_id="media_player.nappali")]
+    monkeypatch.setattr(W.er, "async_get", lambda hass: N(entities=N(values=lambda: ent)))
+
+    async def kedvencek(hass, e):
+        assert e == "media_player.nappali"
+        return W.sonos_kedvencek(f"<Result>{KEDVENCEK}</Result>")
+
+    monkeypatch.setattr(W, "_sonos_kedvencek", kedvencek)
+    W._felh_tar.clear()
+    assert asyncio.run(W.deezer_felhasznalo(None)) == "561711861"
