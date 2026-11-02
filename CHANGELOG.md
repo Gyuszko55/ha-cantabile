@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.6.0b3 – 2026-11-02
+
+- **Sidebar dashboard looks like the card.** In a panel view (the wizard's own sidebar dashboard) the card no longer stretches to the whole screen: it is laid out exactly as a card (1024 px wide, its own height) and scaled up or down to fit, centred – the same picture as on a normal dashboard, in both radio and tape mode. Below 600 px the phone layout stays.
+
 ## 2.6.0b2 – 2026-11-02
 
 One device, one speaker – its own integration first, other ways in as fallback.

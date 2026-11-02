@@ -793,6 +793,8 @@ class CantabileCard extends HTMLElement {
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     BETU();
     this._epit();
+    // panel nézetben az újraépített kártya is a helyére nagyítva (a gazdaelem mérete nem változik, az nem jelezne)
+    if (this.hasAttribute("panel")) requestAnimationFrame(() => this._panelMeret());
     // új beállítás (⚙ Mentés, szerkesztő): azonnal a tárolt hangszóróval és móddal rajzol (ne várja meg a következő változást)
     this._utolsoNy = null;
     if (this._hass) this.hass = this._hass;
@@ -872,9 +874,13 @@ class CantabileCard extends HTMLElement {
         const sz = e[0]?.contentRect.width;
         if (sz) { this.toggleAttribute("keskeny", sz < 600); this.toggleAttribute("szuk", sz < 390); }
         if (sz && !this._bkMert) this._betuKorr();
-        // panel nézet / magas kártyahely: az előlap a saját magasságában, függőlegesen középen (nem nyúlik szét)
+        // panel nézet (oldalsávos vezérlőpult): a kártya ugyanúgy rajzolódik, mint kártyaként, és arányosan kitölti a helyet
         const mag = e[0]?.contentRect.height;
-        if (sz && mag) this.toggleAttribute("magas", sz >= 600 && mag > sz * 0.62);
+        const panel = !!sz && sz >= 600 && this._panelben();
+        if (panel !== this.hasAttribute("panel")) this.toggleAttribute("panel", panel);
+        if (panel) { this.removeAttribute("keskeny"); this.removeAttribute("szuk"); this.removeAttribute("magas"); this._panelMeret(); }
+        // magas kártyahely: az előlap a saját magasságában, függőlegesen középen (nem nyúlik szét)
+        else if (sz && mag) this.toggleAttribute("magas", sz >= 600 && mag > sz * 0.62);
         const sr = this.shadowRoot; if (sr) { this._gorgo(sr.getElementById("kcim")); this._gorgo(sr.querySelector("#ksor .kea")); }
         this._igazitKesobb();
       });
@@ -2001,6 +2007,9 @@ class CantabileCard extends HTMLElement {
         :host([keskeny]) .rbal .kapcs { width: 40px; height: 18px; }
         :host([keskeny]) .rbal .kapcs::after { left: 2px; top: 2px; width: 18px; height: 14px; transition: left .2s; }
         :host([keskeny]) .rotg .og-net { order: 1; } :host([keskeny]) .rotg .og-sleep { order: 2; } :host([keskeny]) .rotg .og-bt { order: 3; }
+        /* panel nézet: a kártya a kártyanézet méretében, a tartalom magasságában; a _panelMeret nagyítja (zoom) és középre teszi */
+        :host([panel]) { display: flex; align-items: center; justify-content: center; overflow: hidden; height: 100%; }
+        :host([panel]) ha-card { flex: none; width: 1024px; height: auto; }
         :host([magas]) ha-card { grid-template-rows: auto; align-content: center; }
         :host([magas]) .elo { height: auto; aspect-ratio: 2.3; max-height: 100%; }
         /* üzenetablak: külön réteg a kártya fölött – füstüveg, borostyán szegély, Michroma fejléc, Exo 2 szöveg, fogyó időcsík */
@@ -7002,6 +7011,37 @@ class CantabileCard extends HTMLElement {
       j.style.setProperty("--hgy", `${Math.max(-60, regi - (hc.bottom - fo.top + 6)).toFixed(1)}px`);
     }
   }
+  // teljes képernyős panel nézetben van-e a kártya (hui-panel-view) – a shadow DOM-határokon át felfelé keresve
+  _panelben() {
+    let n = this;
+    for (let i = 0; i < 16 && n; i++) {
+      n = n.parentElement || n.getRootNode?.()?.host;
+      const t = n?.tagName;
+      if (t === "HUI-PANEL-VIEW") return true;
+      if (t === "HUI-SECTIONS-VIEW" || t === "HUI-MASONRY-VIEW" || t === "HUI-GRID-SECTION" || t === "HUI-SIDEBAR-VIEW") return false;
+    }
+    return false;
+  }
+
+  // panel nézet: a kártya a kártyanézet szélességében (PANEL_SZ), a tartalma szerinti magasságban rajzolódik ki, majd
+  // arányosan nagyítva / kicsinyítve a rendelkezésre álló hely közepére kerül – ugyanaz a kép, mint kártyaként
+  _panelMeret() {
+    const k = this.shadowRoot?.querySelector("ha-card");
+    if (!k || !this.hasAttribute("panel")) { if (k) k.style.zoom = ""; return; }
+    if (this._panelK !== k && "ResizeObserver" in window) {
+      // a kártya saját magassága is változhat (rádió ↔ magnó, polc): akkor is újra igazít; újraépítéskor (setConfig) új
+      // ha-card jön létre – azt figyeli
+      if (!this._panelFigy) this._panelFigy = new ResizeObserver(() => { if (this.hasAttribute("panel")) this._panelMeret(); });
+      this._panelFigy.disconnect();
+      this._panelFigy.observe(k);
+      this._panelK = k;
+    }
+    const W = this.clientWidth, H = this.clientHeight, w0 = k.offsetWidth, h0 = k.offsetHeight;
+    if (!W || !H || !w0 || !h0) return;
+    const z = Math.max(0.4, Math.min(W / w0, H / h0));
+    if (Math.abs((parseFloat(k.style.zoom) || 1) - z) > 0.002) k.style.zoom = z.toFixed(4);
+  }
+
   _igazitKesobb() { cancelAnimationFrame(this._igazitIdo); this._igazitIdo = requestAnimationFrame(() => this._igazit()); }
 
   // görgetés (mint a régi kijelzőkön), ha a szöveg nem fér ki: megáll az elején, végigúszik, megáll a végén, vissza
