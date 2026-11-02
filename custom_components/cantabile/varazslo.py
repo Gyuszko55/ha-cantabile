@@ -96,33 +96,152 @@ def kepernyos(platform: str, szoveg: str, device_class: str | None) -> bool:
     return not NEM_KEPERNYO.search(szoveg) or bool(re.search(r"\bhub\b", szoveg, re.I))
 
 
-def osztalyoz(elemek: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """A media_player-ek (entity_id, platform, nev, device_class, features, model, eszkoz, eszkoznev) besorolása:
-    csoport, képernyős, előválasztott, mód. A Cantabile saját lejátszói kimaradnak."""
-    sajat = [e for e in elemek if e.get("platform") != "cantabile"]
-    nem_dlna_eszkoz = {e.get("eszkoz") for e in sajat if e.get("platform") != "dlna_dmr" and e.get("eszkoz")}
-    nem_dlna_nev = {str(e.get("eszkoznev") or e.get("nev") or "").casefold() for e in sajat if e.get("platform") != "dlna_dmr"}
+# nem hangszóró, akkor sem, ha van lejátszója: böngésző (browser_mod), kioszk-tablet (Fully Kiosk), a Cantabile sajátjai
+KIZART = {"browser_mod", "fully_kiosk", "cantabile"}
+MA = "music_assistant"
+# a saját integrációs utak sorrendje (a fő út választásához): a hangszóró-integrációk, aztán az ismeretlenek, végül a
+# TV-k / távirányítók (pl. a SmartBox Cast-lejátszója a fő, nem az Android TV Remote-é)
+UT_SORREND = ["sonos", "wiim", "linkplay", "cast", "dlna_dmr", "squeezebox"] + sorted(HANGSZORO_PLATFORMOK - set(CSOPORTOK))
+
+
+def _rang(platform: str) -> int:
+    if platform in UT_SORREND:
+        return UT_SORREND.index(platform)
+    return len(UT_SORREND) + (1 if platform in NEM_HANGSZORO else 0)
+
+
+def _lejatszik(e: dict[str, Any]) -> bool:
+    return bool(int(e.get("features") or 0) & PLAY_MEDIA)
+
+
+def keszulekek(elemek: list[dict[str, Any]], parok: dict[str, str] | None = None) -> list[dict[str, Any]]:
+    """A media_player-ek fizikai készülékenként: egy készüléknek több lejátszója (elérési útja) lehet – pl. a SmartBox
+    Cast- és Android TV Remote-lejátszója, a TV saját és DLNA-lejátszója, és mindegyik mellett a Music Assistanté.
+
+    Egy készülék: ugyanaz a HA-eszköz, ugyanaz a MAC-cím, a Music Assistant párja (`parok`: saját → MA), vagy ugyanaz az
+    eszköznév (csak különböző integrációk között – két azonos nevű Cast-hangszóró két készülék). Hangszóró csak az a
+    készülék, amelynek van saját integrációból (eszközhöz kötött, nem Music Assistant) lejátszója; a fő út ezek közül a
+    lejátszani tudó, a hangszóró-integrációk sorrendjében. A kizártak (KIZART) nem kerülnek be.
+    Eredmény: [{"fo": elem, "tobbi": [saját elemek], "ma": MA-elem | None}]."""
+    parok = parok or {}
+    el = [e for e in elemek if (e.get("platform") or "") not in KIZART]
+    apa = list(range(len(el)))
+
+    def gy(i: int) -> int:
+        while apa[i] != i:
+            apa[i] = apa[apa[i]]
+            i = apa[i]
+        return i
+
+    def egyesit(i: int, j: int) -> None:
+        apa[gy(i)] = gy(j)
+
+    kulcs: dict[tuple[str, str], int] = {}
+    for i, e in enumerate(el):
+        jelek = ([("d", str(e["eszkoz"]))] if e.get("eszkoz") else []) + [("m", str(m).lower()) for m in e.get("mac") or ()]
+        for jel in jelek:
+            if jel in kulcs:
+                egyesit(i, kulcs[jel])
+            else:
+                kulcs[jel] = i
+    idx = {e["entity_id"]: i for i, e in enumerate(el)}
+    for sajat, ma in parok.items():
+        if sajat in idx and ma in idx:
+            egyesit(idx[sajat], idx[ma])
+    nevek: dict[str, list[int]] = {}
+    for i, e in enumerate(el):
+        if n := str(e.get("eszkoznev") or "").strip().casefold():
+            nevek.setdefault(n, []).append(i)
+    for tagok in nevek.values():
+        platformok = [el[i].get("platform") or "" for i in tagok]
+        if len(tagok) > 1 and len(set(platformok)) == len(platformok):   # azonos integrációból kettő: két készülék
+            for i in tagok[1:]:
+                egyesit(i, tagok[0])
+
+    csoportok: dict[int, list[dict[str, Any]]] = {}
+    for i, e in enumerate(el):
+        csoportok.setdefault(gy(i), []).append(e)
     ki = []
-    for e in sajat:
-        p = e.get("platform") or ""
-        szoveg = " ".join(str(x) for x in (e.get("model"), e.get("nev"), e.get("eszkoznev")) if x)
-        kep = kepernyos(p, szoveg, e.get("device_class"))
+    for g in csoportok.values():
+        sajat = [e for e in g if e.get("platform") != MA and e.get("eszkoz")]
+        if not sajat:
+            continue                     # csak Music Assistant / eszköz nélküli lejátszó: nem hangszóró
+        sajat.sort(key=lambda e: (not _lejatszik(e), _rang(e.get("platform") or ""), str(e.get("nev") or "").casefold()))
+        fo = sajat[0]
+        mak = [e for e in g if e.get("platform") == MA]
+        ma = next((m for m in mak if parok.get(fo["entity_id"]) == m["entity_id"]), None) or (mak[0] if mak else None)
+        if not _lejatszik(fo) and not (ma and _lejatszik(ma)):
+            continue                     # semmilyen úton nem fogad zenét (pl. csak távirányítható)
+        ki.append({"fo": fo, "tobbi": sajat[1:], "ma": ma})
+    return ki
+
+
+def osztalyoz(elemek: list[dict[str, Any]], parok: dict[str, str] | None = None) -> list[dict[str, Any]]:
+    """A hangszórók készülékenként (keszulekek) besorolva: csoport (a fő út integrációja), képernyős, előválasztott, mód,
+    és a tartalék utak (`utak`: a készülék többi lejátszója, `ma`: a Music Assistant-lejátszója). Az elemek:
+    entity_id, platform, nev, device_class, features, model, eszkoz, eszkoznev, mac."""
+    ki = []
+    for k in keszulekek(elemek, parok):
+        e, p = k["fo"], k["fo"].get("platform") or ""
+        tagok = [e, *k["tobbi"]]
+        szoveg = " ".join(str(x) for t in tagok for x in (t.get("model"), t.get("nev"), t.get("eszkoznev")) if x)
+        kep = kepernyos(p, szoveg, e.get("device_class")) or any(t.get("device_class") == "tv" for t in tagok)
         csoport_ = bool(re.search(r"\b(group|csoport)\b", str(e.get("model") or ""), re.I))
-        dupla = p == "dlna_dmr" and (e.get("eszkoz") in nem_dlna_eszkoz
-                                     or str(e.get("eszkoznev") or e.get("nev") or "").casefold() in nem_dlna_nev)
-        lejatszik = bool(int(e.get("features") or 0) & PLAY_MEDIA)
+        lejatszik = _lejatszik(e)
+        utak = [{"entity_id": t["entity_id"], "platform": t.get("platform") or "", "csoport": CSOPORTOK.get(t.get("platform") or "")}
+                for t in k["tobbi"] + ([k["ma"]] if k["ma"] else [])]
         ki.append({
             "entity_id": e["entity_id"], "nev": str(e.get("nev") or e["entity_id"]), "platform": p,
             "csoport": CSOPORTOK.get(p), "kepernyo": kep, "lejatszik": lejatszik,
-            "elore": p in HANGSZORO_PLATFORMOK and not kep and lejatszik and not csoport_ and not dupla,
+            "elore": p in HANGSZORO_PLATFORMOK and not kep and lejatszik and not csoport_,
             "mod": "sonos" if p == "sonos" else "url",
+            "utak": utak, "ma": k["ma"]["entity_id"] if k["ma"] else None,
         })
     if not any(x["elore"] for x in ki):
         # ismert hangszóró-integráció nincs: ami tud lejátszani és nem TV / médiaszerver, az előválasztott
         for x in ki:
             x["elore"] = x["lejatszik"] and not x["kepernyo"] and x["platform"] not in NEM_HANGSZORO
-    sorrend = list(CSOPORTOK)
-    ki.sort(key=lambda x: (sorrend.index(x["platform"]) if x["platform"] in sorrend else len(sorrend), x["nev"].casefold()))
+    ki.sort(key=lambda x: (_rang(x["platform"]) if x["platform"] in CSOPORTOK else len(CSOPORTOK) + 10, x["nev"].casefold()))
+    return ki
+
+
+def terkep(jeloltek: list[dict[str, Any]]) -> dict[str, Any]:
+    """A kártyának: melyik lejátszó melyik készülék fő lejátszójához tartozik („fo”: entity → fő entity, a fő önmagához
+    is), és a fő lejátszók Music Assistant-párja („ma”)."""
+    fo = {}
+    for x in jeloltek:
+        fo[x["entity_id"]] = x["entity_id"]
+        for u in x["utak"]:
+            fo.setdefault(u["entity_id"], x["entity_id"])
+    return {"fo": fo, "ma": {x["entity_id"]: x["ma"] for x in jeloltek if x["ma"]}}
+
+
+def tartalek_felirat(x: dict[str, Any], nyelv: str = "hu") -> str:
+    """A választó sorában a készülék többi elérési útja (a lejátszás magától ezekre vált, ha a fő út nem tudja)."""
+    nevek = list(dict.fromkeys(str(u["csoport"] or u["platform"]) for u in x.get("utak") or []))
+    if not nevek:
+        return ""
+    return (" · fallback: " if not str(nyelv or "").startswith("hu") else " · tartalék: ") + ", ".join(nevek)
+
+
+def regi_atir(regi: list[dict[str, Any]] | None, fo: dict[str, str]) -> list[dict[str, Any]] | None:
+    """A kártyán már szereplő hangszórók a készülék fő lejátszójára (pl. a Music Assistant „Nappali” → a Sonos
+    „Nappali”); egy készülék csak egyszer (az első beállítása marad). A más fő lejátszóra kerülő típusa újra a
+    platformból jön (a `mod` kimarad)."""
+    if regi is None:
+        return None
+    ki, volt = [], set()
+    for h in regi:
+        if not isinstance(h, dict) or not h.get("entity"):
+            ki.append(h)
+            continue
+        uj = fo.get(h["entity"], h["entity"])
+        if uj in volt:
+            continue
+        volt.add(uj)
+        if uj != h["entity"]:
+            h = {k: v for k, v in h.items() if k not in ("mod", "automod")} | {"entity": uj}
+        ki.append(h)
     return ki
 
 
@@ -189,7 +308,9 @@ def integracio_nev(hass: HomeAssistant, platform: str) -> str:
 
 @callback
 def hangszorok(hass: HomeAssistant) -> list[dict[str, Any]]:
-    """A HA media_player entitásai besorolva (osztalyoz); a csoport az integráció neve."""
+    """A HA media_player entitásai készülékenként besorolva (osztalyoz); a csoport az integráció neve."""
+    from .ma import parok as ma_parok  # noqa: PLC0415
+
     ereg, dreg = er.async_get(hass), dr.async_get(hass)
     elemek = []
     for st in hass.states.async_all("media_player"):
@@ -201,13 +322,17 @@ def hangszorok(hass: HomeAssistant) -> list[dict[str, Any]]:
             "entity_id": st.entity_id, "platform": e.platform if e else "",
             "nev": st.attributes.get("friendly_name") or st.entity_id,
             "device_class": st.attributes.get("device_class") or (e and (e.device_class or e.original_device_class)),
-            "features": st.attributes.get("supported_features") or 0,
+            # nem elérhető lejátszónál az állapotban nincs funkciólista: a regiszterből
+            "features": st.attributes.get("supported_features") or (e.supported_features if e else 0) or 0,
             "model": " ".join(x for x in ((d.manufacturer if d else None), (d.model if d else None)) if x),
             "eszkoz": d.id if d else None, "eszkoznev": (d.name_by_user or d.name) if d else None,
+            "mac": [v for t, v in d.connections if t == dr.CONNECTION_NETWORK_MAC] if d else [],
         })
-    ki = osztalyoz(elemek)
+    ki = osztalyoz(elemek, ma_parok(hass))
     for x in ki:
         x["csoport"] = x["csoport"] or integracio_nev(hass, x["platform"])
+        for u in x["utak"]:
+            u["csoport"] = u["csoport"] or integracio_nev(hass, u["platform"])
     return ki
 
 
@@ -414,7 +539,14 @@ def ado_lista(valasztott: list[dict[str, Any]], regi: list[dict[str, Any]] | Non
 
 def tv_jeloltek(jeloltek: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """A Cast- és DLNA-lejátszók (ezekből lehet Cantabile TV); a képernyősek előválasztva (Cast-csoport kimarad)."""
-    return [x for x in jeloltek if x["platform"] in ("cast", "dlna_dmr")]
+    ki = []
+    for x in jeloltek:
+        if x["platform"] in ("cast", "dlna_dmr"):
+            ki.append(x)
+        # a készülék másik (nem fő) Cast- / DLNA-lejátszója is lehet TV (pl. a Samsung TV DLNA-ja a TV saját lejátszója mellett)
+        ki += [{**x, "entity_id": u["entity_id"], "platform": u["platform"], "csoport": u["csoport"] or x["csoport"], "utak": []}
+               for u in x.get("utak") or [] if u["platform"] in ("cast", "dlna_dmr")]
+    return ki
 
 
 async def tv_feltetelek(hass: HomeAssistant) -> dict[str, Any]:

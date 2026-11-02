@@ -284,8 +284,10 @@ A **Beállítások → Eszközök és szolgáltatások → Integráció hozzáad
 angolul). Az üdvözlés utáni lépések mind kihagyhatók, és később is módosíthatók:
 
 1. **Üdvözlés** – mi kerül beállításra, és mi nem kötelező.
-2. **Hangszórók** – a médialejátszóid integrációnként (Sonos, WiiM, LinkPlay, Google Cast, DLNA, Music Assistant,
-   Squeezebox, egyéb); a hangszórók már ki vannak pipálva, a TV-k és a médiaszerverek nem. Válaszd ki az *alapértelmezett
+2. **Hangszórók** – készülékenként egy sor, a saját integrációja szerint (Sonos, WiiM, LinkPlay, Google Cast, DLNA,
+   Squeezebox, egyéb). Ha egy készülék több úton is elérhető (pl. Music Assistanton át is), az a sorban **tartalék**:
+   ami a saját integráción nem szólhat (pl. a Music Assistant tára), az magától azon megy. A böngészők (browser_mod), a
+   kioszk-tabletek és a csak Music Assistantban létező lejátszók nem hangszórók; a hangszórók már ki vannak pipálva, a TV-k és a médiaszerverek nem. Válaszd ki az *alapértelmezett
    hangszórót* – ez áll elsőként a kártyán. A 8 karakternél hosszabb nevek rövid nevet kapnak a kártyára. Ha még nincs
    hangszóró, a lépés megmondja, melyik integrációt vedd fel előbb.
 3. **Zenetár** *(nem kötelező)* – a Home Assistant médiájának zenét tartalmazó mappái, a *Beállítások → Rendszer →

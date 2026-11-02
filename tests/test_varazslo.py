@@ -44,16 +44,16 @@ def test_kepernyos():
 
 def test_osztalyoz_elovalasztas():
     ki = V.osztalyoz([
-        _mp("media_player.tv", "cast", "Nappali TV", model="Google Chromecast"),
-        _mp("media_player.mini", "cast", "Konyha", model="Google Nest Mini"),
-        _mp("media_player.csoport", "cast", "Mindenhol", model="Google Cast Group"),
+        _mp("media_player.tv", "cast", "Nappali TV", model="Google Chromecast", eszkoz="c1", eszkoznev="Nappali TV"),
+        _mp("media_player.mini", "cast", "Konyha", model="Google Nest Mini", eszkoz="c2", eszkoznev="Konyha"),
+        _mp("media_player.csoport", "cast", "Mindenhol", model="Google Cast Group", eszkoz="c3", eszkoznev="Mindenhol"),
         _mp("media_player.nappali", "sonos", "Nappali", eszkoz="d1"),
         _mp("media_player.wiim", "wiim", "WiiM Mini", eszkoz="d2", eszkoznev="WiiM Mini"),
         _mp("media_player.wiim_dlna", "dlna_dmr", "WiiM Mini", eszkoz="d3", eszkoznev="WiiM Mini"),
-        _mp("media_player.lg", "webostv", "LG TV"),
-        _mp("media_player.spotify", "spotify", "Spotify"),
-        _mp("media_player.nem_jatszik", "squeezebox", "Régi", features=4),
-        _mp("media_player.cantabile_tv", "cantabile", "TV · Nappali"),
+        _mp("media_player.lg", "webostv", "LG TV", eszkoz="d4"),
+        _mp("media_player.spotify", "spotify", "Spotify", eszkoz="d5", features=4),
+        _mp("media_player.nem_jatszik", "squeezebox", "Régi", features=4, eszkoz="d6"),
+        _mp("media_player.cantabile_tv", "cantabile", "TV · Nappali", eszkoz="d7"),
     ])
     e = {x["entity_id"]: x for x in ki}
     assert "media_player.cantabile_tv" not in e                      # a saját lejátszók kimaradnak
@@ -62,22 +62,116 @@ def test_osztalyoz_elovalasztas():
     assert e["media_player.mini"]["elore"]
     assert not e["media_player.tv"]["elore"] and e["media_player.tv"]["kepernyo"]
     assert not e["media_player.csoport"]["elore"]                     # Cast-csoport
-    assert not e["media_player.wiim_dlna"]["elore"]                   # ugyanaz a készülék DLNA-n
-    assert not e["media_player.lg"]["elore"] and not e["media_player.spotify"]["elore"]
-    assert not e["media_player.nem_jatszik"]["elore"]                 # nem tud médiát lejátszani
-    # sorrend: Sonos, WiiM, …, Google Cast, DLNA, majd az egyéb integrációk
+    # ugyanaz a készülék DLNA-n: nem külön sor, hanem a WiiM tartalék útja
+    assert "media_player.wiim_dlna" not in e
+    assert [u["entity_id"] for u in e["media_player.wiim"]["utak"]] == ["media_player.wiim_dlna"]
+    assert not e["media_player.lg"]["elore"]
+    # semmilyen úton nem fogad zenét: nem hangszóró
+    assert "media_player.spotify" not in e and "media_player.nem_jatszik" not in e
+    # sorrend: Sonos, WiiM, …, Google Cast, majd az egyéb integrációk
     assert [x["platform"] for x in ki][:2] == ["sonos", "wiim"]
     assert ki[-1]["platform"] not in V.CSOPORTOK
 
 
 def test_osztalyoz_ismeretlen_integracioknal_is_van_elovalasztas():
-    ki = V.osztalyoz([_mp("media_player.a", "demo", "Kitchen"), _mp("media_player.tv", "demo", "Lounge", device_class="tv"),
-                      _mp("media_player.p", "plex", "Plex")])
+    ki = V.osztalyoz([_mp("media_player.a", "demo", "Kitchen", eszkoz="a"), _mp("media_player.tv", "demo", "Lounge", device_class="tv", eszkoz="b"),
+                      _mp("media_player.p", "plex", "Plex", eszkoz="c")])
     assert [x["entity_id"] for x in ki if x["elore"]] == ["media_player.a"]
 
 
+def _valodi():
+    """Egy valódi telepítés lejátszói (2026-11): minden saját lejátszó mellett a Music Assistanté, külön HA-eszközön."""
+    M = V.MA
+    return [
+        _mp("media_player.haloszoba_tv", "sonos", "Hálószoba", eszkoz="s1", eszkoznev="Hálószoba", mac=["54:2a:1b:58:71:9a"]),
+        _mp("media_player.haloszoba", M, "Hálószoba", eszkoz="m1", eszkoznev="Hálószoba"),
+        _mp("media_player.szonosz", "sonos", "Nappali", eszkoz="s2", eszkoznev="Nappali", mac=["54:2a:1b:65:1f:40"]),
+        _mp("media_player.nappali", M, "Nappali", eszkoz="m2", eszkoznev="Nappali"),
+        _mp("media_player.wiim_mini_a16a_4", "wiim", "WiiM Mini", eszkoz="w1", eszkoznev="WiiM Mini-A16A"),
+        _mp("media_player.wiim_mini_a16a", M, "WiiM Mini", eszkoz="m3", eszkoznev="WiiM Mini-A16A"),
+        # SmartBox: Cast + Android TV Remote (külön HA-eszköz, a név köti össze) + MA
+        _mp("media_player.smartbox", "cast", "SmartBox", eszkoz="c1", eszkoznev="SmartBox"),
+        _mp("media_player.smartbox_2", "androidtv_remote", "SmartBox", eszkoz="a1", eszkoznev="SmartBox", mac=["b0:2e:ba:7e:13:c1"]),
+        _mp("media_player.smartbox_3", M, "SmartBox", eszkoz="m4", eszkoznev="SmartBox"),
+        # Samsung TV: a saját és a DLNA-lejátszója más néven, de ugyanazzal a MAC-címmel; a DLNA most nem elérhető
+        _mp("media_player.samsung_7_series_43", "samsungtv", "Samsung 7 Series (43)", eszkoz="t1", eszkoznev="Samsung 7 Series (43)",
+            mac=["24:fc:e5:de:7a:c0"], device_class="tv"),
+        _mp("media_player.nappali_tv", "dlna_dmr", "Nappali TV", eszkoz="t2", eszkoznev="[TV] Samsung 7 Series (43)",
+            mac=["24:fc:e5:de:7a:c0"]),
+        _mp("media_player.samsung_7_series_43_2", M, "Samsung 7 Series (43)", eszkoz="m5", eszkoznev="Samsung 7 Series (43)"),
+        _mp("media_player.voice", "esphome", "Home Assistant Voice", eszkoz="e1", eszkoznev="Home Assistant Voice 093239"),
+        _mp("media_player.voice_ma", M, "Home Assistant Voice", eszkoz="m6", eszkoznev="Home Assistant Voice 093239"),
+        _mp("media_player.fali_tablet", "fully_kiosk", "Fali tablet", eszkoz="f1", eszkoznev="Npad Pro"),
+        _mp("media_player.browser_mod_1", "browser_mod", "browser_mod_1", eszkoz="b1", eszkoznev="browser_mod_1"),
+        _mp("media_player.cantabile_tv_smartbox", "cantabile", "TV · SmartBox", eszkoz="x1", eszkoznev="Cantabile"),
+        _mp("media_player.csak_ma", M, "Valami", eszkoz="m7", eszkoznev="Valami"),
+        _mp("media_player.eszkoz_nelkul", "universal", "Univerzális"),
+        _mp("media_player.spotify", "spotify", "Spotify Gyula", eszkoz="sp", eszkoznev="Spotify Gyula", features=4),
+    ]
+
+
+def test_keszulekenkent_egy_hangszoro_valodi_telepitesen():
+    parok = {"media_player.haloszoba_tv": "media_player.haloszoba", "media_player.szonosz": "media_player.nappali"}
+    ki = V.osztalyoz(_valodi(), parok)
+    e = {x["entity_id"]: x for x in ki}
+    assert set(e) == {"media_player.haloszoba_tv", "media_player.szonosz", "media_player.wiim_mini_a16a_4", "media_player.smartbox",
+                      "media_player.nappali_tv", "media_player.voice"}
+    # a fő út mindig a saját integráció, a Music Assistant a tartalék
+    assert e["media_player.szonosz"]["ma"] == "media_player.nappali" and e["media_player.szonosz"]["mod"] == "sonos"
+    assert e["media_player.wiim_mini_a16a_4"]["ma"] == "media_player.wiim_mini_a16a"           # név szerint párosítva
+    # SmartBox: a Cast a fő (hangszóró-integráció), az Android TV Remote és az MA tartalék
+    assert [u["entity_id"] for u in e["media_player.smartbox"]["utak"]] == ["media_player.smartbox_2", "media_player.smartbox_3"]
+    # Samsung TV: MAC-cím köti össze; a DLNA a fő út (zenét fogad), a TV saját lejátszója tartalék; képernyős
+    tv = e["media_player.nappali_tv"]
+    assert {u["entity_id"] for u in tv["utak"]} == {"media_player.samsung_7_series_43", "media_player.samsung_7_series_43_2"}
+    assert tv["kepernyo"] and not tv["elore"]
+    # a felirat a tartalék utakkal
+    assert V.tartalek_felirat({"utak": [{"csoport": "Music Assistant", "platform": V.MA}]}) == " · tartalék: Music Assistant"
+    assert V.tartalek_felirat({"utak": []}) == ""
+    # térkép a kártyának
+    t = V.terkep(ki)
+    assert t["fo"]["media_player.nappali"] == "media_player.szonosz" and t["fo"]["media_player.smartbox_2"] == "media_player.smartbox"
+    assert t["ma"]["media_player.haloszoba_tv"] == "media_player.haloszoba"
+    assert "media_player.fali_tablet" not in t["fo"] and "media_player.browser_mod_1" not in t["fo"]
+
+
+def test_azonos_nevu_ket_hangszoro_nem_vonodik_ossze():
+    ki = V.osztalyoz([_mp("media_player.a", "cast", "Google Home Mini", eszkoz="a", eszkoznev="Google Home Mini"),
+                      _mp("media_player.b", "cast", "Google Home Mini", eszkoz="b", eszkoznev="Google Home Mini")])
+    assert len(ki) == 2
+
+
+def test_csak_ma_uton_jatszo_keszulek_is_hangszoro():
+    # a saját lejátszó csak távirányítható, de a Music Assistant fogad zenét: a fő marad a saját, az MA a tartalék
+    ki = V.osztalyoz([_mp("media_player.tv", "samsungtv", "TV", eszkoz="t", eszkoznev="TV", features=4),
+                      _mp("media_player.tv_ma", V.MA, "TV", eszkoz="m", eszkoznev="TV")])
+    assert [(x["entity_id"], x["ma"]) for x in ki] == [("media_player.tv", "media_player.tv_ma")]
+
+
+def test_regi_kartya_atirasa_a_fo_lejatszora():
+    fo = V.terkep(V.osztalyoz(_valodi(), {"media_player.szonosz": "media_player.nappali"}))["fo"]
+    regi = [{"nev": "Nappali", "entity": "media_player.szonosz", "mod": "sonos"},
+            {"nev": "WiiM", "entity": "media_player.wiim_mini_a16a_4"},
+            {"nev": "WiiM MA", "entity": "media_player.wiim_mini_a16a"},                    # ugyanaz a készülék: kimarad
+            {"nev": "Nappali MA", "entity": "media_player.nappali", "mod": "url"},          # a Sonos már fent: kimarad
+            {"nev": "Box", "entity": "media_player.smartbox_2", "mod": "url", "rovid": "Box"},
+            {"nev": "TV", "entity": "media_player.cantabile_tv_smartbox"}]                   # Cantabile TV: marad
+    ki = V.regi_atir(regi, fo)
+    assert [h["entity"] for h in ki] == ["media_player.szonosz", "media_player.wiim_mini_a16a_4", "media_player.smartbox",
+                                         "media_player.cantabile_tv_smartbox"]
+    assert ki[2] == {"nev": "Box", "entity": "media_player.smartbox", "rovid": "Box"}       # a típus újra a platformból
+    assert V.regi_atir(None, fo) is None
+
+
+def test_tv_jeloltek_a_masodlagos_cast_dlna_is():
+    jel = V.osztalyoz(_valodi(), {})
+    tv = {x["entity_id"] for x in V.tv_jeloltek(jel)}
+    assert {"media_player.smartbox", "media_player.nappali_tv"} <= tv
+    assert "media_player.samsung_7_series_43" not in tv
+
+
 def test_alapertelmezett_es_hangszoro_lista():
-    jel = V.osztalyoz([_mp("media_player.wiim", "wiim", "WiiM Mini"), _mp("media_player.nappali", "sonos", "Nappali Sonos One")])
+    jel = V.osztalyoz([_mp("media_player.wiim", "wiim", "WiiM Mini", eszkoz="w"), _mp("media_player.nappali", "sonos", "Nappali Sonos One", eszkoz="n")])
     assert V.alapertelmezett(jel, ["media_player.wiim", "media_player.nappali"]) == "media_player.nappali"
     assert V.alapertelmezett(jel, ["media_player.wiim"]) == "media_player.wiim"
     assert V.alapertelmezett(jel, []) is None

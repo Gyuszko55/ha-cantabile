@@ -287,8 +287,10 @@ Copy `custom_components/cantabile` into your `config/custom_components` folder a
 after the welcome can be skipped and changed later:
 
 1. **Welcome** – what will be set up and what is optional.
-2. **Speakers** – your media players grouped by integration (Sonos, WiiM, LinkPlay, Google Cast, DLNA, Music Assistant,
-   Squeezebox, others); speakers are ticked already, TVs and media servers aren't. Pick the *default speaker* – it comes
+2. **Speakers** – one row per device, by its own integration (Sonos, WiiM, LinkPlay, Google Cast, DLNA, Squeezebox,
+   others). If a device can also be reached another way (e.g. through Music Assistant), that is its **fallback** on the
+   row: whatever its own integration can't play (e.g. the Music Assistant library) goes that way automatically. Browsers
+   (browser_mod), kiosk tablets and players that exist only in Music Assistant aren't speakers; speakers are ticked already, TVs and media servers aren't. Pick the *default speaker* – it comes
    first on the card. Names longer than 8 characters get a short name for the card. No speakers yet? The step tells you
    which integration to add first.
 3. **Music library** *(optional)* – the folders in Home Assistant's media that hold music, including network storage

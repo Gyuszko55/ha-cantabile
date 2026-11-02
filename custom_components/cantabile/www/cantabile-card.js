@@ -582,6 +582,9 @@ const MUFAJ_CSALAD = [[464, /metal/], [116, /\brap\b|hip[ -]?hop|gangsta|\btrap\
 let ATADANDO = null;
 // a hangszórók Music Assistant-párjai (saját lejátszó → MA-lejátszó, ma.py): egy készülék = egy gomb a választón
 let MA_PAROK = null;
+// készülékenként egy hangszóró (cantabile/info „devices”): fo = lejátszó → a készülék fő (saját integrációs) lejátszója,
+// ma = a fő lejátszó Music Assistant-útja; null: még nincs adat (vagy régi integráció) – akkor a régi MA-párosítás
+let KESZ = null;
 const RB_SZERVEREK = () => (RB_LISTA ||= (async () => {
   const ctl = new AbortController(), ido = setTimeout(() => ctl.abort(), 5000);
   try {
@@ -727,6 +730,22 @@ class CantabileCard extends HTMLElement {
     this._angol = !!(eredeti?.speakers || eredeti?.stations || eredeti?.tape || eredeti?.brand);
     this._eredetiCfg = eredeti;
     const config = ATKULCS(eredeti || {}, KULCS);
+    // egy készülék = egy hangszóró: a kártyán szereplő bármelyik lejátszója (pl. a Music Assistant „Nappali”, a SmartBox
+    // Android TV Remote-ja) a készülék fő, saját integrációs lejátszójára kerül; ugyanaz a készülék csak egyszer (az első
+    // beállításával); a más lejátszóra kerülő típusa újra a platformból jön
+    if (KESZ?.fo && Array.isArray(config.hangszorok)) {
+      const volt = new Set();
+      config.hangszorok = config.hangszorok.flatMap((h) => {
+        if (!h || !h.entity || !KESZ.fo[h.entity]) return [h];
+        const fo = KESZ.fo[h.entity];
+        if (volt.has(fo)) return [];
+        volt.add(fo);
+        if (fo === h.entity) return [h];
+        const uj = { ...h, entity: fo };
+        delete uj.mod; delete uj.automod;
+        return [uj];
+      });
+    }
     // a hangszóró típusa magától: Sonos-platform → sonos (sor, csoport, kedvencek), minden más → url
     (config.hangszorok || []).forEach((h) => {
       if (h && h.mod !== "sonos" && h.mod !== "url") { h.mod = this._hass?.entities?.[h.entity]?.platform === "sonos" ? "sonos" : "url"; h.automod = true; }
@@ -750,9 +769,11 @@ class CantabileCard extends HTMLElement {
     // egy készülék = egy gomb: a hangszóró MA-lejátszója (pl. Sonos MA a Sonos 1 mellett) nem külön gomb – az MA tartalma
     // a gomb mögött az MA-lejátszón szól, minden más (zenemappa, rádió, Deezer) a saját lejátszón
     let hl = config.hangszorok.map((h) => ({ ...h }));
+    // a tartalék út: a készülék Music Assistant-lejátszója – ezen szól, amit a saját integráció nem tud (MA-tár, MA-Deezer)
+    if (KESZ?.ma) hl.forEach((h) => { if (KESZ.ma[h.entity]) h.ma = KESZ.ma[h.entity]; });
     if (MA_PAROK) {
       const parja = (e) => Object.keys(MA_PAROK).find((n) => MA_PAROK[n] === e);
-      hl.forEach((h) => { if (MA_PAROK[h.entity]) h.ma = MA_PAROK[h.entity]; });
+      hl.forEach((h) => { if (MA_PAROK[h.entity] && !h.ma) h.ma = MA_PAROK[h.entity]; });
       hl = hl.filter((h) => !(parja(h.entity) && hl.some((k) => k.entity === parja(h.entity))));
     }
     const sonosok = hl.filter((h) => h.mod === "sonos");
@@ -802,13 +823,21 @@ class CantabileCard extends HTMLElement {
 
   // az integráció entitásai (ismétlésszám, alvásidőzítő, NET-adó) a cantabile/info parancsból
   async _infoKer() {
-    try { const v = await this._hass.callWS({ type: "cantabile/info" }); this._ent = v.entities || {}; this._haIndult = v.started ? v.started * 1000 : null; this._stream = v.streaming || {}; this._tvMap = v.tv || {}; }
+    let ujKesz = false;
+    try {
+      const v = await this._hass.callWS({ type: "cantabile/info" }); this._ent = v.entities || {}; this._haIndult = v.started ? v.started * 1000 : null; this._stream = v.streaming || {}; this._tvMap = v.tv || {};
+      if (v.devices && JSON.stringify(v.devices) !== JSON.stringify(KESZ)) { KESZ = v.devices; ujKesz = true; }
+    }
     catch (e) { this._ent = {}; this._nincsIntegracio = true; }
+    // a készüléktérkép megjött / változott: a gombok újra (összevonva, a tartalék úttal); a már beépültnek nem kell
+    const kellUjra = ujKesz || (KESZ && this._keszVolt !== KESZ);
+    this._keszVolt = KESZ;
     if (!this._nincsIntegracio && MA_PAROK === null) {
       await this._maInfoLeker();
       MA_PAROK = this._maInfo?.available ? this._maInfo.pairs || {} : {};
       if (Object.keys(MA_PAROK).length) { this.setConfig(this._eredetiCfg); return; }   // a gombok összevonva
     }
+    if (kellUjra && this._eredetiCfg) this.setConfig(this._eredetiCfg);
     this._foglalasFeliratkozas();
     this._frissit();
   }
@@ -3413,8 +3442,11 @@ class CantabileCard extends HTMLElement {
     // csak olyan lejátszó választható, amelyik tud médiát indítani (PLAY_MEDIA); a már beállítottat mindig mutatjuk
     const beallitott = new Set(sz.hangszorok.map((h) => h.entity));
     // a TV-k saját Cast- / DLNA-lejátszója nem választható, ha van hozzá Cantabile TV-lejátszó (azzal a képernyőn is megjelenik a szám)
+    // készülékenként egy: csak a készülék fő (saját integrációs) lejátszója – a Music Assistant-, a browser_mod- és a
+    // kioszk-lejátszók nem (a Music Assistant a fő lejátszó tartalék útja); a Cantabile TV-lejátszók maradnak
+    const keszulek = (e) => !KESZ?.fo || KESZ.fo[e] === e || this._hass?.entities?.[e]?.platform === "cantabile";
     const lejatszok = Object.values(this._hass?.states || {}).filter((x) => x.entity_id.startsWith("media_player.")
-      && (beallitott.has(x.entity_id) || ((Number(x.attributes?.supported_features) & 512) && !this._tvPar(x.entity_id))))
+      && (beallitott.has(x.entity_id) || ((Number(x.attributes?.supported_features) & 512) && !this._tvPar(x.entity_id) && keszulek(x.entity_id))))
       .sort((x, y) => (x.attributes.friendly_name || x.entity_id).localeCompare(y.attributes.friendly_name || y.entity_id, NYELV()));
     const opc = (val) => lejatszok.map((x) => `<option value="${x.entity_id}" ${x.entity_id === val ? "selected" : ""}>${ESC(x.attributes.friendly_name || x.entity_id)} (${x.entity_id.slice(13)})</option>`).join("");
     const be = (lista, i, mezo, ertek, extra = "") => `<input data-l="${lista}" data-i="${i}" data-m="${mezo}" value="${ESC(ertek ?? "")}" ${extra}>`;

@@ -15,13 +15,13 @@
       },
       "speakers": {
         "title": "Hangszórók",
-        "description": "{count} médialejátszót találtam ({groups}). Pipáld ki, melyeken szóljon a Cantabile – a hangszórók már ki vannak pipálva, a TV-k és a médiaszerverek nem. Az **alapértelmezett hangszóró** áll elsőként a kártya hangszóróválasztóján.\n\nA 8 karakternél hosszabb nevek rövid nevet kapnak a kártyán; később a kártyán, a ⚙ → Hangszórók alatt átírhatod.",
+        "description": "{count} hangszórót (készüléket) találtam ({groups}). Pipáld ki, melyeken szóljon a Cantabile – a hangszórók már ki vannak pipálva, a TV-k és a médiaszerverek nem. Az **alapértelmezett hangszóró** áll elsőként a kártya hangszóróválasztóján.\n\nA 8 karakternél hosszabb nevek rövid nevet kapnak a kártyán; később a kártyán, a ⚙ → Hangszórók alatt átírhatod.",
         "data": {
           "speakers": "Hangszórók a kártyán",
           "default_speaker": "Alapértelmezett hangszóró"
         },
         "data_description": {
-          "speakers": "Integrációnként: Sonos, WiiM, LinkPlay, Google Cast, DLNA, Music Assistant, Squeezebox, egyéb.",
+          "speakers": "Készülékenként egy sor, a saját integrációja szerint (Sonos, WiiM, LinkPlay, Google Cast, DLNA, Squeezebox, egyéb). Ha egy készülék több úton is elérhető (pl. Music Assistanton át), az a „tartalék”: a lejátszás magától azon megy, amit a saját integráció nem tud. A böngészők (browser_mod) és a kioszk-tabletek kimaradnak.",
           "default_speaker": "Elsőként áll a választón; a hangszóró megnevezése nélküli hangparancsok is ezt használják."
         }
       },
@@ -158,13 +158,13 @@
       },
       "speakers": {
         "title": "Hangszórók",
-        "description": "{count} médialejátszót találtam ({groups}). Pipáld ki, melyeken szóljon a Cantabile – a hangszórók már ki vannak pipálva, a TV-k és a médiaszerverek nem. Az **alapértelmezett hangszóró** áll elsőként a kártya hangszóróválasztóján.\n\nA 8 karakternél hosszabb nevek rövid nevet kapnak a kártyán; később a kártyán, a ⚙ → Hangszórók alatt átírhatod.",
+        "description": "{count} hangszórót (készüléket) találtam ({groups}). Pipáld ki, melyeken szóljon a Cantabile – a hangszórók már ki vannak pipálva, a TV-k és a médiaszerverek nem. Az **alapértelmezett hangszóró** áll elsőként a kártya hangszóróválasztóján.\n\nA 8 karakternél hosszabb nevek rövid nevet kapnak a kártyán; később a kártyán, a ⚙ → Hangszórók alatt átírhatod.",
         "data": {
           "speakers": "Hangszórók a kártyán",
           "default_speaker": "Alapértelmezett hangszóró"
         },
         "data_description": {
-          "speakers": "Integrációnként: Sonos, WiiM, LinkPlay, Google Cast, DLNA, Music Assistant, Squeezebox, egyéb.",
+          "speakers": "Készülékenként egy sor, a saját integrációja szerint (Sonos, WiiM, LinkPlay, Google Cast, DLNA, Squeezebox, egyéb). Ha egy készülék több úton is elérhető (pl. Music Assistanton át), az a „tartalék”: a lejátszás magától azon megy, amit a saját integráció nem tud. A böngészők (browser_mod) és a kioszk-tabletek kimaradnak.",
           "default_speaker": "Elsőként áll a választón; a hangszóró megnevezése nélküli hangparancsok is ezt használják."
         }
       },

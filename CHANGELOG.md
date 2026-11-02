@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.6.0b2 – 2026-11-02
+
+One device, one speaker – its own integration first, other ways in as fallback.
+
+- **Speakers are physical devices.** The wizard, the card and its ⚙ list now show one row per device: a speaker is a device that has a media player from its **own integration** (Sonos, WiiM, LinkPlay, Google Cast, DLNA, Squeezebox, ESPHome…). Browsers (browser_mod), kiosk tablets (Fully Kiosk), Cantabile's own players, players without a device and devices reachable only through Music Assistant are not offered.
+- **Several ways to the same device are merged.** Players of one device are recognised by the HA device, the MAC address, the Music Assistant pairing or the same device name (only across different integrations – two same-named Cast speakers stay two). The main route is the device's own player that can play media, in speaker-integration order (e.g. a SmartBox plays via Google Cast, not Android TV Remote); the others – usually Music Assistant – are listed as **fallback** on the wizard row.
+- **Fallback in the background.** What the device's own integration can't play (Music Assistant library, Music Assistant's Deezer) goes through its fallback route automatically; everything else plays via the own integration. The card gets the device map from `cantabile/info` (`devices`), so pairing now also works where Music Assistant's player id differs from the integration's (name / MAC match).
+- **Existing cards are tidied up automatically:** a speaker entry pointing at a device's secondary player (e.g. the Music Assistant "Living room" next to the Sonos one, or a SmartBox added twice) moves to the device's main player; the same device appears only once, keeping its first entry's name. The wizard does the same when it writes the cards.
+- **TV step:** a device's secondary Cast or DLNA player can still be picked as a Cantabile TV.
+
 ## 2.6.0b1 – 2026-11-01
 
 Cantabile 2.6 (beta): a setup wizard – adding the integration now walks through speakers, music library, radio stations, TV, voice and the dashboard, and puts a ready-filled card on a new sidebar dashboard; the wizard can be run again later, also step by step.

@@ -47,8 +47,8 @@ def _hass(tmp_path, pultok=None, lejatszok=None, nyelv="hu"):
 @pytest.fixture
 def kornyezet(monkeypatch):
     """A felderítés kitalált eredménye: hangszórók, adók, TV-feltételek, ügynökök; a dashboards gyűjtemény."""
-    lejatszok = [_mp("media_player.nappali", "sonos", "Nappali"), _mp("media_player.wiim", "wiim", "WiiM Mini"),
-                 _mp("media_player.tv", "cast", "Nappali TV", model="Google Chromecast")]
+    lejatszok = [_mp("media_player.nappali", "sonos", "Nappali", eszkoz="d1"), _mp("media_player.wiim", "wiim", "WiiM Mini", eszkoz="d2"),
+                 _mp("media_player.tv", "cast", "Nappali TV", model="Google Chromecast", eszkoz="d3")]
     allapot = {"jel": V.osztalyoz(lejatszok), "rb": RB, "letrehozott": [], "platform": {"media_player.tv": "cast"}}
     monkeypatch.setattr(V, "hangszorok", lambda hass: copy.deepcopy(allapot["jel"]))
 

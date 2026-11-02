@@ -36,7 +36,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
-from . import atmeneti, foglalas, halkitas, hangszin, helyettesit, library, listak, ma, llm, lyrics, music, party, sonossor, streaming, tovabbito, tv, vu
+from . import atmeneti, foglalas, halkitas, hangszin, helyettesit, library, listak, ma, llm, lyrics, music, party, sonossor, streaming, tovabbito, tv, varazslo, vu
 from .const import (
     CARD_URL, CONF_DUCK_LEVEL, CONF_DUCK_SOURCES, CONF_LLM_API, DOMAIN, DUCK_LEVEL_DEFAULT, STATIC_URL, UID_NET, UID_ROUNDS,
     UID_SLEEP, VERSION,
@@ -85,8 +85,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 ent[kulcs] = reg.async_get_entity_id(platform, DOMAIN, f"{eid}_{uid}")
         # a Cantabile TV-lejátszók és a TV saját lejátszója (a kártya ezeket rejti a választóban, figyelmeztet rájuk)
         tvk = {lj.entity_id: lj.cast for lj in tv.kozpont(hass).lejatszok.values()} if "tv" in hass.data.get(DOMAIN, {}) else {}
+        # készülékenként egy hangszóró: melyik lejátszó melyik fő lejátszóhoz tartozik, és a fő lejátszók tartalék
+        # (Music Assistant) útja – a kártya ezzel vonja össze a gombokat és választ utat forrásonként
+        try:
+            keszulekek = varazslo.terkep(varazslo.hangszorok(hass))
+        except Exception:  # noqa: BLE001 – a térkép nélkül is működik (a régi MA-párosítással)
+            _LOGGER.debug("A készüléktérkép nem készült el", exc_info=True)
+            keszulekek = None
         connection.send_result(msg["id"], {"version": VERSION, "configured": bool(entries), "entities": ent, "started": indult,
-                                              "streaming": streaming.allapot(hass), "tv": tvk})
+                                              "streaming": streaming.allapot(hass), "tv": tvk, "devices": keszulekek})
 
     websocket_api.async_register_command(hass, ws_info)
 

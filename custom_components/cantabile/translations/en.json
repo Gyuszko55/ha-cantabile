@@ -15,13 +15,13 @@
       },
       "speakers": {
         "title": "Speakers",
-        "description": "Found {count} media players ({groups}). Tick the ones Cantabile should play on – speakers are ticked already, TVs and media servers aren't. The **default speaker** comes first on the card's speaker selector.\n\nNames longer than 8 characters get a short name on the card; you can change it later on the card under ⚙ → Speakers.",
+        "description": "Found {count} speakers (devices) ({groups}). Tick the ones Cantabile should play on – speakers are ticked already, TVs and media servers aren't. The **default speaker** comes first on the card's speaker selector.\n\nNames longer than 8 characters get a short name on the card; you can change it later on the card under ⚙ → Speakers.",
         "data": {
           "speakers": "Speakers on the card",
           "default_speaker": "Default speaker"
         },
         "data_description": {
-          "speakers": "Grouped by integration: Sonos, WiiM, LinkPlay, Google Cast, DLNA, Music Assistant, Squeezebox, other.",
+          "speakers": "One row per device, by its own integration (Sonos, WiiM, LinkPlay, Google Cast, DLNA, Squeezebox, other). If a device is also reachable another way (e.g. through Music Assistant), that is its “fallback”: playback uses it automatically for whatever the device's own integration can't play. Browsers (browser_mod) and kiosk tablets are left out.",
           "default_speaker": "First on the selector; voice commands without a speaker name use it too."
         }
       },
@@ -158,13 +158,13 @@
       },
       "speakers": {
         "title": "Speakers",
-        "description": "Found {count} media players ({groups}). Tick the ones Cantabile should play on – speakers are ticked already, TVs and media servers aren't. The **default speaker** comes first on the card's speaker selector.\n\nNames longer than 8 characters get a short name on the card; you can change it later on the card under ⚙ → Speakers.",
+        "description": "Found {count} speakers (devices) ({groups}). Tick the ones Cantabile should play on – speakers are ticked already, TVs and media servers aren't. The **default speaker** comes first on the card's speaker selector.\n\nNames longer than 8 characters get a short name on the card; you can change it later on the card under ⚙ → Speakers.",
         "data": {
           "speakers": "Speakers on the card",
           "default_speaker": "Default speaker"
         },
         "data_description": {
-          "speakers": "Grouped by integration: Sonos, WiiM, LinkPlay, Google Cast, DLNA, Music Assistant, Squeezebox, other.",
+          "speakers": "One row per device, by its own integration (Sonos, WiiM, LinkPlay, Google Cast, DLNA, Squeezebox, other). If a device is also reachable another way (e.g. through Music Assistant), that is its “fallback”: playback uses it automatically for whatever the device's own integration can't play. Browsers (browser_mod) and kiosk tablets are left out.",
           "default_speaker": "First on the selector; voice commands without a speaker name use it too."
         }
       },
