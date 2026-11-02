@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.7.0b2 – 2026-11-02
+
+- Route matrix, after comparing it with the real behaviour:
+  - **TV page as a route:** on a TV with a Cantabile TV player the output is the TV page (picture, cover, lyrics); for Deezer, the Music Assistant library and the Spotify fallback the music folder substitution on the TV page comes first, Music Assistant (sound only) after it.
+  - **Multiroom** (the Sonos group) and **BT** (the browser) columns; **PARTY** and **Own list** rows.
+  - A WiiM preset is direct where the content behind it (Deezer album / radio) is direct, e.g. on a Sonos.
+  - Each cell says whether the device is reachable right now.
+  - Speakers carry the card's names and come in the card's order, the devices not on the card after them.
+
 ## 2.7.0b1 – 2026-11-02
 
 - **Route matrix (step 1 – observing only).** Cantabile now builds a matrix of every source × every speaker: each cell lists the routes in order, each route with its inputs (what it needs: e.g. a Deezer account in the WiiM, a Music Assistant player, the music folder, a known Spotify Connect device – each true / false / unknown), its output (the device's own player or its Music Assistant player; direct or substitution) and its state. It is built from the setup and Home Assistant, kept in storage (`cantabile.matrix`, available right at start-up) and refreshed after start-up, when media players or dashboards change, hourly and on request. Websocket: `cantabile/matrix` (`refresh: true` rebuilds it). The card doesn't use it yet – it still decides as before; this step is for comparing.

@@ -52,11 +52,56 @@ def test_spotify_ismeretlen_eszkoz_es_deezer_tartalek():
 
 def test_csak_sonoson_es_semmi():
     m = U.epit(_be(zenemappa=False))
-    assert m["cellak"]["sonos_kedvenc"]["media_player.tv"] == {"utak": [], "elso": None, "allapot": "nem"}
+    assert m["cellak"]["sonos_kedvenc"]["media_player.tv"] == {"utak": [], "elso": None, "allapot": "nem", "elerheto": True}
     assert m["cellak"]["deezer"]["media_player.tv"]["allapot"] == "nem"
-    assert m["cellak"]["wiim_preset"]["media_player.tv"]["allapot"] == "helyettesites"     # rádióként szól
+    assert m["cellak"]["wiim_preset"]["media_player.tv"]["allapot"] == "ok"     # a rádió-preset közvetlenül szól
 
 
 def test_ismeretlen_sonos_szolgaltatas():
     m = U.epit(_be(sonos_szolg={"deezer": None, "spotify": None}))
     assert m["cellak"]["deezer"]["media_player.sonos"]["utak"][0]["allapot"] == "?"
+
+
+def _be2():
+    be = _be()
+    be["hangszorok"] = [
+        *be["hangszorok"][:2],
+        {"entity_id": U.MULTIROOM, "nev": "Multiroom", "platform": "sonos_csoport", "lejatszik": True, "ma": None},
+        {"entity_id": "media_player.cast_tv", "nev": "Háló TV", "platform": "cast", "lejatszik": True,
+         "ma": "media_player.cast_tv_ma", "tv": "media_player.cantabile_tv_halo", "elerheto": False},
+        {"entity_id": U.BT, "nev": "BT", "platform": "bongeszo", "lejatszik": True, "ma": None},
+    ]
+    return be
+
+
+def test_tv_oldal_elol_az_ma_hangkent_utana():
+    m = U.epit(_be2())
+    c = m["cellak"]["deezer"]["media_player.cast_tv"]
+    assert [u["ut"] for u in c["utak"]] == ["nas_helyett", "ma_deezer"]
+    assert c["utak"][0]["kimenet"] == "media_player.cantabile_tv_halo" and c["allapot"] == "helyettesites"
+    assert c["utak"][1]["kimenet"] == "media_player.cast_tv_ma"
+    assert m["cellak"]["nas"]["media_player.cast_tv"]["utak"][0]["kimenet"] == "media_player.cantabile_tv_halo"
+    assert m["cellak"]["ma_konyvtar"]["media_player.cast_tv"]["utak"][0]["ut"] == "nas_helyett"
+    assert m["cellak"]["nas"]["media_player.cast_tv"]["elerheto"] is False          # most nem elérhető: jelezve
+
+
+def test_multiroom_a_sonos_utjain():
+    m = U.epit(_be2())
+    assert m["cellak"]["deezer"][U.MULTIROOM]["utak"][0]["ut"] == "sonos_deezer"
+    assert m["cellak"]["sonos_kedvenc"][U.MULTIROOM]["allapot"] == "ok"
+    assert m["cellak"]["airplay"][U.MULTIROOM]["allapot"] == "nem"
+    ma = m["cellak"]["ma_konyvtar"][U.MULTIROOM]
+    assert ma["allapot"] == "helyettesites" and ma["utak"][ma["elso"]]["ut"] == "sonos_helyett"
+
+
+def test_bt_csak_a_sajat_utakon():
+    m = U.epit(_be2())
+    assert m["cellak"]["deezer"][U.BT]["allapot"] == "nem" and m["cellak"]["spotify"][U.BT]["allapot"] == "nem"
+    assert m["cellak"]["nas"][U.BT]["allapot"] == "ok" and m["cellak"]["telefon"][U.BT]["allapot"] == "ok"
+    assert m["cellak"]["wiim_preset"][U.BT]["allapot"] == "ok"           # a rádió-preset a böngészőben közvetlen
+
+
+def test_wiim_preset_modja_a_mogotte_levo_cellabol():
+    m = U.epit(_be2())
+    assert m["cellak"]["wiim_preset"]["media_player.sonos"]["allapot"] == "ok"               # Sonos saját Deezere
+    assert m["cellak"]["wiim_preset"]["media_player.cast_tv"]["allapot"] == "helyettesites"  # TV: Deezer helyettesítve

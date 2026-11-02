@@ -41,6 +41,13 @@ FRISSITES = timedelta(hours=1)
 KESLELTETES = 60                 # registry- / vezérlőpult-változás után ennyi mp múlva (a sorozatos változások egybe)
 
 WIIM = ("wiim", "linkplay")
+SONOS = ("sonos", "sonos_csoport")       # a Multiroom (a Sonosok csoportja) a Sonos útjain szól
+MULTIROOM = "cantabile:multiroom"
+BT = "helyi:bt"                          # a böngésző (a kártyát mutató telefon / tablet) saját hangja
+# a böngészőn csak ezek az utak élnek (Deezer, Spotify, MA nem szól a böngészőben)
+BT_UTAK = {"sajat", "ideiglenes", "preset_forditva"}
+# TV-n (Cantabile TV-oldallal) a zenemappás helyettesítés áll elöl (kép, borító, dalszöveg); az MA csak hangként, utána
+TV_ELORE = {"nas_helyett"}
 
 # a feltételek (bemenetek) nevei
 FELTETELEK: dict[str, str] = {
@@ -71,34 +78,34 @@ FORRASOK: list[tuple[str, str, list[tuple[Any, ...]]]] = [
         ("ma_url", "Music Assistant (az adó címével)", "ma", "kozvetlen", None, ["ma"]),
     ]),
     ("deezer", "Deezer-album / -lista", [
-        ("sonos_deezer", "a Sonos saját Deezere", "fo", "kozvetlen", ("sonos",), ["sonos_deezer"]),
+        ("sonos_deezer", "a Sonos saját Deezere", "fo", "kozvetlen", SONOS, ["sonos_deezer"]),
         ("wiim_deezer", "a WiiM saját Deezere (lossless)", "fo", "kozvetlen", WIIM, ["wiim_deezer"]),
         ("ma_deezer", "a Music Assistant Deezere", "ma", "kozvetlen", None, ["ma", "ma_deezer"]),
         ("nas_helyett", "ugyanazok a számok a zenemappából", "fo", "helyettesites", None, ["url", "zenemappa"]),
     ]),
     ("deezer_szamok", "Deezer-számok (előadó, keresés)", [
-        ("sonos_deezer", "a Sonos saját Deezere", "fo", "kozvetlen", ("sonos",), ["sonos_deezer"]),
+        ("sonos_deezer", "a Sonos saját Deezere", "fo", "kozvetlen", SONOS, ["sonos_deezer"]),
         ("ma_deezer", "a Music Assistant Deezere", "ma", "kozvetlen", None, ["ma", "ma_deezer"]),
         ("nas_helyett", "ugyanazok a számok a zenemappából", "fo", "helyettesites", None, ["url", "zenemappa"]),
     ]),
     ("spotify", "Spotify", [
-        ("sonos_spotify", "a Sonos saját Spotify-ja", "fo", "kozvetlen", ("sonos",), ["sonos_spotify"]),
+        ("sonos_spotify", "a Sonos saját Spotify-ja", "fo", "kozvetlen", SONOS, ["sonos_spotify"]),
         ("spotify_connect", "Spotify Connect", "fo", "kozvetlen", None, ["spotify_ha", "spotify_eszkoz"]),
         ("deezer_tartalek", "album és szám a Deezerről (lista nem)", "fo", "helyettesites", None, ["deezer_cella"]),
     ]),
     ("tidal", "Tidal", [
-        ("sonos_tidal", "a Sonos saját Tidalja", "fo", "kozvetlen", ("sonos",), ["tidal"]),
+        ("sonos_tidal", "a Sonos saját Tidalja", "fo", "kozvetlen", SONOS, ["tidal"]),
     ]),
     ("wiim_preset", "WiiM-preset", [
         ("wiim_preset", "a WiiM saját presetje", "fo", "kozvetlen", WIIM, []),
         ("preset_forditva", "a preset tartalma: Deezer-album vagy rádió", "fo", "helyettesites", None, ["preset_cella"]),
     ]),
     ("sonos_kedvenc", "Sonos-kedvencek", [
-        ("sonos_kedvenc", "a Sonos kedvence", "fo", "kozvetlen", ("sonos",), []),
+        ("sonos_kedvenc", "a Sonos kedvence", "fo", "kozvetlen", SONOS, []),
     ]),
     ("ma_konyvtar", "Music Assistant-könyvtár", [
         ("ma_sajat", "a Music Assistant saját sora", "ma", "kozvetlen", None, ["ma"]),
-        ("sonos_helyett", "egyes szám a Sonos Deezeréről", "fo", "helyettesites", ("sonos",), ["sonos_deezer"]),
+        ("sonos_helyett", "egyes szám a Sonos Deezeréről", "fo", "helyettesites", SONOS, ["sonos_deezer"]),
         ("nas_helyett", "egyes szám a zenemappából", "fo", "helyettesites", None, ["url", "zenemappa"]),
     ]),
     ("telefon", "Telefonról", [
@@ -106,6 +113,12 @@ FORRASOK: list[tuple[str, str, list[tuple[Any, ...]]]] = [
     ]),
     ("airplay", "AirPlay", [
         ("airplay", "a készülék saját AirPlay-vevője (a telefon küldi)", "fo", "kozvetlen", ("sonos", *WIIM), []),
+    ]),
+    ("party", "PARTY", [
+        ("party", "a Cantabile sora a zenemappából, mindig előre töltve", "fo", "kozvetlen", None, ["url", "zenemappa"]),
+    ]),
+    ("sajat_lista", "Saját lista", [
+        ("sajat_lista", "a lista számai a saját lejátszón (Sonoson a Deezer-számok is)", "fo", "kozvetlen", None, ["url", "zenemappa"]),
     ]),
 ]
 
@@ -164,23 +177,33 @@ def epit(be: dict[str, Any]) -> dict[str, Any]:
             for kulcs, nev, kimenet, mod, platformok, felt in utak:
                 if platformok and h.get("platform") not in platformok:
                     continue                                    # ez az út ennél a készüléknél nem létezik
+                if h.get("platform") == "bongeszo" and kulcs not in BT_UTAK:
+                    continue
                 ertek = {k: _feltetel(k, h, be, cellak) for k in felt}
+                ki = h["entity_id"] if kimenet == "fo" else h.get("ma")
+                if kimenet == "fo" and h.get("tv"):
+                    ki, nev = h["tv"], f"{nev} – a TV-oldalon" if kulcs != "sajat" else "a TV-oldal (kép, borító, dalszöveg)"
+                if kulcs == "preset_forditva":
+                    # a preset tartalma közvetlenül szól, ha a mögötte lévő cellák (Deezer, rádió) közvetlenek
+                    al = [cellak.get(f, {}).get(h["entity_id"], {}).get("allapot") for f in ("deezer", "radio")]
+                    mod = "kozvetlen" if all(a in ("ok", "nem") for a in al) and "ok" in al else "helyettesites"
                 lista.append({
-                    "ut": kulcs, "nev": nev, "mod": mod,
-                    "kimenet": h["entity_id"] if kimenet == "fo" else h.get("ma"),
+                    "ut": kulcs, "nev": nev, "mod": mod, "kimenet": ki,
                     "feltetelek": [{"k": k, "nev": FELTETELEK[k], "ok": v} for k, v in ertek.items()],
                     "allapot": _ut_allapot(list(ertek.values())),
                 })
+            if h.get("tv"):
+                lista.sort(key=lambda u: u["ut"] not in TV_ELORE)          # stabil: a többi sorrendje marad
             elso = next((i for i, u in enumerate(lista) if u["allapot"] == "ok"), None)
             if elso is not None:
                 allapot = "ok" if lista[elso]["mod"] == "kozvetlen" else "helyettesites"
             else:
                 allapot = "?" if any(u["allapot"] == "?" for u in lista) else "nem"
-            sor[h["entity_id"]] = {"utak": lista, "elso": elso, "allapot": allapot}
+            sor[h["entity_id"]] = {"utak": lista, "elso": elso, "allapot": allapot, "elerheto": h.get("elerheto", True)}
         cellak[fk] = sor
     return {
         "forrasok": [{"k": k, "nev": n} for k, n, _ in FORRASOK],
-        "hangszorok": [{x: h.get(x) for x in ("entity_id", "nev", "platform", "ma", "kartyan", "elerheto")}
+        "hangszorok": [{x: h.get(x) for x in ("entity_id", "nev", "platform", "ma", "tv", "kartyan", "elerheto")}
                        for h in be.get("hangszorok") or []],
         "cellak": cellak,
     }
@@ -228,6 +251,8 @@ async def _spotify_eszkozok(hass: HomeAssistant, hangszorok: list[dict[str, Any]
         return {}
     ki = {}
     for h in hangszorok:
+        if h["entity_id"] in (MULTIROOM, BT):
+            continue
         if x := streaming.eszkoz_valaszt(nevek, h.get("_nevek") or [h.get("nev")]):
             ki[h["entity_id"]] = x["name"]
     return ki
@@ -239,7 +264,22 @@ async def bemenetek(hass: HomeAssistant) -> dict[str, Any]:
     kartya = await _kartya_beallitas(hass)
     jeloltek = varazslo.hangszorok(hass)
     fo = varazslo.terkep(jeloltek)["fo"]          # a kártya régi bejegyzése (pl. az MA-lejátszó) a készülék fő lejátszója
-    kartyan = {fo.get(e, e) for x in kartya.get("hangszorok") or [] if (e := str(x.get("entity") if isinstance(x, dict) else x))}
+    # a Cantabile TV-lejátszói (TV-oldal / DLNA-videó): Cantabile-TV → a TV saját lejátszója; a kártyán a TV gombja ez
+    try:
+        from . import tv  # noqa: PLC0415
+
+        tvk = {lj.entity_id: lj.cast for lj in tv.kozpont(hass).lejatszok.values()} if "tv" in hass.data.get(DOMAIN, {}) else {}
+    except Exception:  # noqa: BLE001
+        tvk = {}
+    tv_of = {fo.get(c, c): t for t, c in tvk.items()}
+    # a kártya sorrendje és nevei (a rövid név, mint a választón)
+    kartya_nev: dict[str, str] = {}
+    for x in kartya.get("hangszorok") or []:
+        e = str(x.get("entity") if isinstance(x, dict) else x)
+        e = fo.get(tvk.get(e, e), tvk.get(e, e))
+        if e not in kartya_nev:
+            kartya_nev[e] = str((x.get("rovid") or x.get("nev")) if isinstance(x, dict) else "") or ""
+    kartyan = set(kartya_nev)
     ereg, dreg = er.async_get(hass), dr.async_get(hass)
     hangszorok = []
     for x in jeloltek:
@@ -247,10 +287,21 @@ async def bemenetek(hass: HomeAssistant) -> dict[str, Any]:
         ent = ereg.async_get(x["entity_id"])
         d = dreg.async_get(ent.device_id) if ent and ent.device_id else None
         hangszorok.append({
-            "entity_id": x["entity_id"], "nev": x["nev"], "platform": x["platform"], "lejatszik": x["lejatszik"],
-            "ma": x.get("ma"), "kartyan": x["entity_id"] in kartyan, "elerheto": bool(st and st.state != "unavailable"),
+            "entity_id": x["entity_id"], "nev": kartya_nev.get(x["entity_id"]) or x["nev"], "platform": x["platform"],
+            "lejatszik": x["lejatszik"], "ma": x.get("ma"), "tv": tv_of.get(x["entity_id"]),
+            "kartyan": x["entity_id"] in kartyan, "elerheto": bool(st and st.state != "unavailable"),
             "_nevek": [n for n in (x["nev"], d and d.name_by_user, d and d.name) if n],
         })
+    # a kártyán lévők elöl, a kártya sorrendjében; utána a többi
+    sorrend = list(kartya_nev)
+    hangszorok.sort(key=lambda h: (sorrend.index(h["entity_id"]) if h["entity_id"] in kartyan else len(sorrend)))
+    sonosok = [h for h in hangszorok if h["platform"] == "sonos"]
+    if len(sonosok) > 1:
+        hangszorok.insert(max(hangszorok.index(sonosok[-1]) + 1, 0), {
+            "entity_id": MULTIROOM, "nev": "Multiroom", "platform": "sonos_csoport", "lejatszik": True, "ma": None, "tv": None,
+            "kartyan": any(h["kartyan"] for h in sonosok), "elerheto": any(h["elerheto"] for h in sonosok)})
+    hangszorok.append({"entity_id": BT, "nev": "BT", "platform": "bongeszo", "lejatszik": True, "ma": None, "tv": None,
+                       "kartyan": True, "elerheto": True})
     wiim = {}
     for h in hangszorok:
         if h["platform"] in WIIM:
