@@ -4813,6 +4813,9 @@ class CantabileCard extends HTMLElement {
       // MY LIBRARY: a Spotify-fiók listái, mentett albumai és követett előadói (a HA Spotify-integrációjának
       // bejelentkezett fiókjával, a Spotify API-ból – akkor is, ha épp nem szól semmi); alatta a keresés
       if (szolg === "spotify" && !hely && KERES_NORM(kerdes).length < 2 && connect) {
+        // a fiók Spotify-eszközei (a szerver megjegyzi a nevüket, amikor névvel látja – a tétlenül csak azonosítóval
+        // listázott hangszóró így később is felismerhető)
+        this._hass.callWS({ type: "cantabile/spotify_devices" }).catch(() => {});
         const [ul, ua, ue] = await Promise.all(["/me/playlists?limit=50", "/me/albums?limit=50", "/me/following?type=artist&limit=50"].map((u) => api(u).catch(() => null)));
         if (!friss()) return;
         if (ul || ua || ue) {

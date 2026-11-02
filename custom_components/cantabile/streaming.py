@@ -411,5 +411,11 @@ def regisztral(hass: HomeAssistant) -> None:
     async def ws_cimek(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
         await _futtat(connection, msg, cimek_deezerre(hass, msg["items"]))
 
+    @websocket_api.websocket_command({vol.Required("type"): "cantabile/spotify_devices"})
+    @websocket_api.async_response
+    async def ws_eszkozok(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        await _futtat(connection, msg, spotify_eszkozok(hass))
+
+    websocket_api.async_register_command(hass, ws_eszkozok)
     websocket_api.async_register_command(hass, ws_connect)
     websocket_api.async_register_command(hass, ws_cimek)
