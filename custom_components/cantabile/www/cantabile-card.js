@@ -3072,7 +3072,10 @@ class CantabileCard extends HTMLElement {
       const r = await this._hass.callWS({ type: "cantabile/wiim_deezer/from_sonos", source: regiEntity, target: uj.entity, track: String(dzf.ids[0]), position: Number(dzf.poz) || 0 });
       this._uzen(T("A(z) {h} hangszórón innen szól: {f}.", { h: KN(uj), f: T("a WiiM saját Deezere – „{c}”", { c: r.title || "Deezer" }) }));
       return true;
-    } catch (_) { return false; }            // nincs Deezer a WiiM-ben, nem kedvenc lista, vagy a szám nincs benne: tartalék út
+    } catch (e) {                            // nincs Deezer a WiiM-ben, nem kedvenc lista, vagy a szám nincs benne: tartalék út
+      console.info("Cantabile: a WiiM saját Deezere nem indult, tartalék út:", e?.message || e);
+      return false;
+    }
   }
 
   // a Sonoson szóló Deezer-sor: a sor elemei, hányadiknál és hol tart (más forrású elemek is maradhatnak benne)

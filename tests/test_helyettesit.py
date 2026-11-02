@@ -41,3 +41,13 @@ def test_deezer_sor_sonosra_lekeres_nelkul(monkeypatch):
     monkeypatch.setattr(H, "_sonos", lambda hass, e: True)
     r = asyncio.run(H.helyettesit(None, "media_player.sonos", None, None, ["x-sonos-http:tr%3a7.mp3"], []))
     assert r == {"mod": "sonos", "elemek": ["https://www.deezer.com/track/7"], "talalt": 1, "osszes": 1}
+
+
+def test_ma_deezer_peldany_a_szolgaltatolistabol(monkeypatch):
+    from types import SimpleNamespace as N
+
+    prov = [N(domain="filesystem_local", instance_id="filesystem_local--x", available=True),
+            N(domain="deezer", instance_id="deezer--GFiGB9Sm", available=True)]
+    monkeypatch.setattr(H.ma, "bejegyzes", lambda hass: N(runtime_data=N(mass=N(providers=prov))))
+    H._ma_dz.clear()
+    assert asyncio.run(H._ma_deezer_peldany(None, {})) == "deezer--GFiGB9Sm"

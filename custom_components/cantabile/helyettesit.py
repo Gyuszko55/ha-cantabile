@@ -110,7 +110,18 @@ async def _ma_deezer_peldany(hass: HomeAssistant, minta: dict[str, Any]) -> str 
     if (t := _ma_dz.get("p")) and time.monotonic() - t[0] < 3600:
         return t[1]
     e = ma.bejegyzes(hass)
-    if e is None or not minta.get("cim"):
+    if e is None:
+        return None
+    # elsőként a Music Assistant szolgáltatólistájából (az integráció kliense): a bekötött Deezer példánya – a keresés a
+    # könyvtárban meglévő számnál csak a könyvtári azonosítót adja (library://…), abból a Deezer nem derül ki
+    try:
+        for p in getattr(getattr(e.runtime_data, "mass", None), "providers", None) or []:
+            if getattr(p, "domain", "") == "deezer" and getattr(p, "available", True) and getattr(p, "instance_id", ""):
+                _ma_dz["p"] = (time.monotonic(), p.instance_id)
+                return p.instance_id
+    except Exception:  # noqa: BLE001 – más integráció-változat: a kereséses út
+        _LOGGER.debug("Cantabile: az MA szolgáltatói nem olvashatók", exc_info=True)
+    if not minta.get("cim"):
         return None
     try:
         v = await asyncio.wait_for(ma._hiv(hass, "search", {"config_entry_id": e.entry_id, "name": minta["cim"],  # noqa: SLF001

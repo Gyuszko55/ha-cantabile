@@ -64,13 +64,23 @@ def _boritek(szolg: str, akcio: str, torzs: str) -> str:
 
 
 async def _soap(hass: HomeAssistant, url: str, szolg: str, akcio: str, torzs: str) -> str:
+    # a Sonos és a WiiM kis webszervere a tétlen kapcsolatot bezárja: minden kérés saját, utána lezárt kapcsolaton megy
+    # („Connection: close”), és ha a készülék mégis bontja („Server disconnected”), egyszer újrapróbálja
     s = async_get_clientsession(hass)
-    async with s.post(url, data=_boritek(szolg, akcio, torzs).encode(), timeout=aiohttp.ClientTimeout(total=15),
-                      headers={"Content-Type": 'text/xml; charset="utf-8"', "SOAPACTION": f'"{szolg}#{akcio}"'}) as r:
-        t = await r.text()
-        if r.status >= 400:
-            raise HomeAssistantError(f"{akcio}: UPnP {r.status}")
-        return html.unescape(t)
+    fej = {"Content-Type": 'text/xml; charset="utf-8"', "SOAPACTION": f'"{szolg}#{akcio}"', "Connection": "close"}
+    for proba in range(2):
+        try:
+            async with s.post(url, data=_boritek(szolg, akcio, torzs).encode(), headers=fej,
+                              timeout=aiohttp.ClientTimeout(total=15)) as r:
+                t = await r.text()
+                if r.status >= 400:
+                    raise HomeAssistantError(f"{akcio}: UPnP {r.status}")
+                return html.unescape(t)
+        except (aiohttp.ServerDisconnectedError, aiohttp.ClientOSError):
+            if proba:
+                raise
+            await asyncio.sleep(0.3)
+    raise HomeAssistantError(f"{akcio}: nincs válasz")
 
 
 async def _pq(hass: HomeAssistant, host: str, akcio: str, torzs: str) -> str:
@@ -79,8 +89,16 @@ async def _pq(hass: HomeAssistant, host: str, akcio: str, torzs: str) -> str:
 
 async def _api(hass: HomeAssistant, host: str, parancs: str) -> str:
     s = async_get_clientsession(hass, verify_ssl=False)
-    async with s.get(f"https://{host}/httpapi.asp?command={parancs}", timeout=aiohttp.ClientTimeout(total=8)) as r:
-        return await r.text()
+    for proba in range(2):
+        try:
+            async with s.get(f"https://{host}/httpapi.asp?command={parancs}", headers={"Connection": "close"},
+                             timeout=aiohttp.ClientTimeout(total=8)) as r:
+                return await r.text()
+        except (aiohttp.ServerDisconnectedError, aiohttp.ClientOSError):
+            if proba:
+                raise
+            await asyncio.sleep(0.3)
+    raise HomeAssistantError(f"{parancs}: nincs válasz")
 
 
 def _wiim(hass: HomeAssistant, entity_id: str) -> str | None:
