@@ -15,6 +15,7 @@ import asyncio
 import logging
 import re
 import time
+from urllib.parse import quote
 from typing import Any
 
 import aiohttp
@@ -160,53 +161,96 @@ async def _spotify_belso(hass: HomeAssistant, ut: str, sajat: bool) -> Any:
     return await _ker(hass, ("u" if sajat else "s") + ut, SPOTIFY_API + ut, tok, {})
 
 
-async def spotify_isrc(hass: HomeAssistant, cim: str) -> list[str | None]:
-    """Egy Spotify-szám / -album / -lista számainak ISRC-azonosítói sorrendben (legfeljebb 100)."""
+def _norm(t: str) -> str:
+    t = re.sub(r"\s*[\(\[].*?(remaster|deluxe|edition|version|live|mono|stereo|anniversary)[^\)\]]*[\)\]]", "", str(t or ""), flags=re.I)
+    return re.sub(r"[^\w]+", " ", t.casefold()).strip()
+
+
+async def _dz_keres(hass: HomeAssistant, fajta: str, eloado: str, cim: str) -> dict[str, Any] | None:
+    """Deezer-keresés előadó + cím szerint (album / szám); a legjobb egyezés (azonos cím és előadó)."""
+    from .music import HibaUzenet, deezer  # noqa: PLC0415
+
+    mezo = "album" if fajta == "album" else "track"
+    q = f'artist:"{eloado}" {mezo}:"{cim}"'
+    try:
+        d = await deezer(hass, f"/search/{mezo}?q={quote(q)}&limit=10")
+    except HibaUzenet:
+        return None
+    talalat = [x for x in (d or {}).get("data") or [] if isinstance(x, dict)]
+    for x in talalat:
+        if _norm(x.get("title")) == _norm(cim) and _norm((x.get("artist") or {}).get("name")) == _norm(eloado):
+            return x
+    return next((x for x in talalat if _norm((x.get("artist") or {}).get("name")) == _norm(eloado)), None)
+
+
+async def _dz_isrc(hass: HomeAssistant, kod: str | None) -> str | None:
+    from .music import HibaUzenet, deezer  # noqa: PLC0415
+
+    if not kod or not ISRC.match(kod.upper()):
+        return None
+    try:
+        d = await deezer(hass, f"/track/isrc:{kod.upper()}")
+    except HibaUzenet:
+        return None
+    return str(d["id"]) if isinstance(d, dict) and d.get("id") else None
+
+
+async def spotify_deezerre(hass: HomeAssistant, cim: str) -> dict[str, Any]:
+    """Tartalék ott, ahol a Spotify nem szólhat (nincs Spotify Connect, DLNA-s TV…): ugyanaz a tartalom a Deezeren, és a
+    Deezer-utakon (Sonos / WiiM saját Deezere, Music Assistant, zenemappa) szól tovább.
+    - album: a Deezer ugyanazon albuma (előadó + cím) → {"album": link} – egész albumként (WiiM-en a saját Deezerén);
+    - szám: ISRC szerint, ha a Spotify megadja, különben előadó + cím → {"deezer": [link]};
+    - lista: a számai ISRC / előadó + cím szerint, ha a Spotify kiadja a lista számait (újabb Spotify-alkalmazásoknak
+      gyakran nem – akkor „spotify_playlist_closed”)."""
     m = SPOTIFY_LINK.search(cim or "")
     if not m:
         raise StreamHiba("svc_denied", szolg="Spotify")
     fajta, sid = m.group(1).lower(), m.group(2)
+    if fajta == "album":
+        a = await _spotify_belso(hass, f"/albums/{sid}", False)
+        eloado = ((a or {}).get("artists") or [{}])[0].get("name") or ""
+        x = await _dz_keres(hass, "album", eloado, (a or {}).get("name") or "")
+        if not x:
+            return {"talalt": 0, "osszes": (a or {}).get("total_tracks") or 0}
+        return {"album": f"https://www.deezer.com/album/{x['id']}", "cim": x.get("title"), "eloado": eloado,
+                "kep": x.get("cover_medium"), "talalt": 1, "osszes": 1}
     if fajta == "track":
-        t = await _spotify_belso(hass, f"/tracks/{sid}", False)
-        return [((t or {}).get("external_ids") or {}).get("isrc")]
-    if fajta == "playlist":
-        ki: list[str | None] = []
-        while len(ki) < SPOTIFY_TARTALEK_MAX:
-            d = await _spotify_belso(hass, f"/playlists/{sid}/tracks?limit=100&offset={len(ki)}", True)
-            elemek = (d or {}).get("items") or []
-            ki += [(((x or {}).get("track") or {}).get("external_ids") or {}).get("isrc") for x in elemek]
-            if not elemek or not (d or {}).get("next"):
-                break
-        return ki[:SPOTIFY_TARTALEK_MAX]
-    # album: a számlistában nincs ISRC – a számok adatai 50-esével
-    d = await _spotify_belso(hass, f"/albums/{sid}/tracks?limit=50", False)
-    ids = [x.get("id") for x in (d or {}).get("items") or [] if x and x.get("id")]
-    ki = []
-    for i in range(0, len(ids), 50):
-        t = await _spotify_belso(hass, f"/tracks?ids={','.join(ids[i:i + 50])}", False)
-        ki += [((x or {}).get("external_ids") or {}).get("isrc") for x in (t or {}).get("tracks") or []]
-    return ki
-
-
-async def spotify_deezerre(hass: HomeAssistant, cim: str) -> dict[str, Any]:
-    """Tartalék ott, ahol a Spotify nem szólhat (nincs Spotify Connect, BT, DLNA-s TV): ugyanazok a számok a Deezeren,
-    az ISRC alapján – a Deezer-utakon (Sonos / WiiM saját Deezere, Music Assistant, zenemappa) szólnak tovább."""
-    from .music import HibaUzenet, deezer  # noqa: PLC0415 – körkörös import nélkül
-
-    isrc = await spotify_isrc(hass, cim)
+        try:
+            t = await _spotify_belso(hass, f"/tracks/{sid}", False)
+        except StreamHiba:
+            t = None
+        dz = await _dz_isrc(hass, ((t or {}).get("external_ids") or {}).get("isrc"))
+        if not dz and t:
+            x = await _dz_keres(hass, "track", ((t.get("artists") or [{}])[0]).get("name") or "", t.get("name") or "")
+            dz = str(x["id"]) if x else None
+        link = f"https://www.deezer.com/track/{dz}" if dz else None
+        return {"deezer": [link], "talalt": int(bool(link)), "osszes": 1}
+    # lista: az újabb (`/items`) és a régi (`/tracks`) végpont, a bejelentkezett fiókkal
+    elemek: list[dict[str, Any]] = []
+    for veg in ("items", "tracks"):
+        try:
+            while len(elemek) < SPOTIFY_TARTALEK_MAX:
+                d = await _spotify_belso(hass, f"/playlists/{sid}/{veg}?limit=100&offset={len(elemek)}", True)
+                uj = [(x or {}).get("item") or (x or {}).get("track") or {} for x in (d or {}).get("items") or []]
+                elemek += uj
+                if not uj or not (d or {}).get("next"):
+                    break
+            break
+        except StreamHiba:
+            elemek = []
+    if not elemek:
+        raise StreamHiba("spotify_playlist_closed")
     sor = asyncio.Semaphore(6)
 
-    async def egy(kod: str | None) -> str | None:
-        if not kod or not ISRC.match(kod.upper()):
-            return None
+    async def egy(t: dict[str, Any]) -> str | None:
         async with sor:
-            try:
-                d = await deezer(hass, f"/track/isrc:{kod.upper()}")
-            except HibaUzenet:
-                return None
-        return f"https://www.deezer.com/track/{d['id']}" if isinstance(d, dict) and d.get("id") else None
+            dz = await _dz_isrc(hass, (t.get("external_ids") or {}).get("isrc"))
+            if not dz and t.get("name"):
+                x = await _dz_keres(hass, "track", ((t.get("artists") or [{}])[0]).get("name") or "", t["name"])
+                dz = str(x["id"]) if x else None
+        return f"https://www.deezer.com/track/{dz}" if dz else None
 
-    linkek = list(await asyncio.gather(*(egy(k) for k in isrc)))
+    linkek = list(await asyncio.gather(*(egy(t) for t in elemek[:SPOTIFY_TARTALEK_MAX])))
     return {"deezer": linkek, "talalt": sum(1 for x in linkek if x), "osszes": len(linkek)}
 
 

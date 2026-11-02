@@ -78,6 +78,8 @@ _TEXT: dict[str, dict[str, str]] = {
     "lyrics_down": {"hu": "A dalszöveg-szolgáltatás nem érhető el.", "en": "The lyrics service is not available."},
     "svc_bad_key": {"hu": "hibás fejlesztői kulcs (client ID / secret)", "en": "invalid developer key (client ID / secret)"},
     "spotify_login_down": {"hu": "a Spotify-integráció bejelentkezése nem érhető el", "en": "the Spotify integration's login is not available"},
+    "spotify_playlist_closed": {"hu": "a Spotify ennek a listának a számait nem adja ki (Spotify-korlátozás) – a lista csak Spotify Connect-hangszórón szól",
+                                "en": "Spotify doesn't release this playlist's tracks (Spotify restriction) – the playlist only plays on a Spotify Connect speaker"},
     "spotify_no_key": {"hu": "nincs Spotify-kulcs és nincs Spotify-integráció", "en": "no Spotify key and no Spotify integration"},
     "svc_login_expired": {"hu": "a bejelentkezés lejárt – próbáld újra", "en": "the login expired – try again"},
     "svc_rate_limit": {"hu": "túl sok kérés – várj egy kicsit", "en": "too many requests – wait a little"},

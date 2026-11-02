@@ -144,6 +144,7 @@ const EN = {
   "WiiM-preset {n} · Deezer": "WiiM preset {n} · Deezer",
   "A Spotify-könyvtárad üres.": "Your Spotify library is empty.",
   "A Spotify itt nem szólhat – ugyanazok a számok a Deezerről ({t}/{o}).": "Spotify can't play here – the same tracks from Deezer ({t}/{o}).",
+  "A Spotify itt nem szólhat – ugyanez az album a Deezerről.": "Spotify can't play here – the same album from Deezer.",
   "Ezen a hangszórón a Deezer-számok a zenemappából szólnak, ha ott megvannak.": "On this speaker Deezer tracks play from the music folder, if they are there.",
   "A BT-n (a telefon / tablet hangja) a Deezer nem szól – válassz hangszórót.": "Deezer doesn't play on BT (the phone / tablet audio) – choose a speaker.",
   "A saját Deezer-könyvtárad (listák, albumok, előadók) itt jelenik meg, ha a Sonos kedvenceiben ott vannak a Deezer-kedvenceid, vagy a kártyán megadod: deezer_user.": "Your own Deezer library (playlists, albums, artists) shows here if your Deezer favourites are among the Sonos favourites, or set deezer_user on the card.",
@@ -4697,7 +4698,17 @@ class CantabileCard extends HTMLElement {
   async _spotifyDeezerre(kaz, kezdo, hsz) {
     let r;
     try { r = await this._hass.callWS({ type: "cantabile/spotify_to_deezer", uri: String(kaz.uri || kaz.id) }); }
-    catch (e) { console.info("Cantabile: a Spotify → Deezer tartalék nem ment:", e?.message || e); return false; }
+    catch (e) {
+      // a Spotify a lista számait nem adja ki: csak Spotify Connect-hangszórón szólhat – ezt mondjuk meg, nem az eszköz-hibát
+      if (/Spotify Connect/.test(e?.message || "")) throw Object.assign(new Error(e.message), { hely: true });
+      console.info("Cantabile: a Spotify → Deezer tartalék nem ment:", e?.message || e); return false;
+    }
+    if (r?.album) {
+      // album: a Deezer ugyanazon albuma, egészben (WiiM-en a WiiM saját Deezerén, Sonoson a Sonos Deezerén), ugyanattól a számtól
+      this._uzen(T("A Spotify itt nem szólhat – ugyanez az album a Deezerről."));
+      await this._betolt({ cim: r.cim || kaz.cim, alcim: r.eloado || kaz.alcim || "", forras: "stream", tipus: "deezer", id: r.album, kep: r.kep || kaz.kep || null }, kezdo);
+      return true;
+    }
     if (!r?.talalt) return false;
     const k = Math.max(0, Number(kezdo) || 0), elotte = r.deezer.slice(0, k).filter(Boolean).length;
     const linkek = r.deezer.filter(Boolean);

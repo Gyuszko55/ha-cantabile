@@ -84,3 +84,33 @@ def test_spotify_deezerre_isrc_alapjan(monkeypatch):
     assert kerdesek[0][1] is True                              # a lista a bejelentkezett fiókkal (privát listák is)
     assert St.SPOTIFY_LINK.search("https://open.spotify.com/intl-hu/album/4aawyAB9vmqN3uQ7FjRGTy").groups() == ("album", "4aawyAB9vmqN3uQ7FjRGTy")
     assert music.DEEZER_UT.match("/track/isrc:GBAYE0601498") and not music.DEEZER_UT.match("/track/isrc:bad")
+
+
+def test_spotify_album_deezer_albumra(monkeypatch):
+    from custom_components.cantabile import music, streaming as St
+
+    async def belso(hass, ut, sajat):
+        assert ut == "/albums/7lUxbRgHGomu4raRe59qTK"
+        return {"name": "Imaginaerum (Remastered 2021)", "artists": [{"name": "Nightwish"}], "total_tracks": 13}
+
+    async def deezer(hass, ut):
+        assert ut.startswith("/search/album?q=")
+        return {"data": [{"id": 1, "title": "Imaginaerum - The Score", "artist": {"name": "Nightwish"}},
+                         {"id": 1530307, "title": "Imaginaerum", "artist": {"name": "Nightwish"}, "cover_medium": "k"}]}
+
+    monkeypatch.setattr(St, "_spotify_belso", belso)
+    monkeypatch.setattr(music, "deezer", deezer)
+    r = asyncio.run(St.spotify_deezerre(None, "spotify:album:7lUxbRgHGomu4raRe59qTK"))
+    assert r["album"] == "https://www.deezer.com/album/1530307" and r["eloado"] == "Nightwish"
+
+
+def test_spotify_lista_zart(monkeypatch):
+    import pytest
+    from custom_components.cantabile import streaming as St
+
+    async def belso(hass, ut, sajat):
+        raise St.StreamHiba("svc_status", status=403)
+
+    monkeypatch.setattr(St, "_spotify_belso", belso)
+    with pytest.raises(St.StreamHiba):
+        asyncio.run(St.spotify_deezerre(None, "spotify:playlist:4wBDB1Bhd9CeI0F5D6aVRZ"))
