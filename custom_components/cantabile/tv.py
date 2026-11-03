@@ -98,6 +98,7 @@ async def x264_van() -> bool:
 TV_DASHBOARD = "cantabile-tv"
 TV_VIEW = "tv"
 OLDAL_VARAS = 35                     # mp – ennyit vár, hogy a kiküldött TV-oldal bejelentkezzen
+AUTO_TUKOR = False                   # 2.7.0b20: a tükör csak kézzel (a kártya TV-ablakának gombjával) indul, magától nem
 ALAIRAS = timedelta(hours=8)
 KEP_URL = "/api/cantabile/tv/image"
 VIDEO_URL = "/api/cantabile/tv/video"
@@ -974,9 +975,40 @@ def ws_follow(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: di
             tv_t = terulet(hass, lj.entity_id, lj.cast)
             if tv_t and cel_t and tv_t != cel_t:
                 lj.tukor_vege()             # más szobában szól: a TV nem mutatja (csak az azonos területű hangszórót)
-            elif msg["target"].startswith("media_player."):
-                lj.tukroz(msg["target"])
+            elif msg["target"].startswith("media_player.") and (lj._tukor == msg["source"] or AUTO_TUKOR):  # noqa: SLF001
+                lj.tukroz(msg["target"])    # 2.7.0b20: csak a kézzel kiküldött tükör követi a zenét (magától nem indul)
     conn.send_result(msg["id"])
+
+
+@websocket_api.websocket_command({vol.Required("type"): "cantabile/tv/mirror", vol.Required("tv"): str,
+                                  vol.Optional("source"): str, vol.Optional("stop", default=False): bool})
+@websocket_api.async_response
+async def ws_mirror(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """A kártya TV-ablakának gombja (2.7.0b20): a TV-oldal kiküldése a TV-re (ha még nincs kint), és hang nélkül a `source`
+    hangszórót mutatja; `stop`: a tükör vége. A tükör csak így indul (magától nem)."""
+    lj = kozpont(hass).lejatszok.get(msg["tv"])
+    if lj is None:
+        conn.send_error(msg["id"], "no_tv", szoveg(hass, "no_tv"))
+        return
+    if msg["stop"]:
+        lj.tukor_vege()
+        conn.send_result(msg["id"], {"mirror_of": None})
+        return
+    forras = msg.get("source") or ""
+    if lj.dlna or not forras.startswith("media_player.") or forras == lj.entity_id:
+        conn.send_error(msg["id"], "no_mirror", "dlna" if lj.dlna else "source")
+        return
+    try:
+        if lj.oldal is None:
+            await kozpont(hass).oldalt_kuld(lj)          # a TV-oldal kiküldése (megvárja a bejelentkezést)
+        lj.tukroz(forras)
+    except HomeAssistantError as err:
+        conn.send_error(msg["id"], "nem_sikerult", str(err))
+        return
+    except Exception as err:  # noqa: BLE001
+        conn.send_error(msg["id"], "nem_sikerult", str(err) or type(err).__name__)
+        return
+    conn.send_result(msg["id"], {"mirror_of": lj._tukor})  # noqa: SLF001
 
 
 def terulet(hass: HomeAssistant, *entity_ids: str | None) -> str | None:
@@ -1078,7 +1110,7 @@ def auto_tukor(hass: HomeAssistant, ev: Event) -> None:
     uj, regi = ev.data.get("new_state"), ev.data.get("old_state")
     if not e.startswith("media_player.") or e.startswith("media_player.cantabile_tv_") or uj is None or regi is None:
         return
-    if uj.state != "playing" or regi.state == "playing":
+    if uj.state != "playing" or regi.state == "playing" or not AUTO_TUKOR:
         return
     kp = hass.data.get(DOMAIN, {}).get("tv")
     if kp is None or not kp.lejatszok:
@@ -1118,5 +1150,6 @@ def regisztral(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_subscribe)
     websocket_api.async_register_command(hass, ws_report)
     websocket_api.async_register_command(hass, ws_follow)
+    websocket_api.async_register_command(hass, ws_mirror)
     websocket_api.async_register_command(hass, ws_reload)
     websocket_api.async_register_command(hass, ws_preview)

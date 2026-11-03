@@ -36,6 +36,14 @@
 
 // angol feliratok (kulcs: a magyar forrásszöveg)
 const EN = {
+  "Kiküldés a TV-re: a TV hang nélkül ezt a hangszórót mutatja": "Send to TV: the TV shows this speaker, silently",
+  "A tükör vége a(z) {t} TV-n": "Stop mirroring on the {t} TV",
+  "Nincs olyan TV, amelyre a tükör kiküldhető (Cast-os Cantabile TV-lejátszó).": "There's no TV to mirror to (a Cast Cantabile TV player).",
+  "A tükör kiküldése a(z) {t} TV-re…": "Sending the mirror to the {t} TV…",
+  "A(z) {t} TV hang nélkül a(z) {h} hangszórót mutatja.": "The {t} TV silently shows {h}.",
+  "A tükör kiküldése nem sikerült: {h}": "Couldn't send the mirror: {h}",
+  "Melyik TV-re küldjem a tükröt?": "Which TV should show the mirror?",
+  "A(z) {t} TV-n a tükör véget ért.": "Mirroring ended on the {t} TV.",
   "A(z) {h} nem tudja lejátszani a Music Assistant zenéjét – a(z) {r} szól tovább.": "{h} can't play Music Assistant's music – {r} keeps playing.",
   "A(z) {h} nem indult el – a(z) {r} szól tovább.": "{h} didn't start – {r} keeps playing.",
   "A(z) {h} TV-n a Music Assistant szól tovább – csak a hang (a TV-oldal képe, dalszövege ehhez nem jár).": "Music Assistant keeps playing on the {h} TV – sound only (no TV page picture or lyrics with it).",
@@ -6616,10 +6624,16 @@ class CantabileCard extends HTMLElement {
     this._tvAblakE = hsz.entity;
     this.shadowRoot.querySelectorAll(".tvg").forEach((b) => b.classList.add("be"));
     const r = document.createElement("div"); r.className = "tvreteg";
-    r.innerHTML = `<div class="uzablak tvablak" role="dialog" aria-label="TV"><div class="tvhely"></div><div class="tvlab"><span>TV · ${ESC(KN(hsz))}</span><span class="tvtk" role="button" title="${T("Teljes képernyő")}">${TV_TK_SVG}FULL SCREEN</span><span>CLOSE</span></div></div>`;
+    // a tükör (2.7.0b20): csak innen, kézzel indul – SEND TO TV; ha egy TV már ezt mutatja: MIRROR OFF
+    const tukrozo = this._tukorTvk(hsz).find((t) => t.most);
+    const tg = /^media_player\.cantabile_tv_/.test(hsz.entity) ? ""
+      : tukrozo ? `<span class="tvtk tvki" role="button" data-ki="1" title="${ESC(T("A tükör vége a(z) {t} TV-n", { t: tukrozo.nev }))}">MIRROR OFF</span>`
+      : `<span class="tvtk tvki" role="button" title="${ESC(T("Kiküldés a TV-re: a TV hang nélkül ezt a hangszórót mutatja"))}">SEND TO TV</span>`;
+    r.innerHTML = `<div class="uzablak tvablak" role="dialog" aria-label="TV"><div class="tvhely"></div><div class="tvlab"><span>TV · ${ESC(KN(hsz))}</span>${tg}<span class="tvtk" role="button" title="${T("Teljes képernyő")}">${TV_TK_SVG}FULL SCREEN</span><span>CLOSE</span></div></div>`;
     const ab = r.firstElementChild;
     ab.addEventListener("click", (ev) => { ev.stopPropagation(); this._tvAblakZar(); });
-    ab.querySelector(".tvtk").addEventListener("click", (ev) => { ev.stopPropagation(); this._tvTeljesBe(); });
+    ab.querySelector(".tvtk:not(.tvki)").addEventListener("click", (ev) => { ev.stopPropagation(); this._tvTeljesBe(); });
+    ab.querySelector(".tvki")?.addEventListener("click", (ev) => { ev.stopPropagation(); ev.currentTarget.dataset.ki ? this._tvTukorKi(tukrozo, hsz) : this._tvTukorKuld(hsz); });
     const tv = document.createElement("cantabile-tv");
     // az ablakban a borítós nézet (kicsiben ez a legolvashatóbb), a hangszóró adataival
     tv.setConfig({ elonezet: hsz.entity, visual: "cover", ...(this._tvIdojaras ? { weather: this._tvIdojaras } : {}) });
@@ -6641,6 +6655,46 @@ class CantabileCard extends HTMLElement {
         if (k) { this._tvIdojaras = k[1]; if (this._tvAblakE === hsz.entity) this._tvAblakNyit(); }
       }, () => {});
     }
+  }
+
+  // a tükör forrása (Multiroom: a csoport vezetője) és a TV-k, amelyekre kiküldhető: a helyiség TV-i elöl (a mátrixból),
+  // utána a többi Cast-os Cantabile TV; `most`: épp ezt a hangszórót mutatja
+  _tukorForras(hsz) { return hsz?.tagok ? (this._hass?.states[hsz.tagok[0]]?.attributes?.group_members?.[0] || hsz.tagok[0]) : hsz?.entity; }
+
+  _tukorTvk(hsz) {
+    const forras = this._tukorForras(hsz), st = this._hass?.states || {};
+    const oszlop = this._matrixOszlop(hsz), helyi = (MATRIX?.hangszorok || []).find((h) => h.entity_id === oszlop)?.tv_kep || [];
+    const nev = (e) => KN(this._kimenetek.find((h) => h.entity === e) || { nev: st[e]?.attributes?.friendly_name || e });
+    const mind = Object.keys(st).filter((e) => /^media_player\.cantabile_tv_/.test(e) && st[e].attributes?.tv_mode !== "dlna" && st[e].state !== "unavailable");
+    const sor = [...helyi.filter((t) => t.tukor).map((t) => t.tv), ...mind].filter((e, i, a) => e && a.indexOf(e) === i && st[e] && st[e].state !== "unavailable" && st[e].attributes?.tv_mode !== "dlna");
+    return sor.map((e) => ({ tv: e, nev: nev(e), most: !!forras && (st[e].attributes?.mirror_of === forras || (hsz?.tagok || []).includes(st[e].attributes?.mirror_of)) }));
+  }
+
+  async _tvTukorKuld(hsz) {
+    const forras = this._tukorForras(hsz), tvk = this._tukorTvk(hsz);
+    if (!tvk.length) return this._uzen(T("Nincs olyan TV, amelyre a tükör kiküldhető (Cast-os Cantabile TV-lejátszó)."));
+    const kuld = async (t) => {
+      this._uzen(T("A tükör kiküldése a(z) {t} TV-re…", { t: t.nev }));
+      try {
+        await this._hass.callWS({ type: "cantabile/tv/mirror", tv: t.tv, source: forras });
+        this._naplo("tükör kiküldve", "info", { tv: t.tv, forras });
+        this._uzen(T("A(z) {t} TV hang nélkül a(z) {h} hangszórót mutatja.", { t: t.nev, h: KN(hsz) }));
+      } catch (e) {
+        this._naplo("tükör kiküldése nem sikerült", "warning", { tv: t.tv, forras, hiba: String(e?.message || e?.code || e) });
+        this._uzen(T("A tükör kiküldése nem sikerült: {h}", { h: e?.message || e?.code || e }));
+      }
+      if (this._tvAblakE) this._tvAblakNyit();
+    };
+    if (tvk.length === 1) return kuld(tvk[0]);
+    this._uzen(T("Melyik TV-re küldjem a tükröt?"), tvk.map((t) => ({ szoveg: t.nev, fn: () => kuld(t) })));
+  }
+
+  async _tvTukorKi(t, hsz) {
+    if (!t) return;
+    try { await this._hass.callWS({ type: "cantabile/tv/mirror", tv: t.tv, stop: true }); } catch (_) { /* régebbi integráció */ }
+    this._naplo("tükör vége", "info", { tv: t.tv });
+    this._uzen(T("A(z) {t} TV-n a tükör véget ért.", { t: t.nev }));
+    if (this._tvAblakE) this._tvAblakNyit();
   }
 
   // a zene megállt (vége az albumnak, leállították): 5 mp múlva az ablak magától bezárul

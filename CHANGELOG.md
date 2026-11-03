@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0b20 – 2026-11-03
+
+- **The TV mirror is sent by hand.** The TV window (TV button on the player) has a new **SEND TO TV** button: it casts the Cantabile TV page to a TV (the room's TVs first; if there are several, you pick one) and the TV silently shows the speaker in the window. While a TV shows it, the button reads **MIRROR OFF**. A mirror no longer starts by itself (not when a speaker in the room starts playing, nor when you switch from the TV to a speaker); a mirror you sent follows the music when you move it to another speaker on the card. New websocket: `cantabile/tv/mirror`.
+
 ## 2.7.0b19 – 2026-11-03
 
 - **A TV whose Music Assistant player can't play no longer swallows the music.** On a DLNA TV (e.g. Samsung) the MA player showed "playing" for a second, then stopped, and the card took it as done. Now the card checks that the TV's MA player keeps playing for a few seconds; if not, the MA queue goes back to the old speaker, the selector returns with a message, and the route is marked as not playing for an hour in the route matrix.
