@@ -82,6 +82,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self._src: str | None = None
         self._fajl: str | None = None
         self._atkodolva = False
+        self._atkod_fut = False          # a FLAC-hiba utáni MP3-as újraindítás folyik: a régi cím jelentései nem számítanak
         self._inditas_adat: tuple[str, str, dict[str, Any]] | None = None
         self._poz: float | None = None
         self._hossz: float | None = None
@@ -195,6 +196,8 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
     def jelentes(self, msg: dict[str, Any]) -> None:
         if msg.get("src") and self._src and msg["src"] != self._src:
             return                              # egy előző szám késve érkező jelentése
+        if self._atkod_fut and msg.get("state") != "playing":
+            return                              # a hibás (FLAC) cím „idle” jelentése: ne lépjen tovább a sorozat
         if (msg.get("error") and self._fajl and not self._atkodolva and self._inditas_adat
                 and self._fajl.lower().endswith(ATKODOLANDO)):
             # a TV-oldal ezt a formátumot nem tudja megnyitni (pl. Android TV-s Cast-vevő és FLAC): megjegyezzük, és
@@ -208,7 +211,8 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             mt, mid, kw = self._inditas_adat
             kw = {**kw, "extra": {**kw.get("extra", {}), "start_position": float(msg.get("position") or 0)}}
             self._inditas_adat = None
-            self.hass.async_create_task(self.async_play_media(mt, mid, **kw), f"cantabile_tv_atkod_{self.entity_id}")
+            self._atkod_fut = True
+            self.hass.async_create_task(self._atkodva_ujra(mt, mid, kw), f"cantabile_tv_atkod_{self.entity_id}")
             return
         if msg.get("meta") and not self._meta:
             # újracsatlakozás (pl. HA-újraindítás után): a TV-oldal még szól – visszavesszük, mi az
@@ -567,6 +571,12 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         return " · ".join(x for x in (hol, honnan) if x)
 
     # ---- vezérlés ----
+    async def _atkodva_ujra(self, mt: str, mid: str, kw: dict[str, Any]) -> None:
+        try:
+            await self.async_play_media(mt, mid, **kw)
+        finally:
+            self._atkod_fut = False
+
     async def async_play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
         self.tukor_vege(kuld=False)
         kp = kozpont(self.hass)
@@ -596,6 +606,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self._mcid, self._src, self._meta, self._cue_i = media_id, src, meta, (0 if meta.get("cue") else None)
         self._hossz, self._poz, self._poz_ido = meta.get("duration") or None, kezdet, dt_util.utcnow()
         self._allapot = MediaPlayerState.PLAYING     # az oldal jelentése felülírja (pl. hiba → idle)
+        self._atkod_fut = False                      # az új cím él: innen a jelentések újra számítanak
         self.uzen({"cmd": "play", "src": src, "meta": meta, "t": time.time(), **({"start": kezdet} if kezdet > 1 and not atkod else {})})
         self.async_write_ha_state()
 

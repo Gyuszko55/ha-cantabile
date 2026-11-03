@@ -4,6 +4,8 @@
 
 - **3D route matrix, step A: every route now carries its recipe.** Besides which player and under which conditions, a cell's route now says how it starts: the command and its parameters (e.g. WiiM CreateQueue with the WiiM's Deezer account, the Sonos queue filled with Deezer links, `cantabile.play_tracks`), whether it can start at a position (seconds / track index / no), whether playback can be handed over to another player, and per content format (the third dimension) whether it plays directly or transcoded (FLAC → MP3 320k). For now the recipe is data only; the card still starts routes itself, so nothing changes in use.
 - **Learned player traits are kept.** When a TV page can't open FLAC, the TV is remembered in the matrix store: after a restart the TV gets MP3 from the first track instead of failing once again. `cantabile/matrix/reset` with `learned: true` forgets them.
+- Fix: when a TV page first failed on a FLAC inside an album, the series ran through every remaining track in seconds (the failed FLAC's late "idle" report looked like the end of the track while the MP3 re-play was starting). Those reports are now ignored until the MP3 plays.
+- The radio route's recipe is `media_player.play_media` with the station's stream URL.
 
 ## 2.7.0b10 – 2026-11-03
 
