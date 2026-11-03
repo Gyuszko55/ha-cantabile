@@ -302,14 +302,14 @@ Assistant language: **Hungarian** or **English**.
 
 | Service | What you need | What you get | Plays on |
 |---|---|---|---|
-| **Sonos favourites** | Favourites saved in the Sonos app | Your saved playlists, albums and stations on the STREAMING tab, by voice too | Sonos |
-| **Deezer** | A Deezer subscription linked in the **Sonos app** (*Settings → Services & voice → Add a service*). Searching needs no account. | Charts, search, artist pages, albums, tracks; voice (*“… from Deezer”*); anything not in your music folder is looked up here | Sonos |
+| **Sonos favourites** | Favourites saved in the Sonos app | Your saved playlists, albums and stations on the STREAMING tab, by voice too | Sonos; elsewhere the favourite's content (Deezer, Spotify, radio) |
+| **Deezer** | A Deezer subscription linked in the **Sonos app** (*Settings → Services & voice → Add a service*). Searching needs no account. | Charts, search, artist pages, albums, tracks; voice (*“… from Deezer”*); anything not in your music folder is looked up here | Sonos, WiiM (own Deezer), Music Assistant players; elsewhere from the music folder |
 | **Spotify** *(experimental)* | 1. The Home Assistant **Spotify** integration – with your own Spotify developer app; redirect URI `https://my.home-assistant.io/redirect/oauth`; **Premium** for playback. 2. Optional: a Spotify developer key (client ID / secret) in the **Cantabile options** for catalogue search (without it the Spotify integration's session is used). 3. For Sonos: Spotify linked in the Sonos app. | Search, artist pages, albums, your playlists and library; voice (*“… from Spotify”*) | Sonos (link), any **Spotify Connect** speaker (e.g. WiiM) |
 | **Tidal** *(experimental)* | A Tidal developer key (developer.tidal.com, client ID / secret) in the Cantabile options; Tidal linked in the Sonos app | Search, artists, albums, playlists; voice (*“… from Tidal”*) | Sonos |
 
 **Watch out**
 - Streaming services play on the speaker itself, so the VU meters **simulate** and no bitrate / codec is shown (the speaker doesn't report them).
-- Deezer, Tidal and the Sonos favourites are **Sonos only** – choosing another speaker shows a message and keeps the music where it is.
+- **Tidal** plays only on Sonos. **Deezer** and the **Sonos favourites** play elsewhere too: on Sonos through its own Deezer, on a WiiM through the WiiM's own Deezer (lossless), on a Music Assistant player through MA's Deezer, otherwise the same tracks from the music folder; instead of a Sonos favourite its content plays (a Deezer album / playlist, Spotify or radio). The route matrix shows which route lives on a speaker.
 - **Spotify developer apps run in “development mode”** with stricter limits, and Cantabile works within them: 10 search results per type, artist albums 10 at a time, no “top tracks” (a filtered search is used instead), and other people's playlists can be started but not listed track by track.
 - Your Spotify library can only be browsed while something is playing on Spotify (a limit of the Home Assistant Spotify player); otherwise the tab asks what to search for.
 - Spotify Connect: a speaker may be missing from Spotify's device list until it has played Spotify once – open the Spotify app on it, or set `spotify_device: <name as Spotify shows it>` on the speaker.
@@ -454,7 +454,7 @@ under *Control Home Assistant* – the wizard's *Voice* step lists your agents a
   kept under ~1.5 GB. Radio runs as a live MPEG-TS video.
 - Seeking is not available on these videos; next / previous track work.
 
-- The TV plays the music folder, radio, NET stations and PHONE music; Deezer, Tidal and the Sonos favourites stay on Sonos.
+- The TV plays the music folder, radio, NET stations and PHONE music on the TV page; Deezer and the Sonos favourites from the music folder (when the tracks are there), a long list on the TV's own Music Assistant player (sound only). Tidal stays on Sonos.
 - DLNA: about 7 s preparation per track (on albums the next one is prepared in the background), sound as AAC 256 kbps,
   no seeking; radio runs as a live video. Cast: the sound is the original file / stream.
 - Cast TV page background: it changes every 30 s with a slow fade and zoom – the artist's fanart from TheAudioDB (free,
@@ -576,7 +576,7 @@ The earlier Hungarian keys (`hangszorok`, `adok`, `magno`, `nas` …) are accept
 - **Speaker lock (several users)**: a speaker belongs to the user who started music on it from a Cantabile card
   (or by voice, when the voice request comes from a logged-in user). On the other users' cards it is dimmed in the selector
   with a slowly blinking lamp and can't be selected; commands to it are refused, and the card says who is using it
-  (“Living room is in use: Kata · phone is using it.”). The same user can carry on from another device. The speaker is
+  (“Living room is in use: Anna · phone is using it.”). The same user can carry on from another device. The speaker is
   released on STOP, POWER or switching to another speaker, or when it has been silent (paused, stopped, off) for
   5 minutes. An administrator can take it over with **Take over** in the message; the previous user's card is told.
   Voice requests (`cantabile.play`, the Assist tool) don't take a speaker someone else is using. The BT output is never

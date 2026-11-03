@@ -300,14 +300,14 @@ nyelvét követik: **magyar** vagy **angol**.
 
 | Szolgáltatás | Mi kell hozzá | Mit tud | Hol szól |
 |---|---|---|---|
-| **Sonos-kedvencek** | A Sonos appban elmentett kedvencek | A mentett listák, albumok, adók a STREAMING fülön, hanggal is | Sonos |
-| **Deezer** | A **Sonos appban** bekötött Deezer-előfizetés (*Beállítások → Szolgáltatások és hang → Szolgáltatás hozzáadása*). A kereséshez nem kell fiók. | Toplisták, keresés, előadó-oldalak, albumok, számok; hanggal (*„… a Deezerről”*); ami a zenemappában nincs meg, azt itt keresi | Sonos |
+| **Sonos-kedvencek** | A Sonos appban elmentett kedvencek | A mentett listák, albumok, adók a STREAMING fülön, hanggal is | Sonos; máshol a kedvenc tartalma (Deezer, Spotify, rádió) |
+| **Deezer** | A **Sonos appban** bekötött Deezer-előfizetés (*Beállítások → Szolgáltatások és hang → Szolgáltatás hozzáadása*). A kereséshez nem kell fiók. | Toplisták, keresés, előadó-oldalak, albumok, számok; hanggal (*„… a Deezerről”*); ami a zenemappában nincs meg, azt itt keresi | Sonos, WiiM (saját Deezer), Music Assistant-lejátszó; máshol a zenemappából |
 | **Spotify** *(kísérleti)* | 1. A Home Assistant **Spotify** integrációja – saját Spotify fejlesztői appal; átirányítási cím `https://my.home-assistant.io/redirect/oauth`; a lejátszáshoz **Premium**. 2. Elhagyható: Spotify fejlesztői kulcs (client ID / secret) a **Cantabile beállításaiban** a katalógus-kereséshez (nélküle a Spotify-integráció munkamenetét használja). 3. Sonoshoz: a Sonos appban bekötött Spotify. | Keresés, előadó-oldalak, albumok, a saját listáid és könyvtárad; hanggal (*„… a Spotifyról”*) | Sonos (linkkel), bármely **Spotify Connect** hangszóró (pl. WiiM) |
 | **Tidal** *(kísérleti)* | Tidal fejlesztői kulcs (developer.tidal.com, client ID / secret) a Cantabile beállításaiban; a Sonos appban bekötött Tidal | Keresés, előadók, albumok, listák; hanggal (*„… a Tidalról”*) | Sonos |
 
 **Mire figyelj**
 - A streaming-szolgáltatások magán a hangszórón szólnak, ezért a VU-mérők **utánoznak**, és bitráta / kódolás sem látszik (a hangszóró nem adja meg).
-- A Deezer, a Tidal és a Sonos-kedvencek **csak Sonoson** szólnak – más hangszóró választásakor üzenet jön, és a zene a helyén marad.
+- A **Tidal** csak Sonoson szól. A **Deezer** és a **Sonos-kedvencek** máshol is: Sonoson a Sonos saját Deezere, WiiM-en a WiiM saját Deezere (lossless), Music Assistant-lejátszón az MA Deezere, egyébként ugyanazok a számok a zenemappából; a Sonos-kedvenc helyett a tartalma szól (Deezer-album / -lista, Spotify vagy rádió). Hogy egy hangszórón melyik út él, az útmátrix mutatja.
 - **A Spotify fejlesztői appok „fejlesztői módban” futnak**, szigorúbb korlátokkal; a Cantabile ezeken belül működik: típusonként 10 találat, az előadó albumai tízesével, „legnépszerűbb számok” nincs (helyette szűrt keresés), mások listái elindíthatók, de számonként nem listázhatók.
 - A Spotify-könyvtárad csak akkor böngészhető, ha épp szól valami a Spotifyon (a Home Assistant Spotify-lejátszójának korlátja); különben a fül megkérdezi, mit keressen.
 - Spotify Connect: egy hangszóró hiányozhat a Spotify eszközlistájáról, amíg egyszer nem játszott Spotifyt – nyisd meg rajta a Spotify appot, vagy add meg a hangszórónál: `spotify_device: <ahogy a Spotify mutatja>`.
@@ -448,7 +448,7 @@ résznél az *Assist* mellett kapcsold be a **Cantabile**-t is – a varázsló 
   MPEG-TS videóként megy.
 - Ezekben a videókban nem lehet tekerni; a következő / előző szám működik.
 
-- A TV a zenemappát, a rádiót, a NET-adókat és a PHONE zenéit játssza; a Deezer, a Tidal és a Sonos-kedvencek Sonoson maradnak.
+- A TV a zenemappát, a rádiót, a NET-adókat és a PHONE zenéit játssza a TV-oldalon; a Deezert és a Sonos-kedvenceket a zenemappából (ha ott megvannak), hosszú listát a TV saját Music Assistant-lejátszóján (csak hang). A Tidal Sonoson marad.
 - DLNA: számonként kb. 7 mp előkészítés (albumnál a következőt a háttérben készíti), a hang AAC 256 kbps, tekerni nem
   lehet; a rádió élő videóként megy. Cast: a hang az eredeti fájl / adás.
 - A Cast-os TV-oldal háttere 30 mp-enként lassú áttűnéssel és nagyítással vált: az előadó TheAudioDB-s háttérképei
@@ -570,7 +570,7 @@ A korábbi magyar kulcsok (`hangszorok`, `adok`, `magno`, `nas` …) is működn
 - **Hangszóró-foglalás (több felhasználó)**: a hangszóró azé a felhasználóé, aki egy Cantabile kártyáról (vagy
   bejelentkezett felhasználóként hanggal) zenét indított rajta. A többi felhasználó kártyáján a választóban halvány,
   a lámpája lassan villog, és nem választható ki; a parancsok sem mennek rá, a kártya megmondja, ki használja
-  („A(z) Nappali foglalt: Kata · telefon használja.”). Ugyanaz a felhasználó a másik készülékéről folytathatja.
+  („A(z) Nappali foglalt: Anna · telefon használja.”). Ugyanaz a felhasználó a másik készülékéről folytathatja.
   A foglalás STOP-ra, POWER-re vagy másik hangszóróra váltáskor szűnik meg, vagy ha a hangszóró 5 perce nem szól
   (szünet, áll, ki van kapcsolva). Rendszergazda az üzenet **Átveszem** gombjával átveheti; az előző felhasználó
   kártyája erről üzenetet kap. A hangparancs (`cantabile.play`, az Assist-eszköz) nem veszi el a más által használt
