@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.0b18 – 2026-11-03
+
+- **Long Deezer lists move to a TV in full.** Moving a Sonos Deezer list of 40+ tracks (e.g. Deezer favourites) to a Cantabile TV used to look every track up in the music folder: it took half a minute and found only a tenth of them, so the TV would stop after those. Now a long list goes to the TV's own Music Assistant player with every track, sound only; albums (shorter) still play from the music folder on the TV page with picture and lyrics.
+- **A late result no longer acts after you've moved on.** If you switch to another speaker while a slow lookup is still running, its result neither starts the old target nor sets the selector back.
+
 ## 2.7.0b17 – 2026-11-03
 
 - **What moved to a TV's Music Assistant player can be moved on.** After a Music Assistant queue was moved to a TV (sound only, on the TV's own MA player), the TV button showed the TV page player as off, so switching away found nothing to move. Now, while the TV's MA player plays or pauses an MA queue, the TV button uses it as its source and the queue moves on to the next speaker.

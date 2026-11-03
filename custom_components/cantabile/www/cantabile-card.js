@@ -556,6 +556,8 @@ const EN = {
 // a DLNA-s TV (élő videó) a „playing” jelzés után kb. ennyi mp-cel később szól ténylegesen (pufferel): váltáskor a régi
 // hangszóró ennyivel tovább szól, a TV-ről elváltva az új ennyivel korábbról indul
 const DLNA_KESES = 3;
+// ennyi számtól a Deezer-lista TV-n a TV saját Music Assistant-lejátszóján szól (a zenemappás keresés lassú, hiányos)
+const TV_HOSSZU_LISTA = 40;
 const VERZIO = (() => { try { return new URL(import.meta.url).searchParams.get("v") || ""; } catch (e) { return ""; } })();
 const MAGYAR = () => /^hu/i.test(document.documentElement.lang || navigator.language || "");
 const T = (s, v = {}) => String((MAGYAR() ? s : EN[s] ?? s)).replace(/\{(\w+)\}/g, (_, k) => v[k] ?? "");
@@ -2958,11 +2960,16 @@ class CantabileCard extends HTMLElement {
   // kimenetváltás: ami szól, átkerül az új kimenetre (mint egy igazi hangszóróválasztón); atvisz=false: csak választ
   // a választó visszaáll a régi hangszóróra (az új nem szólt): naplózva, hogy utólag kiderüljön, miért
   _visszaRegire(regi, ok = "") {
+    if (this._atvitelCel && this._hangszoro() !== this._atvitelCel) {
+      this._naplo("közben máshova váltottak – a választó marad", "info", { regi: regi?.entity || null, ok });
+      return;
+    }
     this._naplo("visszaállt a régi hangszóróra", "warning", { regi: regi?.entity || null, cel: this._hangszoro()?.entity || null, ok });
     this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso();
   }
 
   async _atviszHaKell(regi, uj) {
+    this._atvitelCel = uj;                 // ha közben máshova váltottak, az elkésett eredmény nem indít, nem állít vissza
     // a hangszóró saját bemenete (BT IN, LINE IN) nem vihető át: a régi szünetel (BT-n a telefon is megáll), az új hallgat;
     // ha visszaváltunk rá, onnan folytatja – hacsak nem visszük rá épp más zenét
     const regiBem = regi.entity !== HELYI && this._bemenetrol(regi.entity);
@@ -3190,7 +3197,11 @@ class CantabileCard extends HTMLElement {
         if (await this._wiimDeezer(regi.entity, uj, { ...dzf, poz: dzf.poz + (Date.now() - t0) / 1000 })) {
           return this._hiv("media_player", "media_pause", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
         }
-        if (!(await this._helyettesitJatszik({ deezer: dzf.ids }, a.media_album_name || a.media_title || "Deezer", dzf.kezdo, uj, dzf.poz, t0))) {
+        // TV-re hosszú lista (pl. Deezer-kedvencek): a zenemappában számonkénti keresés lassú és többnyire hiányos – a TV
+        // saját MA-lejátszója a teljes listát viszi (csak hang); album (rövid) marad a zenemappából, a TV-oldalon
+        const tvDz = dzf.ids.length >= TV_HOSSZU_LISTA ? this._tvMaDeezer(uj) : null;
+        if (tvDz) this._naplo("hosszú Deezer-lista TV-re: a TV MA-lejátszója", "info", { cel: tvDz, db: dzf.ids.length });
+        if (!(await this._helyettesitJatszik({ deezer: dzf.ids }, a.media_album_name || a.media_title || "Deezer", dzf.kezdo, uj, dzf.poz, t0, tvDz ? { ma: tvDz, ut: "ma" } : {}))) {
           this._visszaRegire(regi, "deezer-helyettesítés: " + (this._helyettesitOk || "?"));
           if (this._helyettesitOk === "lejatszas") this._uzen(T("A(z) {h} nem indult el – a(z) {r} szól tovább.", { h: KN(uj), r: KN(regi) }));
           return this._frissit();
@@ -3350,6 +3361,12 @@ class CantabileCard extends HTMLElement {
       r = await this._hass.callWS({ type: "cantabile/substitute", entity_id: hsz.entity, ma_entity: opt.ut === "nas" ? null : (opt.ma || this._maE(hsz)),
         mappa: opt.ut === "ma" ? null : String(this._config.magno?.nas || "").replace(/\/$/, "") || null, ...bem });
     } catch (_) { /* régebbi integráció */ }
+    // közben máshova váltottak (a keresés több száz számnál fél percig is tarthat): nem indítunk el semmit
+    if (this._hangszoro()?.entity !== hsz.entity) {
+      this._helyettesitOk = "elavult";
+      this._naplo("helyettesítés elkésett – közben máshova váltottak, nem indul", "info", { cel: hsz.entity });
+      return false;
+    }
     // a hiba oka a hívónak (útmátrix): „nincs” – a tartalom nincs meg ezen az úton; „lejatszas” – megvan, de nem szólt
     this._helyettesitOk = "nincs";
     if (!r?.mod) { if (!opt.csendes) this._uzen(T("„{c}” a(z) {h} hangszórón nem szólhat, és máshonnan sem találtam meg.", { c: cim || "", h: KN(hsz) })); return false; }
@@ -3555,6 +3572,13 @@ class CantabileCard extends HTMLElement {
 
   // a szóló (vagy szünetelő) kazetta számsora és helye, magától a lejátszótól: Sonosnál a sorából, WiiM-nél az integráció
   // sorozatából, BT-n a kártya listájából. Csak zenemappás számsort ad (Deezer / kedvenc / telefonos zene: null).
+  // a TV Music Assistant-lejátszója a Deezerhez (a mátrix deezer-cellájának ma_deezer útja), ha él
+  _tvMaDeezer(h) {
+    if (!h || !/^media_player\.cantabile_tv_/.test(h.entity)) return null;
+    const u = this._matrixCella("deezer", h)?.utak?.find((x) => x.ut === "ma_deezer" && x.allapot === "ok");
+    return u?.kimenet || null;
+  }
+
   _dlnaTv(e) { return this._hass?.states?.[e]?.attributes?.tv_mode === "dlna"; }
 
   // a TV saját Music Assistant-lejátszója (a mátrixból): ott az MA-n szóló zene csak hangként szólhat tovább
