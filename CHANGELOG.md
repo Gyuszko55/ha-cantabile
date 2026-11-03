@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.1b5 – 2026-11-03
+
+- The QUEUE tab's Music Assistant list shows the cover thumbnails again (the full-queue list had none).
+- **Lyrics without timing scroll along with the song.** When only plain lyrics exist, the tape's lyrics panel shows them without highlighting in a 5–6 line window, a little smaller than the highlighted line of synced lyrics, scrolling evenly with the track's position (a made-up timing: the text runs from about 6 % to 92 % of the track). Scrolling by hand pauses it for a few seconds.
+
 ## 2.7.1b4 – 2026-11-03
 
 - The QUEUE tab's Music Assistant list follows the playing track: on a track change it reloads with the new track highlighted and scrolled into view (before, it stayed where it was opened).

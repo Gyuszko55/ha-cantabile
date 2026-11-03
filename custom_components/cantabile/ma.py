@@ -369,8 +369,15 @@ def regisztral(hass: HomeAssistant) -> None:
             mass = getattr(getattr(bej, "runtime_data", None), "mass", None)
             if mass is not None:
                 with contextlib.suppress(Exception):     # régebbi kliens / MA-hiba: csak a szóló és a következő
-                    elemek = [x.to_dict() if hasattr(x, "to_dict") else x
-                              for x in await mass.player_queues.get_queue_items(q["queue_id"], limit=msg["before"] + msg["after"] + 1, offset=off)]
+                    for x in await mass.player_queues.get_queue_items(q["queue_id"], limit=msg["before"] + msg["after"] + 1, offset=off):
+                        d = x.to_dict() if hasattr(x, "to_dict") else dict(x)
+                        # a kliens a képet objektumként adja: a borító címe (az MA képtovábbítóján), ahogy a HA get_queue is
+                        kep = None
+                        with contextlib.suppress(Exception):
+                            kep = mass.get_media_item_image_url(x)
+                        if kep and isinstance(d.get("media_item"), dict):
+                            d["media_item"]["image"] = kep
+                        elemek.append(d)
             if not elemek:
                 off = idx
                 elemek = [x for x in (q.get("current_item"), q.get("next_item")) if x]

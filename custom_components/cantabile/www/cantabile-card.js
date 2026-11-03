@@ -1972,6 +1972,11 @@ class CantabileCard extends HTMLElement {
         .dalpolc .dlista.szinkron p { opacity: .55; }
         .dalpolc .dlista.szinkron p.most { opacity: 1; color: #ffd892; transform: scale(1.06); text-shadow: 0 0 10px rgba(255,190,90,.35); }
         .dalpolc .dlista p.szunet { font-size: calc(13px * var(--bk, 1)); letter-spacing: .3em; }
+        /* időzítés nélküli szöveg (2.7.1): kiemelés nélkül, 5–6 sornyi ablakban, a szám haladásával egyenletesen gördül */
+        .dalpolc .dlista.gordul { flex: 0 1 auto; margin-block: auto; box-sizing: border-box; scrollbar-width: none; -webkit-mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); }
+        .dalpolc .dlista.gordul::-webkit-scrollbar { display: none; }
+        .dalpolc .dlista.gordul p { font-size: calc(16px * var(--bk, 1)); padding: 3px 0; color: #e6cf9f; }
+        :host([keskeny]) .dalpolc .dlista.gordul p { font-size: calc(14px * var(--bk, 1)); }
         .dalpolc .duzenet { margin: auto; color: #cdb995; font: 500 calc(14px * var(--bk, 1))/1.4 "Cantabile Sans", Arial, sans-serif; text-align: center; }
         .dalpolc .dlab { display: flex; justify-content: space-between; gap: 10px; color: #8f7a58; font: 500 calc(10.5px * var(--bk, 1))/1.2 "Cantabile Sans", Arial, sans-serif; letter-spacing: .04em; }
         :host([keskeny]) .dalpolc .dlista p { font-size: calc(15px * var(--bk, 1)); }
@@ -4698,10 +4703,13 @@ class CantabileCard extends HTMLElement {
     const p = sr.getElementById(dl.hol === "r" ? "dalpolc_r" : "dalpolc_m");
     p.hidden = false;
     const v = dl.v, szinkron = dl.hol === "m" && v?.synced?.length;
+    // nincs időzítés: fiktív időzítéssel gördülő szöveg (a magnón, ha a szám hossza ismert)
+    const gordul = !szinkron && dl.hol === "m" && !!(v?.plain || v?.synced?.length) && !uzenet;
+    dl.gordul = gordul;
     let test = `<div class="duzenet">${ESC(uzenet || "")}</div>`;
     if (!uzenet && v) {
       const sorok = szinkron ? v.synced.map(([t, x]) => [t, x]) : (v.plain || (v.synced || []).map((x) => x[1]).join("\n")).split("\n").map((x) => [null, x]);
-      test = `<div class="dlista${szinkron ? " szinkron" : ""}">${sorok.map(([t, x]) => `<p${t != null ? ` data-t="${t}"` : ""}${x.trim() ? "" : ' class="szunet"'}>${x.trim() ? ESC(x) : "♪ ♪ ♪"}</p>`).join("")}</div>`;
+      test = `<div class="dlista${szinkron ? " szinkron" : gordul ? " gordul" : ""}">${sorok.map(([t, x]) => `<p${t != null ? ` data-t="${t}"` : ""}${x.trim() ? "" : ' class="szunet"'}>${x.trim() ? ESC(x) : "♪ ♪ ♪"}</p>`).join("")}</div>`;
     }
     p.innerHTML = `
       <div class="pfej"><span class="pful akt">LYRICS</span><div class="put">${ESC(dl.d.artist)} – ${ESC(dl.d.title)}</div>${v?.found && !this._nincsIntegracio ? `<span class="pful drossz" role="button" tabindex="0" title="${ESC(T("Rossz dalszöveg: törlöm, és másikat keresek (ezt többé nem hozza)"))}">WRONG LYRICS</span>` : ""}<button class="pzar" title="${T("Bezár")}">×</button></div>
@@ -4713,6 +4721,14 @@ class CantabileCard extends HTMLElement {
     if (l) ["wheel", "touchstart", "mousedown"].forEach((e) => l.addEventListener(e, () => { dl.kezi = Date.now(); }, { passive: true }));
     // időzített szövegnél fent-lent fél doboznyi hely, hogy az első és az utolsó sor is középre görgethető legyen
     if (l && szinkron) l.style.paddingBlock = `${Math.round(l.clientHeight * 0.42)}px`;
+    if (l && gordul) {
+      // 5–6 sornyi ablak (ha a hely engedi); fent-lent fél ablaknyi hely, hogy a szöveg alulról jöjjön és felül menjen ki
+      const sor = l.querySelector("p:not(.szunet)")?.offsetHeight || 26;
+      const hely = l.parentElement ? l.parentElement.clientHeight - 70 : sor * 6;
+      const mag = Math.max(sor * 3, Math.min(sor * 6, hely));
+      l.style.height = `${Math.round(mag)}px`;
+      l.style.paddingBlock = `${Math.round(mag / 2)}px`;
+    }
     dl.most = -1;
     this._dalLep();
   }
@@ -4723,6 +4739,7 @@ class CantabileCard extends HTMLElement {
     // másik dal szól → új szöveg (ha épp semmi, a régi marad)
     const uj = dl.hol === "r" ? this._radioDal : this._kazDal;
     if (uj && `${uj.artist}|${uj.title}` !== dl.kulcs) return this._dalNyit(dl.hol);
+    if (dl.hol === "m" && dl.gordul) return this._dalGordit();
     if (dl.hol !== "m" || !dl.v?.synced?.length) return;
     const a = this._magnoAllapot?.s?.attributes || {}, fut = this._magnoAllapot?.szol;
     if (a.media_position == null) return;
@@ -4739,6 +4756,18 @@ class CantabileCard extends HTMLElement {
     if (!el) return;
     el.classList.add("most");
     if (Date.now() - dl.kezi > 4000) l.scrollTo({ top: el.offsetTop - l.clientHeight / 2 + el.clientHeight / 2, behavior: "smooth" });
+  }
+
+  // időzítés nélküli szöveg: a szám helye szerint (eleje ~6 %, vége ~92 % – a bevezető és a lecsengés szöveg nélkül)
+  _dalGordit() {
+    const dl = this._dal, l = this.shadowRoot.querySelector("#dalpolc_m .dlista.gordul");
+    if (!dl || !l || Date.now() - dl.kezi < 4000) return;
+    const a = this._magnoAllapot?.s?.attributes || {}, fut = this._magnoAllapot?.szol;
+    const hossz = Number(a.media_duration) || Number(dl.d.duration) || 0;
+    if (!hossz || a.media_position == null) return;
+    const poz = a.media_position + (fut && a.media_position_updated_at ? (Date.now() - Date.parse(a.media_position_updated_at)) / 1000 : 0);
+    const f = Math.max(0, Math.min(1, (poz / hossz - 0.06) / 0.86));
+    l.scrollTop = f * (l.scrollHeight - l.clientHeight);
   }
 
   _dalZar() {
