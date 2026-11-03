@@ -469,3 +469,28 @@ def test_tv_kartyara_a_lejatszok_megjelenese_utan(monkeypatch):
     asyncio.run(V.tv_kartyara(hass, ["media_player.nappali_tv"], V.lenyomat(ANGOL)))
     hsz = p["lovelace"].cfg["views"][0]["cards"][0]["speakers"]
     assert hsz[-1] == {"name": "Nappali TV", "entity": "media_player.cantabile_tv_nappali_tv", "mode": "url", "short": "TV"}
+
+
+def test_elerhetetlen_nincs_elore_kijelolve():
+    # egy régi, elérhetetlen Sonos ne kerüljön előre (2.7.0b22): a működő hangszóró igen
+    from custom_components.cantabile import varazslo as V
+    elemek = [
+        {"entity_id": "media_player.regi_sonos", "platform": "sonos", "nev": "Régi", "features": 512, "eszkoz": "d1", "elerheto": False},
+        {"entity_id": "media_player.konyha", "platform": "cast", "nev": "Konyha", "features": 512, "eszkoz": "d2", "elerheto": True},
+    ]
+    ki = {x["entity_id"]: x for x in V.osztalyoz(elemek, {})}
+    assert ki["media_player.regi_sonos"]["elore"] is False and ki["media_player.regi_sonos"]["elerheto"] is False
+    assert ki["media_player.konyha"]["elore"] is True
+
+
+def test_eszkoz_nelkuli_lejatszo_is_hangszoro():
+    # YAML-ban megadott (eszköz nélküli) lejátszó felkínálva; a virtuális (univerzális) nem
+    from custom_components.cantabile import varazslo as V
+    elemek = [
+        {"entity_id": "media_player.mpd", "platform": "mpd", "nev": "MPD", "features": 512, "eszkoz": None, "elerheto": True},
+        {"entity_id": "media_player.yaml_demo", "platform": "", "nev": "Demo", "features": 512, "eszkoz": None, "elerheto": True},
+        {"entity_id": "media_player.univ", "platform": "universal", "nev": "Univ", "features": 512, "eszkoz": None, "elerheto": True},
+    ]
+    ki = {x["entity_id"]: x for x in V.osztalyoz(elemek, {})}
+    assert "media_player.mpd" in ki and ki["media_player.mpd"]["elore"] is True
+    assert "media_player.yaml_demo" in ki and "media_player.univ" not in ki

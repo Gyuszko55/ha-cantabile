@@ -98,6 +98,7 @@ def kepernyos(platform: str, szoveg: str, device_class: str | None) -> bool:
 
 # nem hangszóró, akkor sem, ha van lejátszója: böngésző (browser_mod), kioszk-tablet (Fully Kiosk), a Cantabile sajátjai
 KIZART = {"browser_mod", "fully_kiosk", "cantabile"}
+VIRTUALIS = {"universal", "group", "media_player_template", "template"}   # eszköz nélkül nem önálló hangszóró
 MA = "music_assistant"
 # a saját integrációs utak sorrendje (a fő út választásához): a hangszóró-integrációk, aztán az ismeretlenek, végül a
 # TV-k / távirányítók (pl. a SmartBox Cast-lejátszója a fő, nem az Android TV Remote-é)
@@ -163,9 +164,11 @@ def keszulekek(elemek: list[dict[str, Any]], parok: dict[str, str] | None = None
         csoportok.setdefault(gy(i), []).append(e)
     ki = []
     for g in csoportok.values():
-        sajat = [e for e in g if e.get("platform") != MA and e.get("eszkoz")]
+        # eszköz nélküli lejátszó is hangszóró lehet (pl. YAML-ban megadott MPD, demó): saját készülékként (2.7.0b22);
+        # a virtuális gyűjtőlejátszók (univerzális, csoport, sablon) nem – azok más lejátszókat fognak össze
+        sajat = [e for e in g if e.get("platform") != MA and (e.get("eszkoz") or (e.get("platform") or "") not in VIRTUALIS)]
         if not sajat:
-            continue                     # csak Music Assistant / eszköz nélküli lejátszó: nem hangszóró
+            continue                     # csak Music Assistant / virtuális lejátszó: nem hangszóró
         # a hangszóró-integráció (Sonos, Cast, DLNA…) akkor is a fő út, ha épp nem elérhető (kikapcsolt TV DLNA-ja: az
         # állapotban és a regiszterben sincs funkció) – a TV / távirányító saját lejátszója zenei címet nem fogad
         sajat.sort(key=lambda e: (e.get("platform") not in UT_SORREND, not _lejatszik(e), _rang(e.get("platform") or ""),
@@ -196,14 +199,16 @@ def osztalyoz(elemek: list[dict[str, Any]], parok: dict[str, str] | None = None)
         ki.append({
             "entity_id": e["entity_id"], "nev": str(e.get("nev") or e["entity_id"]), "platform": p,
             "csoport": CSOPORTOK.get(p), "kepernyo": kep, "lejatszik": lejatszik,
-            "elore": p in HANGSZORO_PLATFORMOK and not kep and lejatszik and not csoport_,
+            # előre kijelölve csak az elérhető (egy régi, már nem létező hangszóró ne kerüljön a működők elé)
+            "elore": p in HANGSZORO_PLATFORMOK and not kep and lejatszik and not csoport_ and e.get("elerheto", True),
+            "elerheto": e.get("elerheto", True),
             "mod": "sonos" if p == "sonos" else "url",
             "utak": utak, "ma": k["ma"]["entity_id"] if k["ma"] else None,
         })
     if not any(x["elore"] for x in ki):
         # ismert hangszóró-integráció nincs: ami tud lejátszani és nem TV / médiaszerver, az előválasztott
         for x in ki:
-            x["elore"] = x["lejatszik"] and not x["kepernyo"] and x["platform"] not in NEM_HANGSZORO
+            x["elore"] = x["lejatszik"] and not x["kepernyo"] and x["platform"] not in NEM_HANGSZORO and x["elerheto"]
     ki.sort(key=lambda x: (_rang(x["platform"]) if x["platform"] in CSOPORTOK else len(CSOPORTOK) + 10, x["nev"].casefold()))
     return ki
 
@@ -330,12 +335,14 @@ def hangszorok(hass: HomeAssistant) -> list[dict[str, Any]]:
             "model": " ".join(x for x in ((d.manufacturer if d else None), (d.model if d else None)) if x),
             "eszkoz": d.id if d else None, "eszkoznev": (d.name_by_user or d.name) if d else None,
             "mac": [v for t, v in d.connections if t == dr.CONNECTION_NETWORK_MAC] if d else [],
+            "elerheto": st.state != "unavailable",
         })
     ki = osztalyoz(elemek, ma_parok(hass))
+    egyeb = "Egyéb" if str(hass.config.language or "").startswith("hu") else "Other"    # integráció nélküli (YAML) lejátszó
     for x in ki:
-        x["csoport"] = x["csoport"] or integracio_nev(hass, x["platform"])
+        x["csoport"] = x["csoport"] or (integracio_nev(hass, x["platform"]) if x["platform"] else egyeb)
         for u in x["utak"]:
-            u["csoport"] = u["csoport"] or integracio_nev(hass, u["platform"])
+            u["csoport"] = u["csoport"] or (integracio_nev(hass, u["platform"]) if u["platform"] else egyeb)
     return ki
 
 

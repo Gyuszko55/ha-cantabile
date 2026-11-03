@@ -113,7 +113,8 @@ class _Varazslo:
             elore = [x["entity_id"] for x in jel if x["elore"]]
             alap = varazslo.alapertelmezett(jel, elore)
         opciok = [selector.SelectOptionDict(value=x["entity_id"], label=f"{x['csoport']} · {x['nev']}" + (" 📺" if x["kepernyo"] else "")
-                                            + varazslo.tartalek_felirat(x, self.hass.config.language)) for x in jel]
+                                            + varazslo.tartalek_felirat(x, self.hass.config.language)
+                                            + ("" if x.get("elerheto", True) else (" · nem elérhető" if str(self.hass.config.language or "").startswith("hu") else " · unavailable"))) for x in jel]
         opciok += [selector.SelectOptionDict(value=e, label=f"Cantabile · {self._nev(e)}") for e in extra]
         csoportok: dict[str, int] = {}
         for x in jel:
@@ -248,7 +249,8 @@ class _Varazslo:
         else:          # csak ami egyértelműen TV
             elore = [x["entity_id"] for x in jel if x["kepernyo"]]
         opciok = [selector.SelectOptionDict(value=x["entity_id"], label=f"{x['csoport']} · {x['nev']}" + (" 📺" if x["kepernyo"] else "")
-                                            + varazslo.tartalek_felirat(x, self.hass.config.language)) for x in jel]
+                                            + varazslo.tartalek_felirat(x, self.hass.config.language)
+                                            + ("" if x.get("elerheto", True) else (" · nem elérhető" if str(self.hass.config.language or "").startswith("hu") else " · unavailable"))) for x in jel]
         opciok += [selector.SelectOptionDict(value=c, label=self._nev(c)) for c in extra]
         return self.async_show_form(
             step_id="tv", last_step=False, description_placeholders={**LINKEK, **varazslo.feltetel_jelek(f)},
