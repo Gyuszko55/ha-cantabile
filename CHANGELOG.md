@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.1b6 – 2026-11-03
+
+- **Cover art in the TV mirror and the card's TV window when Music Assistant plays**, also on the phone: the player's picture is a plain-http address on the local network (MA's image proxy, a Sonos speaker), which an https page (the HA app through Nabu Casa) doesn't load. MA covers now go through Cantabile's signed image proxy, others through HA's own media player image proxy.
+
 ## 2.7.1b5 – 2026-11-03
 
 - The QUEUE tab's Music Assistant list shows the cover thumbnails again (the full-queue list had none).

@@ -544,7 +544,15 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             "title": a.get("media_title"), "artist": a.get("media_artist"), "album": a.get("media_album_name"),
             "kind": "stream" if radio else "track", "station": a.get("media_channel") if radio else None}
         if not fajl and a.get("entity_picture"):
-            extra["cover"] = a["entity_picture"]
+            # a lejátszó http-képe (MA képtovábbító, Sonos getaa…) a helyi hálózatra mutat: https-oldalon (mobil, Nabu Casa)
+            # nem töltődik be – az MA-é a Cantabile aláírt továbbítóján, a többi a HA saját képtovábbítóján át (2.7.1)
+            kep = str(a["entity_picture"])
+            if not kep.startswith(("https://", "/")):
+                from .ma import _kep as ma_kep  # noqa: PLC0415
+
+                kep = ma_kep(self.hass, kep) or a.get("entity_picture_local") or None
+            if kep:
+                extra["cover"] = kep
         if radio and re.search(r"://|^[\w.-]+\.[a-z]{2,}(/|:|$)", str(extra.get("title") or ""), re.I):
             extra["title"] = None                   # a hangszóró a stream címét adja címként: az adó neve kell helyette
         try:
