@@ -98,6 +98,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self._cue_i: int | None = None          # CUE-s albumnál a szóló szám sorszáma (a TV-oldal jelenti)
         self._cim_tar: tuple[str | None, str | None] = (None, None)
         self._tukor: str | None = None          # a hangszóró, amelyet a TV-oldal hang nélkül mutat
+        self._tukor_ma: str | None = None       # a tükrözött hangszóró MA-párja (ha azon szól az MA sora, az adatai onnan)
         self._tukor_le: list[Any] = []
         self._tukor_kulcs: tuple[Any, ...] | None = None
         self._tukor_csend: float | None = None
@@ -429,9 +430,17 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             return
         self.tukor_vege(kuld=False)
         self._tukor, self._tukor_kulcs, self._tukor_csend = cel, None, None
+        # a hangszóró MA-párja: ha azon az MA sora szól, a tükör annak adatait mutatja (a készülék saját lejátszója – pl.
+        # WiiM – ilyenkor elavult címet / helyet adhat) (2.7.0b22)
+        try:
+            from .ma import parok  # noqa: PLC0415
+
+            self._tukor_ma = parok(self.hass).get(cel)
+        except Exception:  # noqa: BLE001 – nincs Music Assistant
+            self._tukor_ma = None
         self._allapot, self._src, self._meta, self._mcid, self._poz, self._cue_i = MediaPlayerState.IDLE, None, {}, None, None, None
         self._tukor_le = [
-            async_track_state_change_event(self.hass, [cel], self._tukor_valtozott),
+            async_track_state_change_event(self.hass, [cel, *([self._tukor_ma] if self._tukor_ma else [])], self._tukor_valtozott),
             async_track_time_interval(self.hass, self._tukor_ellenoriz, timedelta(seconds=60)),
             # WiiM hézagmentes lejátszásnál a pontos állapot (számváltás, hely) a Cantabile UPnP-lekérdezéséből jön
             async_dispatcher_connect(self.hass, SIGNAL_UPNP, callback(lambda e: self._tukor_frissit() if e == self._tukor else None)),
@@ -476,9 +485,15 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         st = self.hass.states.get(self._tukor) if self._tukor else None
         if st is None:
             return
+        ma_st = self.hass.states.get(self._tukor_ma) if getattr(self, "_tukor_ma", None) else None
+        ma_szol = bool(ma_st and ma_st.state in ("playing", "paused", "buffering") and ma_st.attributes.get("app_id") == "music_assistant"
+                       and re.match(r"^[\w.-]+://", str(ma_st.attributes.get("media_content_id") or ""))
+                       and not str(ma_st.attributes.get("media_content_id") or "").startswith("http"))
+        if ma_szol:
+            st = ma_st                               # az MA sora szól a hangszórón: az MA-lejátszó adatai a frissek
         a = st.attributes
         allapot = {"playing": "playing", "buffering": "playing", "paused": "paused"}.get(st.state, "idle")
-        u = self.rt.upnp_allapot(self._tukor)
+        u = None if ma_szol else self.rt.upnp_allapot(self._tukor)
         if u:
             allapot = u["allapot"]
         if allapot == "playing":
@@ -559,7 +574,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
 
         hol = None
         with contextlib.suppress(Exception):
-            hol = await hangszoro_nev(self.hass, st.entity_id)
+            hol = await hangszoro_nev(self.hass, self._tukor or st.entity_id)   # MA-adatnál is a hangszóró neve
         hol = hol or st.attributes.get("friendly_name") or st.entity_id
         if fajl:
             honnan = "NAS"

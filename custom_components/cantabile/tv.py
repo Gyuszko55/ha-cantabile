@@ -1060,6 +1060,12 @@ def ws_preview(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: d
         def __init__(self) -> None:
             self.hass, self.rt, self.entity_id = hass, zene.rt, f"elonezet_{msg['id']}"
             self._tukor, self._tukor_kulcs, self._tukor_csend, self._tukor_javit = msg["entity_id"], None, None, None
+            try:
+                from .ma import parok  # noqa: PLC0415
+
+                self._tukor_ma = parok(hass).get(msg["entity_id"])
+            except Exception:  # noqa: BLE001
+                self._tukor_ma = None
 
         def uzen(self, adat: dict[str, Any]) -> bool:
             conn.send_message(websocket_api.event_message(msg["id"], adat))
@@ -1068,7 +1074,7 @@ def ws_preview(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: d
     e = Elonezet()
     le = [
         # callback: az eseményhurokban fusson (a sima lambdát a HA szálon futtatná, onnan a számváltás adatai nem indulnak el)
-        async_track_state_change_event(hass, [e._tukor], callback(lambda _ev: e._tukor_frissit())),
+        async_track_state_change_event(hass, [e._tukor, *([e._tukor_ma] if e._tukor_ma else [])], callback(lambda _ev: e._tukor_frissit())),
         async_dispatcher_connect(hass, SIGNAL_UPNP, callback(lambda ent: e._tukor_frissit() if ent == e._tukor else None)),
     ]
     conn.subscriptions[msg["id"]] = lambda: [f() for f in le]
