@@ -889,6 +889,7 @@ class CantabileCard extends HTMLElement {
     this._keszVolt = KESZ;
     // a térkép az első válasszal megjön: a gombok azonnal összevonva (a Music Assistant adatait nem kell megvárni)
     if (kellUjra && this._eredetiCfg) { this.setConfig(this._eredetiCfg); kellUjra = false; }
+    this._matrixKer();               // a mátrix mindig betöltődik (a gombok újraépítése előtt is – az alábbi ág visszatérhet)
     if (!this._nincsIntegracio && MA_PAROK === null) {
       await this._maInfoLeker();
       MA_PAROK = this._maInfo?.available ? this._maInfo.pairs || {} : {};
@@ -6933,7 +6934,15 @@ class CantabileCard extends HTMLElement {
 
   _maLejatszo(e) { return !!e && !!this._hass?.states[e]?.attributes?.mass_player_type; }
   // a gomb MA-lejátszója: maga, ha MA-lejátszó; különben a készülék MA-párja (ha van)
-  _maE(h) { return !h || h.entity === HELYI || h.tagok ? null : this._maLejatszo(h.entity) ? h.entity : h.ma || null; }
+  // TV-gombnál (Cantabile TV): ha a TV saját MA-lejátszóján az MA sora szól / szünetel (pl. oda került át, csak hangként),
+  // az a gomb MA-lejátszója – onnan vihető tovább (2.7.0b17)
+  _maE(h) {
+    if (!h || h.entity === HELYI || h.tagok) return null;
+    if (this._maLejatszo(h.entity)) return h.entity;
+    if (h.ma) return h.ma;
+    const tm = this._tvMa(h), st = tm && this._hass?.states[tm];
+    return tm && this._maSorSzol(tm) && (SZOL(st) || SZUNETEL(st)) ? tm : null;
+  }
   // a gomb mögött az MA saját sora szól (a Sonos is szólhat az MA-ból: akkor az MA-lejátszója a mérvadó)
   _maSorGomb(h) { const m = this._maE(h); return !!m && this._maSorSzol(m) && (SZOL(this._hass?.states[m]) || SZUNETEL(this._hass?.states[m])); }
   // az MA saját sora szól: az MA-lejátszó akkor is „Music Assistant Queue”-t jelez, ha kívülről (pl. a Sonos appból) szól

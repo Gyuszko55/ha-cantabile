@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.0b17 – 2026-11-03
+
+- **What moved to a TV's Music Assistant player can be moved on.** After a Music Assistant queue was moved to a TV (sound only, on the TV's own MA player), the TV button showed the TV page player as off, so switching away found nothing to move. Now, while the TV's MA player plays or pauses an MA queue, the TV button uses it as its source and the queue moves on to the next speaker.
+- The card always loads the route matrix at start (one start-up path skipped it).
+
 ## 2.7.0b16 – 2026-11-03
 
 - Fix: Sonos marks lossless Deezer tracks as `tr-flac%3a…`, which the track-id pattern missed. So the b14 order check didn't run (the WiiM started the Sonos favourites at its last track again and stopped after it), and lists made only of FLAC tracks weren't recognised as Deezer queues. The pattern now covers it everywhere (card, substitution, lists, WiiM).
