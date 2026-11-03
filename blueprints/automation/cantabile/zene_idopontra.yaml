@@ -1,0 +1,187 @@
+blueprint:
+  name: "Cantabile: zene időpontra"
+  description: >-
+    Adott időpontban (választott napokon) zenét vagy rádiót indít a Cantabile-lel, név alapján – ugyanúgy, mint a
+    kártya vagy a hangvezérlés. Beállítható a hangerő, a fokozatos hangosodás (ébresztő), az időzített kikapcsolás,
+    a „csak ha otthon van” feltétel és az értesítés, ha nem indult el.
+    Starts music or radio with Cantabile at a set time on chosen days, by name.
+  domain: automation
+  author: Gyuszko55
+  source_url: https://github.com/Gyuszko55/ha-cantabile/blob/main/blueprints/automation/cantabile/zene_idopontra.yaml
+  homeassistant:
+    min_version: "2025.1.0"
+  input:
+    mikor:
+      name: Mikor
+      icon: mdi:clock-outline
+      input:
+        idopont:
+          name: Időpont
+          selector: { time: {} }
+        napok:
+          name: Napok
+          default: [mon, tue, wed, thu, fri, sat, sun]
+          selector:
+            select:
+              multiple: true
+              options:
+                - { label: Hétfő, value: mon }
+                - { label: Kedd, value: tue }
+                - { label: Szerda, value: wed }
+                - { label: Csütörtök, value: thu }
+                - { label: Péntek, value: fri }
+                - { label: Szombat, value: sat }
+                - { label: Vasárnap, value: sun }
+        otthon:
+          name: Csak ha otthon van (elhagyható)
+          description: Ha megadod, csak akkor indul, ha ez a személy otthon van.
+          default: []
+          selector: { entity: { domain: person, multiple: true } }
+    mit:
+      name: Mit és honnan
+      icon: mdi:music
+      input:
+        zene:
+          name: Mit szóljon
+          description: Előadó, album, szám, rádióadó vagy lista neve (pl. „Klubrádió”, „A Kind of Magic”, „Kedvenc dalok”).
+          selector: { text: {} }
+        fajta:
+          name: Fajta
+          default: auto
+          selector:
+            select:
+              options:
+                - { label: Automatikus, value: auto }
+                - { label: Előadó, value: artist }
+                - { label: Album, value: album }
+                - { label: Szám, value: track }
+                - { label: Rádióadó, value: radio }
+                - { label: Lista, value: playlist }
+        eloado:
+          name: Előadó (elhagyható)
+          description: Albumnál vagy számnál pontosítja a keresést.
+          default: ""
+          selector: { text: {} }
+        forras:
+          name: Forrás
+          default: auto
+          selector:
+            select:
+              options:
+                - { label: Automatikus, value: auto }
+                - { label: Zenemappa, value: local }
+                - { label: Deezer, value: deezer }
+                - { label: Spotify, value: spotify }
+                - { label: Tidal, value: tidal }
+        keverve:
+          name: Keverve
+          default: false
+          selector: { boolean: {} }
+    hol:
+      name: Hol és milyen hangosan
+      icon: mdi:speaker
+      input:
+        hangszoro:
+          name: Hangszóró neve
+          description: Ahogy a Cantabile kártya választóján látszik (pl. „Sonos 1”, „Technics”). Üresen az első hangszóró.
+          default: ""
+          selector: { text: {} }
+        lejatszo:
+          name: A hangszóró entitása (hangerőhöz, időzítőhöz)
+          description: Ugyanaz a készülék, mint a fenti név. Ha üres, a hangerő és az időzítő kimarad.
+          default: ""
+          selector: { entity: { domain: media_player } }
+        hangero:
+          name: Hangerő
+          default: 15
+          selector: { number: { min: 1, max: 100, unit_of_measurement: "%" } }
+        fokozatos:
+          name: Fokozatosan hangosodjon (ébresztő)
+          description: Halkan indul, és pár perc alatt éri el a beállított hangerőt.
+          default: false
+          selector: { boolean: {} }
+        fokozat_perc:
+          name: Hangosodás ideje
+          default: 4
+          selector: { number: { min: 1, max: 30, unit_of_measurement: min } }
+        kikapcsolas:
+          name: Időzített kikapcsolás (0 = nincs)
+          default: 0
+          selector: { number: { min: 0, max: 240, unit_of_measurement: min } }
+    ertesites:
+      name: Értesítés
+      icon: mdi:bell-outline
+      collapsed: true
+      input:
+        ertesito:
+          name: Értesítő szolgáltatás (elhagyható)
+          description: Pl. notify.mobile_app_telefonom – ha a zene nem indult el, ide szól.
+          default: ""
+          selector: { text: {} }
+
+mode: single
+max_exceeded: silent
+
+variables:
+  otthon: !input otthon
+  lejatszo: !input lejatszo
+  hangero: !input hangero
+  fokozatos: !input fokozatos
+  fokozat_perc: !input fokozat_perc
+  kikapcsolas: !input kikapcsolas
+  ertesito: !input ertesito
+  zene_nev: !input zene
+
+triggers:
+  - trigger: time
+    at: !input idopont
+
+conditions:
+  - condition: time
+    weekday: !input napok
+  - condition: template
+    value_template: >-
+      {{ otthon | length == 0 or (otthon | select('is_state', 'home') | list | length > 0) }}
+
+actions:
+  - if: "{{ lejatszo != '' }}"
+    then:
+      - action: media_player.volume_set
+        target: { entity_id: "{{ lejatszo }}" }
+        data:
+          volume_level: "{{ (0.03 if fokozatos else (hangero | float / 100)) | round(2) }}"
+  - action: cantabile.play
+    data:
+      query: !input zene
+      kind: !input fajta
+      artist: !input eloado
+      source: !input forras
+      shuffle: !input keverve
+      speaker: !input hangszoro
+    response_variable: zene
+  - if: "{{ not zene.success }}"
+    then:
+      - if: "{{ ertesito != '' }}"
+        then:
+          - action: "{{ ertesito }}"
+            data:
+              title: Cantabile
+              message: "„{{ zene_nev }}” nem indult el: {{ zene.error }}"
+      - stop: "A zene nem indult el"
+  - if: "{{ fokozatos and lejatszo != '' }}"
+    then:
+      - repeat:
+          count: 10
+          sequence:
+            - delay:
+                seconds: "{{ (fokozat_perc | float * 6) | int }}"
+            - action: media_player.volume_set
+              target: { entity_id: "{{ lejatszo }}" }
+              data:
+                volume_level: "{{ (0.03 + (hangero | float / 100 - 0.03) * repeat.index / 10) | round(2) }}"
+  - if: "{{ (kikapcsolas | int) > 0 and lejatszo != '' }}"
+    then:
+      - action: cantabile.sleep_timer
+        data:
+          entity_id: "{{ lejatszo }}"
+          minutes: "{{ kikapcsolas | int }}"
