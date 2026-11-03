@@ -118,7 +118,8 @@ BT; for a Music Assistant queue the current and next track.
   A Music Assistant queue moved to a Cantabile TV plays from the music folder on the TV page if the tracks are there,
   otherwise on the TV's own Music Assistant player (sound only; long Deezer lists of 40+ tracks always go there, in
   full). The card checks that the TV keeps playing – a DLNA TV (e.g. Samsung) doesn't play Music Assistant, so the
-  music goes back to the old speaker with a message. While Music Assistant plays, next / previous / pause / stop go to it.
+  music goes back to the old speaker with a message. While Music Assistant plays, next / previous / pause / stop go to it,
+  and the tape's timeline and synced lyrics follow it too (the device's own player may report a stale position).
 - **Sonos ↔ WiiM order**: Sonos plays Deezer favourites newest first, Deezer and the WiiM's own Deezer oldest first. When
   the WiiM would continue with a different track than the Sonos, its own Deezer is skipped and the list goes on through
   Music Assistant's Deezer in the Sonos order. A list playing on the WiiM's own Deezer can be moved on too. Splitting a
@@ -205,11 +206,12 @@ keeps showing that speaker's track (mirror), also after a Home Assistant restart
 Music Assistant player (the Cantabile TV page takes its place). Any other **mirror is sent by hand**: **SEND TO TV** in
 the card's TV window casts the TV page (if it isn't there yet) and the TV silently shows that speaker; the room's TVs
 come first, with several TVs the card asks which one; **MIRROR OFF** ends it. A mirror you sent follows the music when
-you move it to another speaker. A mirror never starts by itself (a DLNA TV can't mirror). Some Cast receivers can't open certain FLAC files
+you move it to another speaker. When Music Assistant plays on the mirrored speaker, the mirror – and the card's TV window –
+shows Music Assistant's title, position and cover (the device's own player, e.g. a WiiM, can show an earlier track). A mirror never starts by itself (a DLNA TV can't mirror). Some Cast receivers can't open certain FLAC files
 (typically ones with a large embedded cover and no seek table): Cantabile then plays the same track from the same point
 as MP3 (320 kbit/s, converted on the fly) and remembers that TV – from then on, also after a restart, FLAC goes to it as
 MP3 from the first track. Only a real format error teaches this (not a NAS hiccup or an expired link), and you can seek
-inside a transcoded track.
+inside a transcoded track; started or sought mid-way, it still shows its full length.
 
 The **TV button** on the card (before ⓘ) opens the same page in a small window over the deck for the selected speaker;
 it follows track and speaker changes and closes by itself 5 seconds after the music stops. **⛶ FULL SCREEN** in the
@@ -350,7 +352,7 @@ after the welcome can be skipped and changed later:
 2. **Speakers** – one row per device, by its own integration (Sonos, WiiM, LinkPlay, Google Cast, DLNA, Squeezebox,
    others). If a device can also be reached another way (e.g. through Music Assistant), that is its **fallback** on the
    row: whatever its own integration can't play (e.g. the Music Assistant library) goes that way automatically. Browsers
-   (browser_mod), kiosk tablets and players that exist only in Music Assistant aren't speakers; speakers are ticked already, TVs and media servers aren't. Pick the *default speaker* – it comes
+   (browser_mod), kiosk tablets and players that exist only in Music Assistant aren't speakers; available speakers are ticked already, TVs and media servers aren't; unavailable players are marked “unavailable” and can still be chosen. Players without a device in Home Assistant (e.g. set up in YAML, like MPD) are offered under “Other”; virtual players (universal, group, template) aren't. Pick the *default speaker* – it comes
    first on the card. Names longer than 8 characters get a short name for the card. No speakers yet? The step tells you
    which integration to add first.
 3. **Music library** *(optional)* – the folders in Home Assistant's media that hold music, including network storage

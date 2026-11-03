@@ -118,7 +118,8 @@ Music Assistant sornál a szóló és a következő szám.
   Assistant-sor a TV-oldalon a zenemappából szól, ha ott megvannak a számok, különben a TV saját Music Assistant-lejátszóján
   (csak hang; a 40-nél több számos Deezer-lista mindig ott, teljes egészében). A kártya ellenőrzi, hogy a TV tényleg szól-e
   – a DLNA-s TV (pl. Samsung) a Music Assistantot nem játssza, ilyenkor a zene üzenettel visszamegy a régi hangszóróra.
-  Amíg a Music Assistant szól, a következő / előző szám, a szünet és a leállítás is neki megy.
+  Amíg a Music Assistant szól, a következő / előző szám, a szünet és a leállítás is neki megy, és a magnó idővonala meg az
+  időzített dalszöveg is őt követi (a készülék saját lejátszója elavult pozíciót adhat).
 - **Sonos ↔ WiiM sorrend**: a Sonos a Deezer-kedvenceket a legújabbal kezdve adja, a Deezer és a WiiM saját Deezere a
   legrégebbivel. Ha a WiiM a Sonostól eltérő számmal folytatná, a saját Deezere kimarad, és a lista a Music Assistant
   Deezerén megy tovább, a Sonos sorrendjében. A WiiM saját Deezerén szóló lista is továbbvihető. Sonos-csoport bontásakor
@@ -202,12 +203,14 @@ vagy a lenti `select` / `switch` entitásokkal. Ha a TV-ről másik hangszórór
 számát (tükör), a Home Assistant újraindítása után is – akkor is, ha a TV a saját Music Assistant-lejátszóján szólt (ilyenkor
 a Cantabile TV-oldal kerül a helyére). Minden más **tükör kézzel indul**: a kártya TV-ablakában a **SEND TO TV** kiküldi a
 TV-oldalt (ha még nincs kint), és a TV hang nélkül azt a hangszórót mutatja; elöl a helyiség TV-i, több TV-nél a kártya
-megkérdezi, melyikre; a **MIRROR OFF** leállítja. A kiküldött tükör követi a zenét, ha másik hangszóróra viszed. Magától
+megkérdezi, melyikre; a **MIRROR OFF** leállítja. A kiküldött tükör követi a zenét, ha másik hangszóróra viszed. Ha a tükrözött hangszórón a Music Assistant szól, a tükör –
+és a kártya TV-ablaka is – a Music Assistant címét, pozícióját és borítóját mutatja (a készülék saját lejátszója, pl. a
+WiiM, elavult számot adhat). Magától
 tükör nem indul (DLNA-s TV tükrözni nem tud). Egyes Cast-vevők bizonyos FLAC-fájlokat nem
 tudnak megnyitni (jellemzően a nagy beágyazott borítósakat, keresőtábla nélkül): a Cantabile ilyenkor ugyanazt a számot
 ugyanonnan MP3-ként játssza (320 kbit/s, menet közben kódolva), és megjegyzi a TV-t – onnantól, újraindítás után is, arra
 a TV-re a FLAC az első számtól MP3-ként megy. Ezt csak valódi formátumhiba tanítja (NAS-akadás vagy lejárt link nem), és
-az átkódolt számon belül is lehet tekerni.
+az átkódolt számon belül is lehet tekerni; középről indítva vagy tekerve is a teljes hossza látszik.
 
 A kártya **TV-gombja** (az ⓘ előtt) ugyanezt az oldalt kis ablakban mutatja a kiválasztott hangszóróról, a kijelző
 fölött; követi a szám- és hangszóróváltást, és a zene megállása után 5 mp-cel magától bezárul. Az ablak alsó sávjában
@@ -347,7 +350,7 @@ angolul). Az üdvözlés utáni lépések mind kihagyhatók, és később is mó
 2. **Hangszórók** – készülékenként egy sor, a saját integrációja szerint (Sonos, WiiM, LinkPlay, Google Cast, DLNA,
    Squeezebox, egyéb). Ha egy készülék több úton is elérhető (pl. Music Assistanton át is), az a sorban **tartalék**:
    ami a saját integráción nem szólhat (pl. a Music Assistant tára), az magától azon megy. A böngészők (browser_mod), a
-   kioszk-tabletek és a csak Music Assistantban létező lejátszók nem hangszórók; a hangszórók már ki vannak pipálva, a TV-k és a médiaszerverek nem. Válaszd ki az *alapértelmezett
+   kioszk-tabletek és a csak Music Assistantban létező lejátszók nem hangszórók; az elérhető hangszórók már ki vannak pipálva, a TV-k és a médiaszerverek nem; az elérhetetlen lejátszók „nem elérhető” jelzéssel választhatók. Az eszköz nélküli lejátszók (pl. YAML-ban felvett, mint az MPD) az „Egyéb” csoportban szerepelnek; a virtuálisak (univerzális, csoport, sablon) nem. Válaszd ki az *alapértelmezett
    hangszórót* – ez áll elsőként a kártyán. A 8 karakternél hosszabb nevek rövid nevet kapnak a kártyára. Ha még nincs
    hangszóró, a lépés megmondja, melyik integrációt vedd fel előbb.
 3. **Zenetár** *(nem kötelező)* – a Home Assistant médiájának zenét tartalmazó mappái, a *Beállítások → Rendszer →
