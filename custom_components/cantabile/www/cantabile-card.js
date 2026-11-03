@@ -1972,7 +1972,7 @@ class CantabileCard extends HTMLElement {
         .dalpolc .dlista.szinkron p { opacity: .55; }
         .dalpolc .dlista.szinkron p.most { opacity: 1; color: #ffd892; transform: scale(1.06); text-shadow: 0 0 10px rgba(255,190,90,.35); }
         .dalpolc .dlista p.szunet { font-size: calc(13px * var(--bk, 1)); letter-spacing: .3em; }
-        /* időzítés nélküli szöveg (2.7.1): kiemelés nélkül, 5–6 sornyi ablakban, a szám haladásával egyenletesen gördül */
+        /* időzítés nélküli szöveg (2.7.1): kiemelés nélkül, a panel teljes magasságában, a szám haladásával egyenletesen gördül */
         .dalpolc .dlista.gordul { flex: 0 1 auto; margin-block: auto; box-sizing: border-box; scrollbar-width: none; -webkit-mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); }
         .dalpolc .dlista.gordul::-webkit-scrollbar { display: none; }
         .dalpolc .dlista.gordul p { font-size: calc(16px * var(--bk, 1)); padding: 3px 0; color: #e6cf9f; }
@@ -4722,10 +4722,11 @@ class CantabileCard extends HTMLElement {
     // időzített szövegnél fent-lent fél doboznyi hely, hogy az első és az utolsó sor is középre görgethető legyen
     if (l && szinkron) l.style.paddingBlock = `${Math.round(l.clientHeight * 0.42)}px`;
     if (l && gordul) {
-      // 5–6 sornyi ablak (ha a hely engedi); fent-lent fél ablaknyi hely, hogy a szöveg alulról jöjjön és felül menjen ki
+      // annyi sor, amennyi a panelen elfér (legalább 3); fent-lent fél ablaknyi hely, hogy a szöveg alulról jöjjön és felül
+      // menjen ki
       const sor = l.querySelector("p:not(.szunet)")?.offsetHeight || 26;
       const hely = l.parentElement ? l.parentElement.clientHeight - 70 : sor * 6;
-      const mag = Math.max(sor * 3, Math.min(sor * 6, hely));
+      const mag = Math.max(sor * 3, Math.floor(hely / sor) * sor);
       l.style.height = `${Math.round(mag)}px`;
       l.style.paddingBlock = `${Math.round(mag / 2)}px`;
     }
