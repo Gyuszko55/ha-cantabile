@@ -971,12 +971,17 @@ def ws_follow(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: di
     for lj in list(kozpont(hass).lejatszok.values()):
         if lj.entity_id == msg["target"]:
             lj.tukor_vege()
-        elif (lj.entity_id == msg["source"] and lj.friss_szolt()) or lj._tukor == msg["source"]:  # noqa: SLF001
+        elif lj.entity_id == msg["source"] and lj.friss_szolt():
+            # a zene erről a TV-ről ment el (2.7.0b21): a TV hang nélkül az új hangszórót mutatja – a helyiségtől függetlenül,
+            # hiszen innen vitték el
+            if msg["target"].startswith("media_player."):
+                lj.tukroz(msg["target"])
+        elif lj._tukor == msg["source"]:  # noqa: SLF001
             tv_t = terulet(hass, lj.entity_id, lj.cast)
-            if tv_t and cel_t and tv_t != cel_t:
+            if tv_t and cel_t and tv_t != cel_t and AUTO_TUKOR:
                 lj.tukor_vege()             # más szobában szól: a TV nem mutatja (csak az azonos területű hangszórót)
-            elif msg["target"].startswith("media_player.") and (lj._tukor == msg["source"] or AUTO_TUKOR):  # noqa: SLF001
-                lj.tukroz(msg["target"])    # 2.7.0b20: csak a kézzel kiküldött tükör követi a zenét (magától nem indul)
+            elif msg["target"].startswith("media_player."):
+                lj.tukroz(msg["target"])    # a kiküldött tükör követi a zenét
     conn.send_result(msg["id"])
 
 

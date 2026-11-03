@@ -3065,7 +3065,15 @@ class CantabileCard extends HTMLElement {
       if (!cel) await mostLeker();
       if (cel && cel !== rma) {
         try { await this._hass.callWS({ type: "cantabile/ma/transfer", source: rma, target: cel, device: ESZKOZ() }); }
-        catch (err) { this._maHiba(cel, err); }
+        catch (err) { this._maHiba(cel, err); return; }
+        // a TV saját MA-lejátszójáról ment el a zene (2.7.0b21): a TV-re a tükör kerül az MA helyére – hang nélkül az új
+        // hangszórót mutatja
+        if (/^media_player\.cantabile_tv_/.test(regi.entity) && rma === this._tvMa(regi) && uj.entity !== HELYI && !/^media_player\.cantabile_tv_/.test(uj.entity)) {
+          const forras = this._tukorForras(uj);
+          this._hass.callWS({ type: "cantabile/tv/mirror", tv: regi.entity, source: forras })
+            .then(() => this._naplo("tükör az MA helyére", "info", { tv: regi.entity, forras }),
+              (e) => this._naplo("tükör az MA helyére nem sikerült", "warning", { tv: regi.entity, forras, hiba: String(e?.message || e?.code || e) }));
+        }
         return;
       }
       if (cel === rma) return this._csoportAllit(uj);
