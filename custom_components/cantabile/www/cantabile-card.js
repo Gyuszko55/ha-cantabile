@@ -1755,7 +1755,8 @@ class CantabileCard extends HTMLElement {
         .maful .pful { padding: 4px 9px; font-size: calc(10px * var(--bk, 1)); }
         .masor { display: grid; gap: 8px; margin: 4px 0 10px; }
         .masorelem { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 4px; background: rgba(255,255,255,.06); }
-        .masorelem img, .masorelem > i { width: 54px; height: 54px; flex: none; border-radius: 3px; object-fit: cover; background: rgba(0,0,0,.3); }
+        .masorelem.most { background: rgba(168,143,107,.2); box-shadow: inset 3px 0 0 #a88f6b; }
+        .masorelem img, .masorelem > i { width: 42px; height: 42px; flex: none; border-radius: 3px; object-fit: cover; background: rgba(0,0,0,.3); }
         .masorelem small { display: block; font: 700 calc(8px * var(--bk, 1))/1 "Cantabile Sans", Arial, sans-serif; letter-spacing: .2em; color: #a88f6b; margin-bottom: 3px; }
         .masorelem b { display: block; font: 700 calc(13px * var(--bk, 1))/1.25 "Cantabile Sans", Arial, sans-serif; color: #f3e8d4; }
         .masorelem span { display: block; font: 500 calc(11.5px * var(--bk, 1))/1.3 "Cantabile Sans", Arial, sans-serif; color: #cdb995; }
@@ -7306,19 +7307,37 @@ class CantabileCard extends HTMLElement {
     catch (err) { this._maHiba(e, err); }
   }
 
-  // QUEUE fül MA-sornál: a szóló és a következő szám (az MA sorát az MA szerkeszti – a HA ehhez nem ad műveletet)
+  // az MA sorának helye (hányadik / hány): számváltáskor (vagy percenként) újra lekérve, a gombhoz tárolva
+  _maSorAdat(e, st) {
+    this._maSorTar = this._maSorTar || {};
+    const t = this._maSorTar[e], cid = String(st?.attributes?.media_content_id || "") + "|" + (st?.attributes?.media_title || "");
+    if ((!t || t.cid !== cid || Date.now() - t.ido > 60000) && !t?.tolt && !this._nincsIntegracio) {
+      this._maSorTar[e] = { ...(t || {}), tolt: true };
+      this._hass.callWS({ type: "cantabile/ma/queue_items", entity_id: e, before: 0, after: 1 })
+        .then((q) => { this._maSorTar[e] = { cid, ido: Date.now(), index: Number(q?.index) || 0, total: Number(q?.total) || 0 }; this._frissit(); },
+          () => { this._maSorTar[e] = { cid, ido: Date.now(), index: 0, total: 0 }; });
+    }
+    return t && t.cid === cid ? t : null;
+  }
+
+  // QUEUE fül MA-sornál: a sor a szóló szám körül (néhány előző és a következők; az MA sorát az MA szerkeszti – a HA ehhez
+  // nem ad műveletet)
   async _maSorRajz(lista, e) {
     lista.innerHTML = `<div class="puzenet">${T("Betöltés…")}</div>`;
     let q;
-    try { q = await this._hass.callWS({ type: "cantabile/ma/queue", entity_id: e }); }
-    catch (err) { lista.innerHTML = `<div class="puzenet">${T("A Music Assistant most nem érhető el: {h}", { h: ESC(err?.message || err) })}</div>`; return; }
+    try { q = await this._hass.callWS({ type: "cantabile/ma/queue_items", entity_id: e, before: 3, after: 40 }); }
+    catch (_) {
+      try { const r = await this._hass.callWS({ type: "cantabile/ma/queue", entity_id: e }); q = r?.active ? { active: true, index: 0, offset: 0, total: r.items, shuffle: r.shuffle, repeat: r.repeat, items: [r.current, r.next].filter(Boolean) } : r; }
+      catch (err) { lista.innerHTML = `<div class="puzenet">${T("A Music Assistant most nem érhető el: {h}", { h: ESC(err?.message || err) })}</div>`; return; }
+    }
     if (this._polc?.ful !== "sor") return;
-    if (!q?.active || !q.current) { lista.innerHTML = `<div class="puzenet">${T("A Music Assistant sora üres.")}</div>`; return; }
-    const elem = (x, cim) => `<div class="masorelem">${x.image ? `<img src="${ESC(x.image)}" alt="">` : `<i></i>`}<div><small>${cim}</small><b>${ESC(x.name)}</b><span>${ESC([x.artist, x.album].filter(Boolean).join(" · "))}</span></div></div>`;
+    if (!q?.active || !q.items?.length) { lista.innerHTML = `<div class="puzenet">${T("A Music Assistant sora üres.")}</div>`; return; }
+    const elem = (x, sorsz, most) => `<div class="masorelem${most ? " most" : ""}">${x.image ? `<img src="${ESC(x.image)}" alt="">` : `<i></i>`}<div><small>${most ? "NOW PLAYING · " : ""}${sorsz}${q.total ? ` / ${q.total}` : ""}</small><b>${ESC(x.name)}</b><span>${ESC([x.artist, x.album].filter(Boolean).join(" · "))}</span></div></div>`;
     const ism = { off: T("ki"), one: T("egy szám"), all: T("az egész sor") }[q.repeat] || q.repeat || "–";
-    lista.innerHTML = `<h5 class="kcsop">MUSIC ASSISTANT<span>${ESC(T("{n} szám", { n: q.items ?? "?" }))}</span></h5>
-      <div class="masor">${elem(q.current, "NOW PLAYING")}${q.next ? elem(q.next, "NEXT") : ""}</div>
+    lista.innerHTML = `<h5 class="kcsop">MUSIC ASSISTANT<span>${ESC(T("{n} szám", { n: q.total ?? "?" }))}</span></h5>
+      <div class="masor">${q.items.map((x, k) => elem(x, q.offset + k + 1, q.offset + k === q.index)).join("")}</div>
       <div class="puzenet">${ESC(T("A sort a Music Assistant kezeli (keverés: {k}, ismétlés: {i}); átrendezni és törölni az MA saját felületén lehet.", { k: q.shuffle ? T("be") : T("ki"), i: ism }))}</div>`;
+    lista.querySelector(".masorelem.most")?.scrollIntoView({ block: "nearest" });
   }
 
   // ---- lenyíló előlap: bemenet és hangszín (hangszin.py) ----
@@ -7883,7 +7902,12 @@ class CantabileCard extends HTMLElement {
     // a gomb mögött a Music Assistant sora szól (pl. Technics): az idővonal, a cím és a dalszöveg az MA-lejátszóé – a
     // készülék saját lejátszója ilyenkor elavult helyet / címet mutathat (pl. fél órája nem frissült) (2.7.0b22)
     const maE = this._maSorGomb(hsz) ? this._maE(hsz) : null;
-    const sm = maE && maE !== hsz.entity && h.states[maE] ? h.states[maE] : s;
+    let sm = maE && maE !== hsz.entity && h.states[maE] ? h.states[maE] : s;
+    // az MA-lejátszó nem adja ki, hányadik szám szól a sorból: az MA sorából (2.7.1) – a kazetta „012/300” számlálója
+    if (maE && sm !== s) {
+      const mq = this._maSorAdat(maE, sm);
+      if (mq?.total) sm = { ...sm, attributes: { ...sm.attributes, queue_position: mq.index + 1, queue_size: mq.total } };
+    }
     const szalagSzol = SZOL(sm) && i === -1, szunet = SZUNETEL(sm) && i === -1;
     this._magnoAllapot = { szol: szalagSzol, szunet, s: sm, kaz };
     magno.classList.toggle("fut", szalagSzol);

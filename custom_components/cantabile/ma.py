@@ -16,6 +16,7 @@ Websocket: `cantabile/ma/info`, `cantabile/ma/library`, `cantabile/ma/search`, `
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 import re
@@ -344,6 +345,43 @@ def regisztral(hass: HomeAssistant) -> None:
             "shuffle": bool(q.get("shuffle_enabled")), "repeat": q.get("repeat_mode"), "elapsed": q.get("elapsed_time"),
             "current": _sor_elem(hass, q.get("current_item")), "next": _sor_elem(hass, q.get("next_item")),
         })
+
+    @websocket_api.websocket_command({
+        vol.Required("type"): "cantabile/ma/queue_items", vol.Required("entity_id"): str,
+        vol.Optional("before", default=3): vol.All(int, vol.Range(min=0, max=50)),
+        vol.Optional("after", default=40): vol.All(int, vol.Range(min=1, max=200)),
+    })
+    @websocket_api.async_response
+    async def ws_queue_items(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        """Az MA sorának elemei a szóló szám körül (2.7.1): a HA `get_queue` csak a szólót és a következőt adja, a teljes
+        sort a HA MA-integrációjának kliensétől kérjük. Eredmény: {index, total, offset, items:[…]}."""
+        e = msg["entity_id"]
+        try:
+            bej = _entry()
+            v = await _hiv(hass, "get_queue", {"entity_id": e}) if ma_lejatszo(hass, e) else None
+            q = (v or {}).get(e) if isinstance(v, dict) else None
+            if not isinstance(q, dict) or not q.get("queue_id"):
+                conn.send_result(msg["id"], {"active": False})
+                return
+            idx, osszes = int(q.get("current_index") or 0), int(q.get("items") or 0)
+            off = max(0, idx - msg["before"])
+            elemek: list[Any] = []
+            mass = getattr(getattr(bej, "runtime_data", None), "mass", None)
+            if mass is not None:
+                with contextlib.suppress(Exception):     # régebbi kliens / MA-hiba: csak a szóló és a következő
+                    elemek = [x.to_dict() if hasattr(x, "to_dict") else x
+                              for x in await mass.player_queues.get_queue_items(q["queue_id"], limit=msg["before"] + msg["after"] + 1, offset=off)]
+            if not elemek:
+                off = idx
+                elemek = [x for x in (q.get("current_item"), q.get("next_item")) if x]
+        except HomeAssistantError as err:
+            conn.send_error(msg["id"], "nem_sikerult", str(err))
+            return
+        conn.send_result(msg["id"], {"active": bool(q.get("active")), "index": idx, "total": osszes, "offset": off,
+                                     "shuffle": bool(q.get("shuffle_enabled")), "repeat": q.get("repeat_mode"),
+                                     "items": [y for y in (_sor_elem(hass, x) for x in elemek) if y]})
+
+    websocket_api.async_register_command(hass, ws_queue_items)
 
     @websocket_api.websocket_command({
         vol.Required("type"): "cantabile/ma/now",

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.1b3 – 2026-11-03
+
+- **Music Assistant queue on the cassette and in QUEUE.** When an MA queue plays behind a button (e.g. after a Deezer list moved to MA), the cassette counter shows which track of the list plays (e.g. 012/300), and the QUEUE tab lists the queue around the playing track – a few before, the next 40 after, the playing one highlighted – instead of only the next track. New websocket: `cantabile/ma/queue_items` (through the Music Assistant integration's client).
+
 ## 2.7.1b2 – 2026-11-03
 
 - **Sonos → TV no longer refused on the first try.** A TV's Music Assistant player exists only while the TV's Cast connection is up (a few seconds after switching on); the card now waits up to 12 s for it. If it still isn't there, a Deezer list goes from the music folder to the TV page, and a Music Assistant queue stays where it plays, with a clear message instead of "not a Music Assistant player".
