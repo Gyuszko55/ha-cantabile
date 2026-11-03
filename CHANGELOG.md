@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.0b15 – 2026-11-03
+
+- **Music Assistant streaming tracks move to a TV too.** Switching from a speaker playing an MA queue (e.g. Deezer through MA) to a Cantabile TV first looks for the track in the music folder (TV page with picture and lyrics); if it isn't there, the MA queue moves to the TV's own MA player, sound only. Before, the card refused with "only a Music Assistant player can play it".
+- **No more gap when switching to or from a DLNA TV.** A DLNA TV reports "playing" while it is still buffering the live video: the old speaker now keeps playing a few seconds longer, and when leaving the TV the new speaker starts a little earlier (the TV plays behind what it reports). The buffer time (3 s) is a constant, to be tuned.
+
 ## 2.7.0b14 – 2026-11-03
 
 - **A list keeps going in the same order when moved from Sonos to the WiiM.** Sonos plays Deezer favourites (loved tracks) newest first, while Deezer and the WiiM's own Deezer have them oldest first. Moving the first Sonos track to the WiiM started it at the WiiM list's last track, so it stopped after one song (and moving back gave the Sonos only that song). Now, when the WiiM would continue with a different track than the Sonos, the WiiM's own Deezer is skipped and the list continues through Music Assistant's Deezer in the Sonos order.

@@ -36,6 +36,8 @@
 
 // angol feliratok (kulcs: a magyar forrásszöveg)
 const EN = {
+  "A(z) {h} nem indult el – a(z) {r} szól tovább.": "{h} didn't start – {r} keeps playing.",
+  "A(z) {h} TV-n a Music Assistant szól tovább – csak a hang (a TV-oldal képe, dalszövege ehhez nem jár).": "Music Assistant keeps playing on the {h} TV – sound only (no TV page picture or lyrics with it).",
   "Véletlenszerű lejátszás": "Shuffle",
   "Ismétlés: 1 · 2 · 3 · 4 · 5 kör · végtelen": "Repeat: 1 · 2 · 3 · 4 · 5 rounds · endless",
   "Áttűnés a számok között (csak Sonos)": "Crossfade between tracks (Sonos only)",
@@ -551,6 +553,9 @@ const EN = {
 };
 // felirat a Home Assistant nyelvén: a forrásszöveg magyar, angolul az EN szótárból ({x} = behelyettesítés)
 // a kártya változata (a betöltés ?v= paraméteréből) – szerényen a lejátszó jobb alsó sarkában
+// a DLNA-s TV (élő videó) a „playing” jelzés után kb. ennyi mp-cel később szól ténylegesen (pufferel): váltáskor a régi
+// hangszóró ennyivel tovább szól, a TV-ről elváltva az új ennyivel korábbról indul
+const DLNA_KESES = 3;
 const VERZIO = (() => { try { return new URL(import.meta.url).searchParams.get("v") || ""; } catch (e) { return ""; } })();
 const MAGYAR = () => /^hu/i.test(document.documentElement.lang || navigator.language || "");
 const T = (s, v = {}) => String((MAGYAR() ? s : EN[s] ?? s)).replace(/\{(\w+)\}/g, (_, k) => v[k] ?? "");
@@ -3065,11 +3070,21 @@ class CantabileCard extends HTMLElement {
       if (most?.current?.uri && uj.entity !== HELYI) {
         const t0 = Date.now(), c = most.current;
         await this._csoportAllit(uj);
-        if (await this._helyettesitJatszik({ ma: [{ uri: c.uri, cim: c.name, eloado: c.artist, album: c.album }] }, c.album || c.name, 0, uj, Number(most.elapsed) || 0, t0)) {
+        if (await this._helyettesitJatszik({ ma: [{ uri: c.uri, cim: c.name, eloado: c.artist, album: c.album }] }, c.album || c.name, 0, uj, Number(most.elapsed) || 0, t0, { csendes: !!this._tvMa(uj) })) {
           return this._hiv("media_player", "media_stop", { entity_id: rma }, { csendes: true }).catch(() => {});
         }
       }
-      this._visszaRegire(regi);
+      // TV-re: a zenemappában nincs meg – a TV saját MA-lejátszóján szól tovább (csak hang, kép nélkül)
+      const tvMa = this._tvMa(uj);
+      if (tvMa && tvMa !== rma) {
+        try {
+          await this._hass.callWS({ type: "cantabile/ma/transfer", source: rma, target: tvMa, device: ESZKOZ() });
+          this._naplo("MA-sor a TV MA-lejátszójára", "info", { cel: tvMa });
+          this._uzen(T("A(z) {h} TV-n a Music Assistant szól tovább – csak a hang (a TV-oldal képe, dalszövege ehhez nem jár).", { h: KN(uj) }));
+          return;
+        } catch (err) { this._maHiba(tvMa, err); }
+      }
+      this._visszaRegire(regi, "MA-szám, a célon nincs MA-lejátszó");
       this._uzen(T("Ezt a Music Assistant-számot ({p}) csak Music Assistant-lejátszó játszhatja – a(z) {r} szól tovább.", { p: most?.provider?.split("--")[0] || "MA", r: KN(regi) }));
       return this._frissit();
     }
@@ -3242,6 +3257,8 @@ class CantabileCard extends HTMLElement {
       this._visszaRegire(regi); this._frissit();
       return this._uzen(T("A(z) {h} nem indult el – a(z) {r} szól tovább.", { h: KN(uj), r: KN(regi) }));
     }
+    // DLNA-s TV-re: a TV a „playing” után még pufferel – a régi addig szól tovább, hogy ne legyen csend
+    if (szol && ok && this._dlnaTv(uj.entity)) await new Promise((x) => setTimeout(x, (DLNA_KESES + 1) * 1000));
     if (szol) await regiLe();
   }
 
@@ -3537,6 +3554,15 @@ class CantabileCard extends HTMLElement {
 
   // a szóló (vagy szünetelő) kazetta számsora és helye, magától a lejátszótól: Sonosnál a sorából, WiiM-nél az integráció
   // sorozatából, BT-n a kártya listájából. Csak zenemappás számsort ad (Deezer / kedvenc / telefonos zene: null).
+  _dlnaTv(e) { return this._hass?.states?.[e]?.attributes?.tv_mode === "dlna"; }
+
+  // a TV saját Music Assistant-lejátszója (a mátrixból): ott az MA-n szóló zene csak hangként szólhat tovább
+  _tvMa(h) {
+    if (!h || !/^media_player\.cantabile_tv_/.test(h.entity)) return null;
+    const u = this._matrixCella("ma_konyvtar", h)?.utak?.find((x) => x.ut === "ma_sajat" && x.allapot !== "hianyzik");
+    return u?.kimenet || null;
+  }
+
   async _szoloForras(hsz, s) {
     const a = s?.attributes || {};
     let poz = a.media_position != null ? a.media_position + (s.state === "playing" && a.media_position_updated_at ? (Date.now() - Date.parse(a.media_position_updated_at)) / 1000 : 0) : 0;
@@ -3573,6 +3599,7 @@ class CantabileCard extends HTMLElement {
       if (!szamok && k?.forras === "nas" && k.szamok?.length && k.entity === hsz.entity) { szamok = k.szamok; kezdo = Math.max(0, this._szamIndex(k, a)); }
       if (!szamok) return null;
     }
+    if (this._dlnaTv(hsz.entity)) poz = Math.max(0, poz - DLNA_KESES);      // a TV a jelzettnél később szól (puffer)
     const k = TAR.json("tablet-magno-kazetta"), ugyanaz = k?.forras === "nas" && k.szamok?.length === szamok.length;
     const kaz = { forras: "nas", szamok, cim: ugyanaz ? k.cim : a.media_album_name || FAJLNEV(szamok[0]), alcim: ugyanaz ? k.alcim : a.media_artist || "" };
     if (ugyanaz && k.id) kaz.id = k.id;
