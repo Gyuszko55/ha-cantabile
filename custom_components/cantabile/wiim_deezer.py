@@ -167,7 +167,7 @@ async def deezer_sorrend(hass: HomeAssistant, fajta: str, did: str, legfeljebb: 
 
 
 async def lejatszik(hass: HomeAssistant, entity_id: str, fajta: str, did: str, szam: str | None = None,
-                    poz: float = 0) -> dict[str, Any]:
+                    poz: float = 0, kovetkezok: list[str] | None = None) -> dict[str, Any]:
     """Deezer-album / -lista a WiiM saját Deezeréről; `szam` (Deezer-azonosító) a kezdő szám, `poz` a hely benne (mp)."""
     host = _wiim(hass, entity_id)
     alap = await deezer_alap(hass, entity_id)
@@ -181,6 +181,11 @@ async def lejatszik(hass: HomeAssistant, entity_id: str, fajta: str, did: str, s
         if str(szam) not in sorrend:
             raise HomeAssistantError("not_in_list")
         index = sorrend.index(str(szam)) + 1
+    if kovetkezok:
+        # a forrás (pl. Sonos) sorában a szóló szám után ezek jönnek: ha a WiiM sora másképp folytatná (pl. a Sonos a
+        # Deezer-kedvenceket fordított sorrendben adja – a legújabb elöl), a WiiM nem viheti tovább ugyanígy a listát
+        if index >= len(sorrend) or sorrend[index] != str(kovetkezok[0]):
+            raise HomeAssistantError("order_mismatch")
     nemitva = False
     try:
         # 2.7.0b12: mindig némítva indul, és a sor betöltése után mindig újra a kért számra lép. Az első
@@ -504,6 +509,7 @@ def regisztral(hass: HomeAssistant) -> None:
     @websocket_api.websocket_command({
         vol.Required("type"): "cantabile/wiim_deezer/from_sonos", vol.Required("source"): str, vol.Required("target"): str,
         vol.Required("track"): vol.Coerce(str), vol.Optional("position", default=0): vol.Coerce(float),
+        vol.Optional("next"): [vol.Coerce(str)],
     })
     @websocket_api.async_response
     async def ws_from_sonos(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
@@ -517,7 +523,8 @@ def regisztral(hass: HomeAssistant) -> None:
             if not f:
                 raise HomeAssistantError("not_found")
             szam = (m.group(1) if (m := DZ_SZAM.search(msg["track"])) else msg["track"]) or None
-            r = await lejatszik(hass, msg["target"], f["kind"], f["id"], szam, msg["position"])
+            kov = [m.group(1) if (m := DZ_SZAM.search(x)) else x for x in msg.get("next") or []]
+            r = await lejatszik(hass, msg["target"], f["kind"], f["id"], szam, msg["position"], [k for k in kov if k.isdigit()][:1])
         except HomeAssistantError as err:
             conn.send_error(msg["id"], "nem_sikerult", str(err))
             return

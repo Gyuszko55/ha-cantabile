@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0b14 – 2026-11-03
+
+- **A list keeps going in the same order when moved from Sonos to the WiiM.** Sonos plays Deezer favourites (loved tracks) newest first, while Deezer and the WiiM's own Deezer have them oldest first. Moving the first Sonos track to the WiiM started it at the WiiM list's last track, so it stopped after one song (and moving back gave the Sonos only that song). Now, when the WiiM would continue with a different track than the Sonos, the WiiM's own Deezer is skipped and the list continues through Music Assistant's Deezer in the Sonos order.
+
 ## 2.7.0b13 – 2026-11-03
 
 - **WiiM's own Deezer plays the whole list again when started from the first track.** The WiiM got the queue but its list stayed empty: it played that one track and stopped, and while loading it played a few seconds of its previous queue (e.g. a track from an earlier Music Assistant session). Now it always waits for the queue to load and jumps to the wanted track again, muted until then.

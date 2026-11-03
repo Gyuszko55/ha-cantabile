@@ -3407,7 +3407,8 @@ class CantabileCard extends HTMLElement {
   async _wiimDeezer(regiEntity, uj, dzf) {
     if (this._nincsIntegracio || !dzf?.ids?.length || !["wiim", "linkplay"].includes(this._hass?.entities?.[uj.entity]?.platform)) return false;
     try {
-      const r = await this._hass.callWS({ type: "cantabile/wiim_deezer/from_sonos", source: regiEntity, target: uj.entity, track: String(dzf.ids[0]), position: Number(dzf.poz) || 0 });
+      const r = await this._hass.callWS({ type: "cantabile/wiim_deezer/from_sonos", source: regiEntity, target: uj.entity, track: String(dzf.ids[0]), position: Number(dzf.poz) || 0,
+        ...(dzf.ids.length > 1 ? { next: [String(dzf.ids[1])] } : {}) });
       this._uzen(T("A(z) {h} hangszórón innen szól: {f}.", { h: KN(uj), f: T("a WiiM saját Deezere – „{c}”", { c: r.title || "Deezer" }) }));
       return true;
     } catch (e) {                            // nincs Deezer a WiiM-ben, nem kedvenc lista, vagy a szám nincs benne: tartalék út

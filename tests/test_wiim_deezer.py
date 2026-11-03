@@ -194,3 +194,11 @@ def test_elso_szamtol_is_nemitva_es_megvarja_a_sort(wiim):
     parancsok = [t for a, t in wiim.naplo if a == "api"]
     assert "setPlayerCmd:mute:1" in parancsok and parancsok[-1] == "setPlayerCmd:mute:0"
     assert akciok.count("PlayQueueWithIndex") == 2 and akciok.count("BrowseQueue") >= 2
+
+
+def test_mas_sorrendnel_nem_indul(wiim):
+    # a Sonos fordítva adja a Deezer-kedvenceket: ha a szóló szám után a WiiM sora mást hozna, a WiiM nem indul
+    # (a hívó az MA-t választja, az a Sonos sorrendjében viszi tovább)
+    with pytest.raises(HomeAssistantError, match="order_mismatch"):
+        asyncio.run(W.lejatszik(None, "media_player.wiim", "playlist", "989611251", "4140323881", 0, ["1"]))
+    assert wiim.naplo == []
