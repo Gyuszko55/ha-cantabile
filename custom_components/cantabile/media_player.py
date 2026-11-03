@@ -233,7 +233,8 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         if msg.get("position") is not None:
             self._poz, self._poz_ido = msg["position"] + (self._atk_kezdet if self._atkodolva else 0), dt_util.utcnow()
         if msg.get("duration"):
-            self._hossz = msg["duration"]
+            # átkódolt folyamnál a TV-oldal a folyam hosszát jelenti (a kezdőponttól hátralévő időt): a teljes hossz ennyivel több
+            self._hossz = msg["duration"] + (self._atk_kezdet if self._atkodolva else 0)
         self.async_write_ha_state()
 
     # ---- állapot ----

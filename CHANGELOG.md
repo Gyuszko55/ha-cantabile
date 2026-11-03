@@ -12,6 +12,7 @@ Fixes from a full review of 2.7.0b1–b21:
 - **Music Assistant library on a TV's MA player** now also checks the TV keeps playing (DLNA TVs stop after a second); a failed MA transfer sets the selector back.
 - **TV mirror:** clear messages instead of raw codes, the button turns to MIRROR OFF right after sending, the TV's own Cast player can't be mirrored onto itself, and "pending" (old page code being refreshed) counts as success.
 - **Route matrix:** an expired "didn't play" mark clears at once; a damaged stored matrix no longer stops the integration from starting. The card asks for the matrix once at start.
+- A transcoded track started or sought mid-way shows its full length (the page reports the stream's remaining time).
 - `cantabile/sonos_favorite` no longer leaks an error into the HA log when Deezer doesn't answer.
 
 ## 2.7.0b21 – 2026-11-03
