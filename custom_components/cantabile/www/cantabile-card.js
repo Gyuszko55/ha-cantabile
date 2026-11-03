@@ -550,6 +550,8 @@ const EN = {
   "A(z) {h} a(z) {b} bemenetről szólt – ez nem vihető át, szüneteltettem. Ha visszaváltasz rá, onnan folytatja.": "{h} was playing from its {b} input – that can't be moved, so it's paused. Switch back to it and it carries on."
 };
 // felirat a Home Assistant nyelvén: a forrásszöveg magyar, angolul az EN szótárból ({x} = behelyettesítés)
+// a kártya változata (a betöltés ?v= paraméteréből) – szerényen a lejátszó jobb alsó sarkában
+const VERZIO = (() => { try { return new URL(import.meta.url).searchParams.get("v") || ""; } catch (e) { return ""; } })();
 const MAGYAR = () => /^hu/i.test(document.documentElement.lang || navigator.language || "");
 const T = (s, v = {}) => String((MAGYAR() ? s : EN[s] ?? s)).replace(/\{(\w+)\}/g, (_, k) => v[k] ?? "");
 const NYELV = () => (MAGYAR() ? "hu-HU" : document.documentElement.lang || undefined);
@@ -2046,6 +2048,7 @@ class CantabileCard extends HTMLElement {
         /* keskeny (telefon, < 600 px): álló elrendezés, a kártya magassága a tartalomhoz igazodik */
         :host([keskeny]) { height: auto; }
         :host([keskeny]) ha-card { height: auto; padding: 0 8px; }
+        .verzio { position: absolute; right: 9px; bottom: 3px; font-size: 9px; line-height: 1; letter-spacing: .05em; opacity: .38; pointer-events: none; user-select: none; }
         :host([keskeny]) .elo { position: relative; inset: auto; margin: 6px 0; display: flex; flex-direction: column; gap: 12px; padding: 16px 12px 14px; }
         :host([keskeny]) .elo.rejt { display: none; }
         :host([keskeny]) .bal { display: contents; }
@@ -2364,6 +2367,7 @@ class CantabileCard extends HTMLElement {
           <button class="fedfog" hidden title="${T("Bemenet és hangszín")}">INPUT · TONE</button>
           <div class="polc" id="netpolc" hidden></div>
           <div class="polc dalpolc" id="dalpolc_r" hidden></div>
+          ${VERZIO ? `<span class="verzio">${ESC(VERZIO)}</span>` : ""}
         </div>
         <div class="elo magno rejt${c.magno?.vu_kijelzo === "fluor" ? " vfdmod" : ""}" id="magno">
           <div class="bal">
@@ -2385,6 +2389,7 @@ class CantabileCard extends HTMLElement {
           <button class="fedfog" hidden title="${T("Bemenet és hangszín")}">INPUT · TONE</button>
           <div class="polc konyv" id="polc" hidden></div>
           <div class="polc dalpolc" id="dalpolc_m" hidden></div>
+          ${VERZIO ? `<span class="verzio">${ESC(VERZIO)}</span>` : ""}
         </div>
         <div class="fedel" id="fedel" hidden></div>
         <div class="beall" id="beall" hidden></div>

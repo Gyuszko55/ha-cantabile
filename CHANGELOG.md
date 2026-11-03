@@ -6,6 +6,7 @@
 - **Learned player traits are kept.** When a TV page can't open FLAC, the TV is remembered in the matrix store: after a restart the TV gets MP3 from the first track instead of failing once again. `cantabile/matrix/reset` with `learned: true` forgets them.
 - Fix: when a TV page first failed on a FLAC inside an album, the series ran through every remaining track in seconds (the failed FLAC's late "idle" report looked like the end of the track while the MP3 re-play was starting). Those reports are now ignored until the MP3 plays.
 - The radio route's recipe is `media_player.play_media` with the station's stream URL.
+- The card shows its version, small and faint, in the bottom-right corner of the receiver and the cassette deck.
 
 ## 2.7.0b10 – 2026-11-03
 
