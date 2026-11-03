@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0b16 – 2026-11-03
+
+- Fix: Sonos marks lossless Deezer tracks as `tr-flac%3a…`, which the track-id pattern missed. So the b14 order check didn't run (the WiiM started the Sonos favourites at its last track again and stopped after it), and lists made only of FLAC tracks weren't recognised as Deezer queues. The pattern now covers it everywhere (card, substitution, lists, WiiM).
+
 ## 2.7.0b15 – 2026-11-03
 
 - **Music Assistant streaming tracks move to a TV too.** Switching from a speaker playing an MA queue (e.g. Deezer through MA) to a Cantabile TV first looks for the track in the music folder (TV page with picture and lyrics); if it isn't there, the MA queue moves to the TV's own MA player, sound only. Before, the card refused with "only a Music Assistant player can play it".

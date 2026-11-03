@@ -54,7 +54,7 @@ _alap_tar: dict[str, tuple[float, str | None]] = {}
 SONOS_ALBUM = re.compile(r"album-(\d+)", re.I)
 SONOS_LISTA = re.compile(r"playlist[^-?]*-(\d+)", re.I)
 SONOS_KEDVENC = re.compile(r"user-tracks-(\d+)", re.I)
-DZ_SZAM = re.compile(r"tr(?:%3a|:|-flac:)(\d+)", re.I)
+DZ_SZAM = re.compile(r"tr(?:-flac)?(?:%3a|:)(\d+)", re.I)
 
 
 def _boritek(szolg: str, akcio: str, torzs: str) -> str:

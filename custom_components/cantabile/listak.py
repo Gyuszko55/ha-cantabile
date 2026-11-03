@@ -36,7 +36,7 @@ _LOGGER = logging.getLogger(__name__)
 TAROLO = "cantabile_listak"
 ELEM_MAX = 500
 LISTA_MAX = 200
-DZ_SZAM = re.compile(r"(?:tr(?:%3a|:|-flac:)|deezer\.com/(?:\w+/)?track/)(\d+)", re.I)
+DZ_SZAM = re.compile(r"(?:tr(?:-flac)?(?:%3a|:)|deezer\.com/(?:\w+/)?track/)(\d+)", re.I)
 MA_URI = re.compile(r"^[\w.-]+://(track|album|playlist|artist|radio)/")
 
 ELEM = vol.Schema({

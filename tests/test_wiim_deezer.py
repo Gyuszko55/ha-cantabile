@@ -202,3 +202,9 @@ def test_mas_sorrendnel_nem_indul(wiim):
     with pytest.raises(HomeAssistantError, match="order_mismatch"):
         asyncio.run(W.lejatszik(None, "media_player.wiim", "playlist", "989611251", "4140323881", 0, ["1"]))
     assert wiim.naplo == []
+
+
+def test_flac_szam_azonosito():
+    # a Sonos a FLAC-számokat „tr-flac%3a…” alakban adja (2.7.0b16 előtt ez kimaradt: a sorrend-ellenőrzés nem futott)
+    assert W.DZ_SZAM.search("x-sonos-http:tr-flac%3a1008473712.flac?sid=2").group(1) == "1008473712"
+    assert W.DZ_SZAM.search("x-sonos-http:tr%3a4140323881.mp3").group(1) == "4140323881"

@@ -3311,7 +3311,7 @@ class CantabileCard extends HTMLElement {
     if (ut === "wiim") {
       // a WiiM saját Deezere (lossless) a kért számtól; az integráció csak akkor jelez sikert, ha a WiiM meg is szólalt
       const dzl = /deezer\.com\/(?:\w+\/)?(album|playlist)\/(\d+)/i.exec(String(kaz.id || ""));
-      const szam = /track\/(\d+)|tr(?:%3a|:|-flac:)(\d+)/i.exec(String(kaz.szamok?.[kezdo] || ""));
+      const szam = /track\/(\d+)|tr(?:-flac)?(?:%3a|:)(\d+)/i.exec(String(kaz.szamok?.[kezdo] || ""));
       try {
         await this._hass.callWS({ type: "cantabile/wiim_deezer/play", entity_id: hsz.entity, kind: dzl[1].toLowerCase(), item: dzl[2], ...(kezdo > 0 && szam ? { track: szam[1] || szam[2] } : {}) });
         this._uzen(T("A(z) {h} hangszórón innen szól: {f}.", { h, f: T("a WiiM saját Deezere – „{c}”", { c }) }), masik);
@@ -3441,7 +3441,7 @@ class CantabileCard extends HTMLElement {
     try {
       const v = await this._hass.callWS({ type: "call_service", domain: "sonos", service: "get_queue", service_data: { entity_id: vez }, return_response: true });
       const ids = (v?.response?.[vez] || []).map((x) => String(x.media_content_id || ""));
-      if (!ids.some((x) => /tr(%3a|:|-flac:)\d+/i.test(x))) return null;
+      if (!ids.some((x) => /tr(?:-flac)?(?:%3a|:)\d+/i.test(x))) return null;
       let kezdo = Math.max(0, (Number(a.queue_position) || 1) - 1), poz = a.media_position || 0;
       try { const ps = await this._hass.callWS({ type: "cantabile/sonos_position", entity_id: vez }); if (ps?.position >= 0) { poz = ps.position; if (ps.track >= 0) kezdo = ps.track; } } catch (_) { /* régebbi integráció */ }
       // a szóló számtól legfeljebb 300 (a helyettesítés határa; hosszú listánál – pl. 315 kedvenc – a teljes sor elutasítódna)
@@ -3633,13 +3633,13 @@ class CantabileCard extends HTMLElement {
     const tvPar = cel && this._tvPar(cel.entity);
     if (tvPar) this._uzen(T("A(z) {h} a TV saját lejátszója – csak a hang megy át. A ⚙-ben állítsd át a(z) „{n}” lejátszóra.", { h: KN(cel), n: tvPar.nev }));   // figyelmeztet, de vált
     const regiCid = String(regiAll?.attributes?.media_content_id || "");
-    const dzSor = kiz === "sonos" && /tr(%3a|:|-flac:)\d+/i.test(regiCid) && cel?.entity !== HELYI && !this._nincsIntegracio;
+    const dzSor = kiz === "sonos" && /tr(?:-flac)?(?:%3a|:)\d+/i.test(regiCid) && cel?.entity !== HELYI && !this._nincsIntegracio;
     // a Sonos saját Spotify-ján szóló sor: átvihető (Spotify Connecttel, vagy a számok a Deezerről)
     const spSor = kiz === "sonos" && /^x-sonos-spotify:/i.test(regiCid) && cel?.entity !== HELYI && !this._nincsIntegracio;
     if (((kiz === "sonos" && !dzSor && !spSor && !this._spotifyConnectSzol(regi)) && cel?.mod !== "sonos") || (kiz === "bt" && cel?.entity !== HELYI)) {
       // ami csak Sonoson szólhat (Sonos-kedvenc, Sonos-rádió…), illetve a telefonos zene csak BT-n: a választó marad, a zene
       // szól tovább – az üzenet a valóban szóló forrást nevezi meg
-      const forras = /^x-sonos-spotify:/i.test(regiCid) ? "Spotify" : /tr(%3a|:|-flac:)\d+/i.test(regiCid) ? "Deezer"
+      const forras = /^x-sonos-spotify:/i.test(regiCid) ? "Spotify" : /tr(?:-flac)?(?:%3a|:)\d+/i.test(regiCid) ? "Deezer"
         : /^x-sonosapi-(stream|radio|hls)/i.test(regiCid) ? T("a Sonos-rádió") : T("a Sonos-kedvenc");
       this._uzen(kiz === "sonos" ? T("Ez ({f}) innen nem vihető át: a(z) {u} hangszórón nem szólhat – a(z) {h} szól tovább.", { f: forras, u: KN(cel), h: KN(regi) })
         : T("A telefonról választott zene csak BT-n szól – ott marad."));

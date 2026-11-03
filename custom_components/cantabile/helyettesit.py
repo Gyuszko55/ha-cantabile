@@ -34,7 +34,7 @@ from .music import HibaUzenet, deezer, nas_lista, norm, tiszta
 _LOGGER = logging.getLogger(__name__)
 
 DZ_LINK = re.compile(r"deezer\.com/(?:\w+/)?(track|album|playlist)/(\d+)", re.I)
-DZ_SONOS = re.compile(r"tr(?:%3a|:|-flac:)(\d+)", re.I)
+DZ_SONOS = re.compile(r"tr(?:-flac)?(?:%3a|:)(\d+)", re.I)
 MA_DZ = re.compile(r"^(deezer--[\w-]+)://track/(\d+)$")
 SZAM_MAX = 300
 _index_tar: dict[str, tuple[int, dict[tuple[str, str], str]]] = {}
