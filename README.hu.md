@@ -133,7 +133,37 @@ Music Assistant sornál a szóló és a következő szám.
 - **ⓘ Jelút**: a ⚙ előtti gomb élőben mutatja, honnan jön a hang, mi történik vele, és hol szól (forrás → feldolgozás →
   kimenet, az EQ-val / hangszínnel, és hogy a VU-mérő valódi-e).
 - **Üzenetek a lejátszón**: a súgók és hibák füstüveg ablakban jelennek meg a kártyán, aztán elhalványulnak.
+- **Verziószám**: a kártya verziója (pl. `2.7.0b11`) kicsi, halvány betűvel a rádió és a magnó jobb alsó sarkában
+  látszik – hibabejelentésnél érdemes megadni.
 - **Hangszóró-foglalás** több felhasználónál – lásd *Tudnivalók*.
+
+## Útmátrix – mi hol szól
+
+A 2.7 óta a Cantabile egy **útmátrixot** tart nyilván: minden forrás (zenemappa, rádió, Deezer, Spotify, Tidal,
+WiiM-presetek, Sonos-kedvencek, Music Assistant-könyvtár, telefon, AirPlay, PARTY, saját listák) × minden hangszóró.
+Minden cella sorrendben sorolja az utakat – pl. WiiM-en a Deezer-album először a WiiM saját Deezerén (lossless), aztán a
+Music Assistant Deezerén, végül ugyanazok a számok a zenemappádból –, mindegyiket a feltételeivel (Deezer-fiók a
+WiiM-ben, Music Assistant-lejátszó a készüléken, zenemappa beállítva…) és azzal, hol szól (a készülék saját lejátszója,
+TV-oldal vagy a Music Assistant-lejátszója; közvetlenül vagy helyettesítéssel). A mátrix a beállításból és a Home
+Assistantból épül, tárolva van, és frissül induláskor, ha a lejátszók vagy a vezérlőpultok változnak, óránként és kérésre.
+
+- **A kártya a mátrixból indít**: a cella első élő útja szól, kérdés nélkül; az üzenetben a **MÁSIK ÚT** a cella többi
+  élő útját kínálja. Ha egy út nem szól, egy óráig „nem szól”-nak számít, és rögtön a következő út indul. Az üzenetek, a
+  váltógombok és a forráscímkék („lejátszható: …”) is a mátrixból jönnek.
+- **Minden mindenütt**: a Sonos-kedvencek minden hangszórón szólnak – nem Sonoson a kedvenc tartalma (Deezer-album /
+  -lista, Spotify-elem vagy rádióadó), és a STREAMING fül ezt ki is írja; a **BT** (a böngésző) a Deezer, a Spotify és a
+  Music Assistant számait a zenemappádból játssza, ha megvannak.
+- **ROUTE MATRIX nézet**: ⓘ (jelút) → **ROUTE MATRIX** a kártyán mutatja a mátrixot – zöld közvetlen, narancs
+  helyettesítés, sárgás nem ellenőrizhető, szürke nem szól, a cellában az első élő út rövid nevével. Cellára koppintva
+  látszanak az utak a feltételekkel (✓ / ✗ / ?), és hogy TV-n hol lesz a kép. Az **ALL DEVICES** a kártyán nem szereplő
+  hangszórókat is hozzáveszi, a **REFRESH** újraépíti a mátrixot, a **CLEAR MARKS** törli a „nem szólt” jelöléseket.
+- **Útreceptek** (2.7.0b11): minden út a receptjét is hordozza – a parancsot és a paramétereit, a cél lejátszót, hogy
+  indulhat-e egy adott pontról (másodperc / sorindex / nem), átadható-e másik lejátszóra, és tartalomformátumonként, hogy
+  közvetlenül vagy átkódolva szól (FLAC → MP3 320k). Egyelőre ez csak adat: a kártya ugyanúgy indít, mint eddig.
+- **A tanult tulajdonságok megmaradnak**: pl. az a TV, amelyiknek az oldala nem nyitja meg a FLAC-ot (lásd *TV*), a
+  mátrix tárolójába kerül, és az első számtól MP3-at kap, újraindítás után is.
+- Websocket (érdeklődőknek): `cantabile/matrix` (`refresh: true`: újraépíti), `cantabile/matrix/reset` – törli a
+  jelöléseket, `learned: true`-val a tanult tulajdonságokat is.
 
 ## Music Assistant (elhagyható)
 
@@ -156,7 +186,13 @@ teljes képernyős TV-oldal – borító, cím, előadó, album, formátum, a h�
 **futó dalszöveg**; **DLNA** TV-n teljes képernyős álló számkártya (szám közben váltva élő videó, rögtön a kezdőponttól).
 Kinézet: **borító** (alapértelmezés), **forgó bakelit** körspektrummal, vagy az equalizer – a ⚙ → *TV-kinézet* résznél
 vagy a lenti `select` / `switch` entitásokkal. Ha a TV-ről másik hangszóróra váltasz, a TV tovább mutatja annak a
-számát (tükör), a Home Assistant újraindítása után is.
+számát (tükör), a Home Assistant újraindítása után is. A 2.7 óta a **helyiség TV-je magától követi**: ha egy
+területen bármelyik hangszóró elkezd szólni – a kártyáról, a saját appjából, hanggal vagy automatizálásból –, az ugyanott
+lévő Cast-os TV hang nélkül mutatja (adatlap, dalszöveg), ha a Cantabile TV-oldala nyitva van rajta, és a TV maga nem
+szól (a TV-nek és a hangszórónak terület kell; DLNA-s TV tükrözni nem tud). Egyes Cast-vevők bizonyos FLAC-fájlokat nem
+tudnak megnyitni (jellemzően a nagy beágyazott borítósakat, keresőtábla nélkül): a Cantabile ilyenkor ugyanazt a számot
+ugyanonnan MP3-ként játssza (320 kbit/s, menet közben kódolva), és megjegyzi a TV-t – onnantól, újraindítás után is, arra
+a TV-re a FLAC az első számtól MP3-ként megy.
 
 A kártya **TV-gombja** (az ⓘ előtt) ugyanezt az oldalt kis ablakban mutatja a kiválasztott hangszóróról, a kijelző
 fölött; követi a szám- és hangszóróváltást, és a zene megállása után 5 mp-cel magától bezárul. Az ablak alsó sávjában
@@ -194,8 +230,8 @@ nyelvét követik: **magyar** vagy **angol**.
 |---|---|---|---|---|---|---|
 | **Sonos** | ✔ | ✔ | ✔ (Sonos-sor) | ✔ | ✔ (csak Sonos) | ✔ |
 | **WiiM**, **LinkPlay** (Arylic, Audio Pro…), **DLNA-renderelők** | ✔ | ✔ | ✔ (DLNA következő szám) | ✔ | – | Deezer: a WiiM saját Deezere (lossless), különben a Music Assistanton át |
-| **Chromecast / Google Cast**, **Music Assistant**, **Squeezebox**, más *play media*-képes | ✔ | ✔ (számonként) | – | ✔ | – | – |
-| **BT** (a készülék, amelyiken a kártya nyitva van) | ✔ | ✔ | közel hézagmentes | ✔ | – | – |
+| **Chromecast / Google Cast**, **Music Assistant**, **Squeezebox**, más *play media*-képes | ✔ | ✔ (számonként) | – | ✔ | – | a zenemappából (helyettesítés) vagy a Music Assistant Deezeréről |
+| **BT** (a készülék, amelyiken a kártya nyitva van) | ✔ | ✔ | közel hézagmentes | ✔ | – | a zenemappából (helyettesítés) |
 
 - A lejátszás-indítás nélküli lejátszók (pl. csak távirányítható tévék, Spotify Connect entitások) nem használhatók,
   nem is kerülnek a listába.
@@ -445,6 +481,8 @@ résznél az *Assist* mellett kapcsold be a **Cantabile**-t is – a varázsló 
 | A TV csak a hangot kapja (pl. „Default Media Receiver” a képernyőn) | A kártya a TV saját Cast- / DLNA-lejátszóját használja: állítsd át a hangszórót a „Cantabile TV · …” lejátszóra (a ⚙-ben *Átállítás* gomb). |
 | A Cast-os TV-n nem jelenik meg semmi / „dashboard not found” | Hozd létre a `cantabile-tv` irányítópultot a `tv` nézettel (lásd *TV-lejátszók*), és ellenőrizd, hogy a Home Assistant a TV felől https-en elérhető. |
 | Üres a zenemappa | Ellenőrizd a ⚙-ben a médiaforrás-útvonalat, és hogy a mappa látszik-e a **Média** menüben. |
+| Egy FLAC-szám a TV-n egyszer megakad, aztán szól; a számon belül nem lehet tekerni | A TV-oldal nem tudja megnyitni ezt a FLAC-ot; a Cantabile MP3-ként játssza, és megjegyzi a TV-t (újraindítás után is). Elfelejteni: `cantabile/matrix/reset` websocket, `learned: true`-val. |
+| A helyiség TV-je nem mutatja, ami a helyiségben szól | Még nincs nyitva rajta a Cantabile TV-oldala (egyszer indíts valamit a Cantabile-ből a TV-n), a TV maga szól, vagy a TV-nek / hangszórónak nincs területe (a ROUTE MATRIX figyelmeztet). DLNA-s TV tükrözni nem tud. |
 | A MŰFAJOK fülön csak Deezer-csempék vannak | A zenefájlokban nincs műfajcímke, vagy még fut az első beolvasás (a fül mutatja a haladást). |
 | A PARTY QR-kódja nem nyílik meg a telefonon | A telefon legyen az otthoni Wi-Fin, és legyen beállítva a Home Assistant *belső címe* (Beállítások → Rendszer → Hálózat). |
 | Egy lista csak néhány számot játszik | Minden hangszóró azt játssza, amit tud: Sonos a zenemappát és a Deezert, Music Assistant-lejátszó az MA-számokat, a többi a zenemappát. |
