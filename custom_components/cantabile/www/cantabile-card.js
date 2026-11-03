@@ -36,6 +36,7 @@
 
 // angol feliratok (kulcs: a magyar forrásszöveg)
 const EN = {
+  "A(z) {h} Music Assistant-lejátszója most nem érhető el (pl. a TV még csatlakozik) – próbáld újra pár másodperc múlva.": "{h}'s Music Assistant player isn't available right now (e.g. the TV is still connecting) – try again in a few seconds.",
   "Rossz dalszöveg: törlöm, és másikat keresek (ezt többé nem hozza)": "Wrong lyrics: delete them and look for others (these won't come back)",
   "A rossz szöveget törlöm, másikat keresek…": "Deleting the wrong lyrics, looking for others…",
   "Nincs másik dalszöveg ehhez a dalhoz – a rosszat töröltem, többé nem jön elő.": "No other lyrics for this song – the wrong ones are deleted and won't come back.",
@@ -574,6 +575,7 @@ const DLNA_KESES = 3;
 let MATRIX_KER = null;                    // a futó mátrix-lekérés (egyszerre egy)
 // ennyi számtól a Deezer-lista TV-n a TV saját Music Assistant-lejátszóján szól (a zenemappás keresés lassú, hiányos)
 const TV_HOSSZU_LISTA = 40;
+const MA_ELSO = 25;                       // ennyi számmal indul az MA-sor (gyorsabb kezdés), a többi utána kerül a sor végére
 const VERZIO = (() => { try { return new URL(import.meta.url).searchParams.get("v") || ""; } catch (e) { return ""; } })();
 const MAGYAR = () => /^hu/i.test(document.documentElement.lang || navigator.language || "");
 const T = (s, v = {}) => String((MAGYAR() ? s : EN[s] ?? s)).replace(/\{(\w+)\}/g, (_, k) => v[k] ?? "");
@@ -3134,6 +3136,12 @@ class CantabileCard extends HTMLElement {
       if (this._hangszoro() !== uj) return;           // közben máshova váltottak: ide már nem visszük
       // TV-re: a zenemappában nincs meg – a TV saját MA-lejátszóján szól tovább (csak hang, kép nélkül)
       const tvMa = this._tvMa(uj);
+      if (tvMa && tvMa !== rma && !(await this._maVar(tvMa))) {
+        this._naplo("a TV MA-lejátszója nem érhető el", "warning", { cel: tvMa });
+        this._visszaRegire(regi, "a TV MA-lejátszója nem érhető el");
+        this._uzen(T("A(z) {h} Music Assistant-lejátszója most nem érhető el (pl. a TV még csatlakozik) – próbáld újra pár másodperc múlva.", { h: KN(uj) }));
+        return this._frissit();
+      }
       if (tvMa && tvMa !== rma) {
         try {
           await this._maAtvisz(rma, tvMa);
@@ -3264,7 +3272,12 @@ class CantabileCard extends HTMLElement {
         }
         // TV-re hosszú lista (pl. Deezer-kedvencek): a zenemappában számonkénti keresés lassú és többnyire hiányos – a TV
         // saját MA-lejátszója a teljes listát viszi (csak hang); album (rövid) marad a zenemappából, a TV-oldalon
-        const tvDz = dzf.ids.length >= TV_HOSSZU_LISTA ? this._tvMaDeezer(uj) : null;
+        let tvDz = dzf.ids.length >= TV_HOSSZU_LISTA ? this._tvMaDeezer(uj) : null;
+        // a TV MA-lejátszója csak akkor van meg, ha a TV Cast-kapcsolata él (bekapcsolás után pár mp): megvárjuk (2.7.1)
+        if (tvDz && !(await this._maVar(tvDz))) {
+          this._naplo("a TV MA-lejátszója nem érhető el – zenemappa", "warning", { cel: tvDz });
+          tvDz = null;
+        }
         if (tvDz) this._naplo("hosszú Deezer-lista TV-re: a TV MA-lejátszója", "info", { cel: tvDz, db: dzf.ids.length });
         if (!(await this._helyettesitJatszik({ deezer: dzf.ids }, a.media_album_name || a.media_title || "Deezer", dzf.kezdo, uj, dzf.poz, t0, tvDz ? { ma: tvDz, ut: "ma" } : {}))) {
           this._visszaRegire(regi, "deezer-helyettesítés: " + (this._helyettesitOk || "?"));
@@ -3446,9 +3459,19 @@ class CantabileCard extends HTMLElement {
     this._naplo("helyettesítés", "info", { cel: hsz.entity, mod: r.mod, talalt: r.talalt, osszes: r.osszes, kezdo: i });
     if (r.mod === "ma") {
       const e = opt.ma || this._maE(hsz);
-      try { await this._hass.callWS({ type: "cantabile/ma/play", entity_id: e, uri: lista.slice(i), media_type: "track", enqueue: "replace", device: ESZKOZ() }); }
+      // először csak az eleje (az MA minden címet felold, mielőtt szól – 300-nál ez sokáig tart), a többi utána a sor végére
+      const eleje = lista.slice(i, i + MA_ELSO), tobbi = lista.slice(i + MA_ELSO);
+      try { await this._hass.callWS({ type: "cantabile/ma/play", entity_id: e, uri: eleje, media_type: "track", enqueue: "replace", device: ESZKOZ() }); }
       catch (err) { this._maHiba(e, err); return false; }
       let ok = await this._szolMar({ entity: e }, () => true);
+      if (ok && tobbi.length) {
+        (async () => {
+          for (let j = 0; j < tobbi.length; j += 100) {
+            try { await this._hass.callWS({ type: "cantabile/ma/play", entity_id: e, uri: tobbi.slice(j, j + 100), media_type: "track", enqueue: "add", device: ESZKOZ() }); }
+            catch (err) { this._naplo("MA-sor feltöltése nem sikerült", "warning", { cel: e, hiba: String(err?.message || err) }); break; }
+          }
+        })();
+      }
       if (ok && /^media_player\.cantabile_tv_/.test(hsz.entity)) {
         // TV saját MA-lejátszója (pl. DLNA-n): egy pillanatra „playing”, aztán leállhat – csak a tartós szólás számít
         await new Promise((x) => setTimeout(x, 6000));
@@ -7164,10 +7187,18 @@ class CantabileCard extends HTMLElement {
     return p;
   }
 
+  // az MA-lejátszó elérhető-e (a TV-é csak élő Cast-kapcsolatnál): legfeljebb `ms` ideig vár rá
+  async _maVar(e, ms = 12000) {
+    const jo = () => { const st = this._hass?.states[e]; return !!st && st.state !== "unavailable" && !!st.attributes?.mass_player_type; };
+    const hatar = Date.now() + ms;
+    while (!jo() && Date.now() < hatar) await new Promise((x) => setTimeout(x, 500));
+    return jo();
+  }
+
   _maHiba(e, err) {
     const m = String(err?.message || "");
     if (m.startsWith("busy:")) this._uzen(T("A(z) {h} foglalt: {n} használja.", { h: this._hszNev(e), n: m.slice(5) }));
-    else if (m === "not_ma") this._uzen(T("Ez nem Music Assistant-lejátszó."));
+    else if (m === "not_ma") this._uzen(T("A(z) {h} Music Assistant-lejátszója most nem érhető el (pl. a TV még csatlakozik) – próbáld újra pár másodperc múlva.", { h: this._hszNev(e) }));
     else this._hivHiba(e, err);
   }
 

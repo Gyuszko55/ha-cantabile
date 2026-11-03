@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.1b2 – 2026-11-03
+
+- **Sonos → TV no longer refused on the first try.** A TV's Music Assistant player exists only while the TV's Cast connection is up (a few seconds after switching on); the card now waits up to 12 s for it. If it still isn't there, a Deezer list goes from the music folder to the TV page, and a Music Assistant queue stays where it plays, with a clear message instead of "not a Music Assistant player".
+- **Music Assistant starts sooner** when a long list moves to it: the first 25 tracks go first, the rest are added to the queue after playback has started.
+
 ## 2.7.1b1 – 2026-11-03
 
 - **WRONG LYRICS:** the lyrics panel has a button for lyrics that don't belong to the song (or are out of sync). Cantabile deletes the downloaded lyrics (the `.lrc` it saved next to the file or in its store; your own `.lrc` is kept as `.lrc.elutasitott`), remembers them as wrong (by LRCLIB id and by content) and looks for others at once – the wrong ones won't come back, not from the background collector either. New websocket: `cantabile/lyrics/reject`.
