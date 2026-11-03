@@ -190,3 +190,4 @@ def test_recept_tanult_flac_atkodolas():
     assert u["recept"]["formatumok"]["mp3"]["mod"] == "kozvetlen"
     r = m["cellak"]["radio"]["media_player.tv"]["utak"][0]["recept"]
     assert r["formatumok"] == {"stream": {"mod": "kozvetlen"}}
+    assert r["parancs"] == "media_player.play_media" and r["pozicio"] == "nem"

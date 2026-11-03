@@ -101,6 +101,9 @@ def recept(forras: str, kulcs: str, h: dict[str, Any], ki: str | None, be: dict[
     r["parameterek"] = dict(r.get("parameterek") or {})
     if kulcs == "sajat" and h.get("platform") in SONOS:
         r.update({**_SOR_SONOS, "parameterek": {"media_content_id": "a számok címei"}})
+    if forras == "radio" and kulcs == "sajat":
+        r.update({"parancs": "media_player.play_media", "parameterek": {"media_content_id": "az adó stream-címe",
+                  "media_content_type": "music"}, "pozicio": "nem", "atadhato": True})
     if h.get("platform") == "bongeszo" and kulcs in FAJLOS:
         r["parancs"] = "a kártya saját lejátszója (böngésző)"
     r["cel"] = ki
