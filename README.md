@@ -115,6 +115,14 @@ BT; for a Music Assistant queue the current and next track.
 - **Switching speakers carries the music over**, like a real speaker selector – a tape, a station, a party, a playlist,
   and a Music Assistant queue: to another Music Assistant player, or to the same device's other player (Sonos ↔ its
   Music Assistant player), or, for music-folder tracks, Cantabile takes over from the same track and position.
+  A Music Assistant queue moved to a Cantabile TV plays from the music folder on the TV page if the tracks are there,
+  otherwise on the TV's own Music Assistant player (sound only; long Deezer lists of 40+ tracks always go there, in
+  full). The card checks that the TV keeps playing – a DLNA TV (e.g. Samsung) doesn't play Music Assistant, so the
+  music goes back to the old speaker with a message. While Music Assistant plays, next / previous / pause / stop go to it.
+- **Sonos ↔ WiiM order**: Sonos plays Deezer favourites newest first, Deezer and the WiiM's own Deezer oldest first. When
+  the WiiM would continue with a different track than the Sonos, its own Deezer is skipped and the list goes on through
+  Music Assistant's Deezer in the Sonos order. A list playing on the WiiM's own Deezer can be moved on too. Splitting a
+  Sonos group puts the speaker left alone back where the group was (if the group played from its queue).
 - Each speaker has a **card name** of up to 8 characters (e.g. *Lounge*) for the selector, the header and the cassette;
   voice control keeps using the full name.
 - **INPUT · TONE** – the flip-down lower panel, like the hinged flap of an old hi-fi: the speaker's own **inputs**
@@ -134,8 +142,11 @@ BT; for a Music Assistant queue the current and next track.
 - **ⓘ Signal path**: the button before ⚙ shows, live, where the sound comes from, what happens to it and where it plays
   (source → processing → output, with the EQ / tone and whether the VU meter is real).
 - **Messages on the player**: hints and errors appear in a smoked-glass window on the card, then fade out.
-- **Version label**: the card's version (e.g. `2.7.0b11`) shows in small, faint type in the bottom-right corner of the
+- **Version label**: the card's version (e.g. `2.7.0b22`) shows in small, faint type in the bottom-right corner of the
   radio and the deck – handy for bug reports.
+- **Decision log**: speaker switches, the route taken, fallbacks, every message and every bounce back to the old speaker
+  are logged in Home Assistant – the last 300 entries via websocket `cantabile/log/get`; warnings and errors also go to
+  the HA log (`custom_components.cantabile.kartya`). Handy when the selector “bounced back without a word”.
 - **Speaker lock** for several users – see *Notes*.
 
 ## Route matrix – what plays where
@@ -165,7 +176,8 @@ storage and refreshed at start-up, when players or dashboards change, hourly and
 - **Learned traits are kept**: e.g. a TV whose page can't open FLAC (see *TV*) is remembered in the matrix store and gets
   MP3 from the first track, also after a restart.
 - Websocket (for the curious): `cantabile/matrix` (`refresh: true` rebuilds it), `cantabile/matrix/reset` clears the
-  marks – with `learned: true` it also forgets the learned traits.
+  marks – with `learned: true` it also forgets the learned traits. An expired “didn't play” mark clears at once, and a
+  damaged stored matrix doesn't stop the integration from starting (the matrix is rebuilt).
 
 ## Music Assistant (optional)
 
@@ -189,13 +201,15 @@ full-screen TV page – the cover, title, artist, album, format, artist pictures
 **lyrics running along** at the bottom; on **DLNA** TVs a full-screen still track card (mid-track a live video that
 starts right at the position). Looks: **cover** (default), **spinning vinyl** with a circular spectrum, or the equaliser
 – chosen in ⚙ → *TV look* or with the `select` / `switch` entities below. When a TV is switched to another speaker it
-keeps showing that speaker's track (mirror), also after a Home Assistant restart. Since 2.7 the **room's TV follows by
-itself**: when any speaker in an area starts playing – from the card, its own app, by voice or an automation – a Cast TV
-in the same area shows it silently (track details, lyrics), if its Cantabile TV page is open and the TV isn't playing
-itself (the TV and the speaker need an area; a DLNA TV can't mirror). Some Cast receivers can't open certain FLAC files
+keeps showing that speaker's track (mirror), also after a Home Assistant restart – also when the TV played on its own
+Music Assistant player (the Cantabile TV page takes its place). Any other **mirror is sent by hand**: **SEND TO TV** in
+the card's TV window casts the TV page (if it isn't there yet) and the TV silently shows that speaker; the room's TVs
+come first, with several TVs the card asks which one; **MIRROR OFF** ends it. A mirror you sent follows the music when
+you move it to another speaker. A mirror never starts by itself (a DLNA TV can't mirror). Some Cast receivers can't open certain FLAC files
 (typically ones with a large embedded cover and no seek table): Cantabile then plays the same track from the same point
 as MP3 (320 kbit/s, converted on the fly) and remembers that TV – from then on, also after a restart, FLAC goes to it as
-MP3 from the first track.
+MP3 from the first track. Only a real format error teaches this (not a NAS hiccup or an expired link), and you can seek
+inside a transcoded track.
 
 The **TV button** on the card (before ⓘ) opens the same page in a small window over the deck for the selected speaker;
 it follows track and speaker changes and closes by itself 5 seconds after the music stops. **⛶ FULL SCREEN** in the
@@ -429,7 +443,7 @@ under *Control Home Assistant* – the wizard's *Voice* step lists your agents a
 - Android TV / Google TV: set the screensaver (and sleep) to *Never*, otherwise the TV leaves the page after ~15 minutes.
 - Don't let other automations cast to the same TV while it plays (they would replace the page).
 - If the Home Assistant app still runs on the TV but lost its connection (e.g. after a restart), Cantabile closes it and casts again.
-- **Mirror**: when you switch the card from a playing Cast TV to another speaker (with the selector, by moving the music, or with a ▶ button in a “doesn't play here” message), the TV page stays on, without sound, and shows what plays there – title, artist, album, cover, where it plays and where it comes from (e.g. “▶ SONOS 2 · DEEZER”), the rotating artist pictures and the progress, updated on every new track, wherever the music comes from (music folder, Deezer, radio…). The equaliser follows the real signal level where Cantabile can analyse it, otherwise it is simulated. Switching on to yet another speaker takes the TV along. The mirror ends when you play on the TV again, turn the TV off from the card, or after 10 minutes of silence; then the TV may go to its screensaver.
+- **Mirror**: by hand with **SEND TO TV** / **MIRROR OFF** in the card's TV window (websocket `cantabile/tv/mirror`). And when you switch the card from a playing Cast TV to another speaker (with the selector, by moving the music, or with a ▶ button in a “doesn't play here” message), the TV page stays on, without sound, and shows what plays there – title, artist, album, cover, where it plays and where it comes from (e.g. “▶ SONOS 2 · DEEZER”), the rotating artist pictures and the progress, updated on every new track, wherever the music comes from (music folder, Deezer, radio…). The equaliser follows the real signal level where Cantabile can analyse it, otherwise it is simulated. Switching on to yet another speaker takes the TV along. The mirror ends when you play on the TV again, turn the TV off from the card, or after 10 minutes of silence; then the TV may go to its screensaver.
 
 **DLNA settings and requirements**
 - The TV must be **on** (most TVs drop off DLNA in standby) – turn it on first, e.g. with a script or Wake-on-LAN.
@@ -488,8 +502,11 @@ under *Control Home Assistant* – the wizard's *Voice* step lists your agents a
 | A TV only plays the sound (e.g. “Default Media Receiver” on screen) | The card uses the TV's own Cast / DLNA player: switch the speaker to its “Cantabile TV · …” player (⚙ shows a *Switch* button). |
 | The Cast TV shows nothing / “dashboard not found” | Create the `cantabile-tv` dashboard with the `tv` view (see *TV players*), and check that Home Assistant is reachable from the TV over https. |
 | Music folder is empty | Check the media-source path in ⚙ and that the folder is visible under **Media**. |
-| A FLAC track on a TV hiccups once, then plays; no seeking inside it | The TV page can't open that FLAC; Cantabile plays it as MP3 and remembers the TV (also after a restart). To forget: websocket `cantabile/matrix/reset` with `learned: true`. |
-| The room's TV doesn't show what plays in the room | Its Cantabile TV page isn't open yet (play something on the TV from Cantabile once), the TV is playing itself, or the TV / speaker has no area (ROUTE MATRIX warns). DLNA TVs can't mirror. |
+| A FLAC track on a TV hiccups once, then plays | The TV page can't open that FLAC; Cantabile plays it as MP3 (seeking works) and remembers the TV (also after a restart). To forget: websocket `cantabile/matrix/reset` with `learned: true`. |
+| The room's TV doesn't show what plays in the room | Not a fault: the mirror is sent by hand – **SEND TO TV** in the card's TV window (**MIRROR OFF** ends it). DLNA TVs can't mirror. |
+| The selector bounced back to the old speaker, or you wonder why a route was taken | Read the card's decision log: websocket `cantabile/log/get` (last 300 entries); warnings and errors are also in the HA log (`custom_components.cantabile.kartya`). |
+| A fix doesn't show in the HA app on a phone / tablet | The app may keep the old card code after a restart: check the version in the card's bottom-right corner; if it is older, close the app completely (or clear its cache) and reopen it. |
+| Deezer favourites moved from Sonos to the WiiM play through Music Assistant, not the WiiM's own Deezer | Not a fault: Sonos gives the favourites in reverse order (newest first); when the WiiM would continue with another track, the list goes on through Music Assistant in the Sonos order. |
 | GENRES shows only Deezer tiles | The music files have no genre tags, or the first reading is still running (the tab shows the progress). |
 | The PARTY QR code doesn't open on a phone | The phone must be on the home Wi-Fi, and Home Assistant's *internal URL* must be set (Settings → System → Network). |
 | A playlist plays only some tracks | Each speaker plays what it can: Sonos the music folder and Deezer, a Music Assistant player the MA tracks, others the music folder. |
