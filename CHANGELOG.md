@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.0b13 – 2026-11-03
+
+- **WiiM's own Deezer plays the whole list again when started from the first track.** The WiiM got the queue but its list stayed empty: it played that one track and stopped, and while loading it played a few seconds of its previous queue (e.g. a track from an earlier Music Assistant session). Now it always waits for the queue to load and jumps to the wanted track again, muted until then.
+- **A list playing on WiiM's own Deezer can be moved to another speaker.** Before, switching away from it said it can't be moved; now the same tracks continue on the new speaker from the playing track and position (Sonos: its own Deezer; elsewhere Music Assistant's Deezer or the music folder), then the WiiM stops. New websocket: `cantabile/wiim_deezer/now`.
+
 ## 2.7.0b12 – 2026-11-03
 
 - **The card's decisions are logged in Home Assistant.** Speaker switches, the route taken, fallbacks (WiiM's own Deezer → Music Assistant, Spotify Connect → Deezer), every message the card shows and every time the selector falls back to the old speaker go to `cantabile/log`; the last 300 entries are kept (`cantabile/log/get`), warnings and errors also land in the HA log (`custom_components.cantabile.kartya`). A "it bounced back without a word" case can now be traced, even from a tablet or phone.

@@ -183,3 +183,14 @@ def test_ha_a_wiim_nem_szolal_meg_hibat_jelez(wiim, monkeypatch):
     with pytest.raises(HomeAssistantError, match="not_playing"):
         asyncio.run(W.lejatszik(None, "media_player.wiim", "playlist", "989611251", "4140323881", 60))
     assert [t for a, t in wiim.naplo if a == "api"][-1] == "setPlayerCmd:mute:0"   # a némítás akkor is feloldódik
+
+
+def test_elso_szamtol_is_nemitva_es_megvarja_a_sort(wiim):
+    # 2.7.0b12: az 1. számtól is megvárja a sor betöltését (különben a WiiM csak egy számot játszik, és előtte a régi
+    # sorából szól), és közben némít
+    r = asyncio.run(W.lejatszik(None, "media_player.wiim", "playlist", "989611251", None, 0))
+    assert r["index"] == 1
+    akciok = [a for a, _ in wiim.naplo]
+    parancsok = [t for a, t in wiim.naplo if a == "api"]
+    assert "setPlayerCmd:mute:1" in parancsok and parancsok[-1] == "setPlayerCmd:mute:0"
+    assert akciok.count("PlayQueueWithIndex") == 2 and akciok.count("BrowseQueue") >= 2

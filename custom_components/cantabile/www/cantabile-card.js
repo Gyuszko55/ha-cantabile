@@ -3191,6 +3191,24 @@ class CantabileCard extends HTMLElement {
         return this._hiv("media_player", "media_pause", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
       }
     }
+    if (szol && ado === -1 && !forras && uj.entity !== HELYI && !this._nincsIntegracio
+        && ["wiim", "linkplay"].includes(this._hass?.entities?.[regi.entity]?.platform)) {
+      // a WiiM saját Deezerén szóló lista (2.7.0b12): ugyanazok a számok az új helyen – Sonoson a Sonos Deezere, máshol
+      // az MA Deezere / a zenemappa –, a szóló számtól és ugyanattól a ponttól; utána áll le a WiiM
+      let wf = null;
+      try { wf = await this._hass.callWS({ type: "cantabile/wiim_deezer/now", entity_id: regi.entity }); } catch (_) { /* nem a Cantabile indította */ }
+      if (wf?.ids?.length) {
+        const t0 = Date.now();
+        this._naplo("WiiM saját Deezer → átvitel", "info", { cel: uj.entity, lista: `${wf.kind}/${wf.id}`, szam: wf.index, poz: Math.round(wf.position) });
+        await this._csoportAllit(uj);
+        if (await this._helyettesitJatszik({ deezer: wf.ids }, wf.title || "Deezer", 0, uj, wf.position, t0)) {
+          return this._hiv("media_player", "media_stop", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
+        }
+        this._visszaRegire(regi, "WiiM Deezer → " + (this._helyettesitOk || "?"));
+        if (this._helyettesitOk === "lejatszas") this._uzen(T("A(z) {h} nem indult el – a(z) {r} szól tovább.", { h: KN(uj), r: KN(regi) }));
+        return this._frissit();
+      }
+    }
     if (szol && ado === -1 && !forras) {
       // ismeretlen forrás (pl. a lejátszó saját appjából indított zene): nem visszük át, és nem is állítjuk le
       this._visszaRegire(regi);
