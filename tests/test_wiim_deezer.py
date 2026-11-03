@@ -208,3 +208,10 @@ def test_flac_szam_azonosito():
     # a Sonos a FLAC-számokat „tr-flac%3a…” alakban adja (2.7.0b16 előtt ez kimaradt: a sorrend-ellenőrzés nem futott)
     assert W.DZ_SZAM.search("x-sonos-http:tr-flac%3a1008473712.flac?sid=2").group(1) == "1008473712"
     assert W.DZ_SZAM.search("x-sonos-http:tr%3a4140323881.mp3").group(1) == "4140323881"
+
+
+def test_sor_osszes_es_cim():
+    assert W.sor_osszes("<TotalNumber>315</TotalNumber><TrackNumber>40</TrackNumber>") == 315
+    assert W.sor_osszes("<TrackNumber>4</TrackNumber>") == 0
+    assert W._cim({"Title": "5075676C6961"}) == "Puglia"
+    assert W._cim({"Title": "Nem hex cím"}) == "Nem hex cím"

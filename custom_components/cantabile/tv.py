@@ -1000,7 +1000,7 @@ async def ws_mirror(hass: HomeAssistant, conn: websocket_api.ActiveConnection, m
         conn.send_result(msg["id"], {"mirror_of": None})
         return
     forras = msg.get("source") or ""
-    if lj.dlna or not forras.startswith("media_player.") or forras == lj.entity_id:
+    if lj.dlna or not forras.startswith("media_player.") or forras in (lj.entity_id, lj.cast):
         conn.send_error(msg["id"], "no_mirror", "dlna" if lj.dlna else "source")
         return
     try:
@@ -1013,7 +1013,8 @@ async def ws_mirror(hass: HomeAssistant, conn: websocket_api.ActiveConnection, m
     except Exception as err:  # noqa: BLE001
         conn.send_error(msg["id"], "nem_sikerult", str(err) or type(err).__name__)
         return
-    conn.send_result(msg["id"], {"mirror_of": lj._tukor})  # noqa: SLF001
+    # régi kártyakód a TV-n: a tükör a friss oldal kiküldése után indul (háttérben) – az is siker
+    conn.send_result(msg["id"], {"mirror_of": lj._tukor or forras, "pending": lj._tukor != forras})  # noqa: SLF001
 
 
 def terulet(hass: HomeAssistant, *entity_ids: str | None) -> str | None:

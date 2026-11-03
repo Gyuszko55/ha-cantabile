@@ -36,6 +36,9 @@
 
 // angol feliratok (kulcs: a magyar forrásszöveg)
 const EN = {
+  "ez a TV (DLNA) nem tud tükrözni": "this TV (DLNA) can't mirror",
+  "ezt a lejátszót nem lehet tükrözni": "this player can't be mirrored",
+  "a(z) {h} nem tudja lejátszani a Music Assistant zenéjét": "{h} can't play Music Assistant's music",
   "Kiküldés a TV-re: a TV hang nélkül ezt a hangszórót mutatja": "Send to TV: the TV shows this speaker, silently",
   "A tükör vége a(z) {t} TV-n": "Stop mirroring on the {t} TV",
   "Nincs olyan TV, amelyre a tükör kiküldhető (Cast-os Cantabile TV-lejátszó).": "There's no TV to mirror to (a Cast Cantabile TV player).",
@@ -565,6 +568,7 @@ const EN = {
 // a DLNA-s TV (élő videó) a „playing” jelzés után kb. ennyi mp-cel később szól ténylegesen (pufferel): váltáskor a régi
 // hangszóró ennyivel tovább szól, a TV-ről elváltva az új ennyivel korábbról indul
 const DLNA_KESES = 3;
+let MATRIX_KER = null;                    // a futó mátrix-lekérés (egyszerre egy)
 // ennyi számtól a Deezer-lista TV-n a TV saját Music Assistant-lejátszóján szól (a zenemappás keresés lassú, hiányos)
 const TV_HOSSZU_LISTA = 40;
 const VERZIO = (() => { try { return new URL(import.meta.url).searchParams.get("v") || ""; } catch (e) { return ""; } })();
@@ -915,10 +919,15 @@ class CantabileCard extends HTMLElement {
   // ---- útmátrix ----
   async _matrixKer(friss = false) {
     if (this._nincsIntegracio || !this._hass) return MATRIX;
-    if (!friss && MATRIX && Date.now() - MATRIX_IDO < MATRIX_ERVENY) return MATRIX;
-    try { const m = await this._hass.callWS({ type: "cantabile/matrix" }); if (m?.cellak) { MATRIX = m; MATRIX_IDO = Date.now(); } }
-    catch (_) { /* régebbi integráció: mátrix nélkül, a régi úton */ }
-    return MATRIX;
+    if (!friss && Date.now() - MATRIX_IDO < MATRIX_ERVENY) return MATRIX;     // (régebbi integrációnál sem kérdez újra)
+    if (!friss && MATRIX_KER) return MATRIX_KER;                               // egyszerre egy kérés
+    MATRIX_KER = (async () => {
+      try { const m = await this._hass.callWS({ type: "cantabile/matrix" }); if (m?.cellak) MATRIX = m; }
+      catch (_) { /* régebbi integráció: mátrix nélkül, a régi úton */ }
+      MATRIX_IDO = Date.now();
+      return MATRIX;
+    })().finally(() => { MATRIX_KER = null; });
+    return MATRIX_KER;
   }
 
   // a kártya hangszórójának oszlopa a mátrixban (a TV gombja a Cantabile TV-lejátszó; a Multiroom a Sonos-csoport)
@@ -3065,7 +3074,7 @@ class CantabileCard extends HTMLElement {
       if (!cel) await mostLeker();
       if (cel && cel !== rma) {
         try { await this._hass.callWS({ type: "cantabile/ma/transfer", source: rma, target: cel, device: ESZKOZ() }); }
-        catch (err) { this._maHiba(cel, err); return; }
+        catch (err) { this._maHiba(cel, err); this._visszaRegire(regi, "MA-átvitel hiba"); return this._frissit(); }
         // a TV saját MA-lejátszójáról ment el a zene (2.7.0b21): a TV-re a tükör kerül az MA helyére – hang nélkül az új
         // hangszórót mutatja
         if (/^media_player\.cantabile_tv_/.test(regi.entity) && rma === this._tvMa(regi) && uj.entity !== HELYI && !/^media_player\.cantabile_tv_/.test(uj.entity)) {
@@ -3099,6 +3108,7 @@ class CantabileCard extends HTMLElement {
           return this._hiv("media_player", "media_stop", { entity_id: rma }, { csendes: true }).catch(() => {});
         }
       }
+      if (this._hangszoro() !== uj) return;           // közben máshova váltottak: ide már nem visszük
       // TV-re: a zenemappában nincs meg – a TV saját MA-lejátszóján szól tovább (csak hang, kép nélkül)
       const tvMa = this._tvMa(uj);
       if (tvMa && tvMa !== rma) {
@@ -3154,7 +3164,10 @@ class CantabileCard extends HTMLElement {
       const ids = (v?.response?.[vez] || []).map((x) => String(x.media_content_id || ""));
       let track = Math.max(0, (Number(st?.attributes?.queue_position) || 1) - 1), poz = Number(st?.attributes?.media_position) || 0;
       try { const ps = await this._hass.callWS({ type: "cantabile/sonos_position", entity_id: vez }); if (ps?.position >= 0) { poz = ps.position; if (ps.track >= 0) track = ps.track; } } catch (_) { /* régebbi integráció */ }
-      return ids.length && track < ids.length ? { ids, track, poz, t0: Date.now(), cim: st?.attributes?.media_title || "" } : null;
+      // csak ha a csoport tényleg a sorból szól (nem rádió, TV-hang, line-in, Spotify Connect, MA-folyam…)
+      const tisztit = (x) => String(x || "").split("?")[0];
+      if (!ids.length || track >= ids.length || tisztit(st?.attributes?.media_content_id) !== tisztit(ids[track])) return null;
+      return { ids, track, poz, t0: Date.now(), cim: st?.attributes?.media_title || "" };
     } catch (_) { return null; }
   }
 
@@ -3366,6 +3379,7 @@ class CantabileCard extends HTMLElement {
       return;
     } else {
       okok.push(this._helyettesitOk || "nincs");
+      if (this._helyettesitOk === "elavult") return;   // közben máshova váltottak: nem próbálunk tovább
     }
     // ezen az úton nem szólt: ha az út hibája (a tartalom megvolt), a mátrixban egy óráig „nem szól”; a cella következő
     // útja indul (mátrix nélkül: kérdez)
@@ -3391,7 +3405,7 @@ class CantabileCard extends HTMLElement {
         mappa: opt.ut === "ma" ? null : String(this._config.magno?.nas || "").replace(/\/$/, "") || null, ...bem });
     } catch (_) { /* régebbi integráció */ }
     // közben máshova váltottak (a keresés több száz számnál fél percig is tarthat): nem indítunk el semmit
-    if (this._hangszoro()?.entity !== hsz.entity) {
+    if (this._atvitelCel?.entity === hsz.entity && this._hangszoro()?.entity !== hsz.entity) {
       this._helyettesitOk = "elavult";
       this._naplo("helyettesítés elkésett – közben máshova váltottak, nem indul", "info", { cel: hsz.entity });
       return false;
@@ -3722,6 +3736,7 @@ class CantabileCard extends HTMLElement {
     };
     if (atvisz && regi && regi !== uj) {
       this._valtSor = (this._valtSor || Promise.resolve()).then(() => this._atviszHaKell(regi, uj))
+        .finally(() => { if (this._atvitelCel === uj) this._atvitelCel = null; })
         .catch((e) => this._uzen(T("Az átváltás nem sikerült: {h}", { h: e?.message || e }))).then(kovet);
     } else { this._csoportAllit(uj); kovet(); }
     // a régi hangszóró foglalása: ha átváltás után már nem szól, elengedjük (ami az új állásnak is tagja, az marad)
@@ -4229,6 +4244,16 @@ class CantabileCard extends HTMLElement {
       return this._polcNyit();
     }
     if (k === "stop" || k === "pause") this._inditasJel = null;     // a felhasználó leállította: az indításfigyelő ne szóljon
+    // a gomb mögött a Music Assistant sora szól (pl. a Technicsen, a TV MA-lejátszóján): a vezérlés az MA-lejátszóé – a
+    // készülék saját lejátszója (pl. WiiM) ilyenkor nem tud számot léptetni (2.7.0b22)
+    const maV = !kaz?.party && ["stop", "pause", "ff", "rew", "play"].includes(k) && this._maSorGomb(hsz) ? this._maE(hsz) : null;
+    if (maV) {
+      const m = { entity_id: maV }, ms = this._hass.states[maV];
+      if (k === "stop") return this._hiv("media_player", "media_stop", m);
+      if (k === "pause") return this._hiv("media_player", SZUNETEL(ms) ? "media_play" : "media_pause", m);
+      if (k === "play") { if (SZUNETEL(ms)) return this._hiv("media_player", "media_play", m); }
+      else { this._gyors(k === "rew"); return this._hiv("media_player", k === "ff" ? "media_next_track" : "media_previous_track", m); }
+    }
     // a hangszóró saját bemenetéről (BT IN, LINE IN) szól: a STOP szünet – a WiiM a stopot nem adja tovább a telefonnak, az pár
     // másodperc múlva újraindulna; a szünetet igen, és a PLAY onnan folytatja
     if (k === "stop" && this._bemenetrol(hsz.entity)) {
@@ -6689,9 +6714,10 @@ class CantabileCard extends HTMLElement {
         this._uzen(T("A(z) {t} TV hang nélkül a(z) {h} hangszórót mutatja.", { t: t.nev, h: KN(hsz) }));
       } catch (e) {
         this._naplo("tükör kiküldése nem sikerült", "warning", { tv: t.tv, forras, hiba: String(e?.message || e?.code || e) });
-        this._uzen(T("A tükör kiküldése nem sikerült: {h}", { h: e?.message || e?.code || e }));
+        const ok = { dlna: T("ez a TV (DLNA) nem tud tükrözni"), source: T("ezt a lejátszót nem lehet tükrözni") }[e?.message] || e?.message || e?.code || e;
+        this._uzen(T("A tükör kiküldése nem sikerült: {h}", { h: ok }));
       }
-      if (this._tvAblakE) this._tvAblakNyit();
+      setTimeout(() => { if (this._tvAblakE) this._tvAblakNyit(); }, 1500);   // a TV állapota (mirror_of) addigra megjön
     };
     if (tvk.length === 1) return kuld(tvk[0]);
     this._uzen(T("Melyik TV-re küldjem a tükröt?"), tvk.map((t) => ({ szoveg: t.nev, fn: () => kuld(t) })));
@@ -6702,7 +6728,7 @@ class CantabileCard extends HTMLElement {
     try { await this._hass.callWS({ type: "cantabile/tv/mirror", tv: t.tv, stop: true }); } catch (_) { /* régebbi integráció */ }
     this._naplo("tükör vége", "info", { tv: t.tv });
     this._uzen(T("A(z) {t} TV-n a tükör véget ért.", { t: t.nev }));
-    if (this._tvAblakE) this._tvAblakNyit();
+    setTimeout(() => { if (this._tvAblakE) this._tvAblakNyit(); }, 1500);
   }
 
   // a zene megállt (vége az albumnak, leállították): 5 mp múlva az ablak magától bezárul
@@ -7164,8 +7190,14 @@ class CantabileCard extends HTMLElement {
         const fr = this._foglaloIds([u.kimenet]);
         if (fr) return this._foglaltUzen(fr);
         this._polcZar();
-        try { await this._hass.callWS({ type: "cantabile/ma/play", entity_id: u.kimenet, uri: x.uri, ...(x.type ? { media_type: x.type } : {}), enqueue: "replace", device: ESZKOZ() }); return; }
-        catch (err) {
+        try {
+          await this._hass.callWS({ type: "cantabile/ma/play", entity_id: u.kimenet, uri: x.uri, ...(x.type ? { media_type: x.type } : {}), enqueue: "replace", device: ESZKOZ() });
+          // TV MA-lejátszója (pl. DLNA): egy pillanatra „playing”, aztán leállhat – csak a tartós szólás számít
+          if (!/^media_player\.cantabile_tv_/.test(hsz.entity)) return;
+          if (await this._szolMar({ entity: u.kimenet }, () => true)) await new Promise((r) => setTimeout(r, 6000));
+          if (SZOL(this._hass.states[u.kimenet])) return;
+          throw new Error(T("a(z) {h} nem tudja lejátszani a Music Assistant zenéjét", { h: KN(hsz) }));
+        } catch (err) {
           this._matrixHiba("ma_konyvtar", hsz, u.ut);
           if (cella.utak.some((v) => v.ut !== u.ut && v.allapot !== "hianyzik" && x.type === "track")) return this._maJatszik(x, hsz, [...probalt, u.ut]);
           return this._maHiba(u.kimenet, err);

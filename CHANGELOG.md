@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.7.0b22 – 2026-11-03
+
+Fixes from a full review of 2.7.0b1–b21:
+
+- **Next / previous / pause / stop go to Music Assistant when MA plays.** On the Technics, next track while MA played failed with "does not support media_next_track" (the WiiM's own player got the command).
+- **TV FLAC → MP3:** only a real format error (the page can't open or decode the file) teaches "no FLAC" – a NAS hiccup or an expired link no longer marks the TV for good. The position of a transcoded track is right when it didn't start from 0, and seeking in it works (a new stream starts from there). The MP3 re-play no longer overrides a track started meanwhile.
+- **WiiM's own Deezer** no longer needs the public Deezer API when starting a list from the top, and doesn't wait in vain on a one-track list. A title that isn't hex-encoded no longer breaks moving the music away.
+- **Splitting a Sonos group** restores the position only if the group really played from its queue (not radio, TV sound, line-in, an MA stream…).
+- **Moving on quickly:** a late Music Assistant → TV attempt or Deezer route retry stops once you've switched elsewhere; the "moved on" guard applies only during a switch, so a deliberate play on a non-selected speaker isn't dropped.
+- **Music Assistant library on a TV's MA player** now also checks the TV keeps playing (DLNA TVs stop after a second); a failed MA transfer sets the selector back.
+- **TV mirror:** clear messages instead of raw codes, the button turns to MIRROR OFF right after sending, the TV's own Cast player can't be mirrored onto itself, and "pending" (old page code being refreshed) counts as success.
+- **Route matrix:** an expired "didn't play" mark clears at once; a damaged stored matrix no longer stops the integration from starting. The card asks for the matrix once at start.
+- `cantabile/sonos_favorite` no longer leaks an error into the HA log when Deezer doesn't answer.
+
 ## 2.7.0b21 – 2026-11-03
 
 - **When music leaves a TV, the TV shows where it went.** If the TV played Music Assistant (sound only, on its own MA player) and you move the music to another speaker on the card, the Cantabile TV page is cast to that TV in MA's place and silently mirrors the new speaker. The same when the TV page itself played: it switches to mirroring the new speaker. This happens regardless of the room (the music was taken from that TV); other mirrors still start only with SEND TO TV.

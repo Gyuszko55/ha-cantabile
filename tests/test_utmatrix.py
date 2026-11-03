@@ -191,3 +191,13 @@ def test_recept_tanult_flac_atkodolas():
     r = m["cellak"]["radio"]["media_player.tv"]["utak"][0]["recept"]
     assert r["formatumok"] == {"stream": {"mod": "kozvetlen"}}
     assert r["parancs"] == "media_player.play_media" and r["pozicio"] == "nem"
+
+
+def test_lejart_jeloles_azonnal_le():
+    m = U.epit(_be())
+    hibak = {("deezer", "media_player.wiim", "wiim_deezer"): 0.0}
+    U.hibat_ralo(m, hibak, 10.0)
+    c = m["cellak"]["deezer"]["media_player.wiim"]
+    assert c["utak"][0]["allapot"] == "hianyzik" and c["elso"] == 1
+    U.hibat_ralo(m, hibak, 10.0 + U.HIBA_IDO + 1)
+    assert not hibak and c["utak"][0]["allapot"] == "ok" and c["elso"] == 0

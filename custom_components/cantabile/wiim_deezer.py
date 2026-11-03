@@ -141,6 +141,21 @@ def sor_betoltve(valasz: str) -> int:
     return max(int(m.group(1)) if m else 0, len(sor_szamai(valasz)))
 
 
+def sor_osszes(valasz: str) -> int:
+    """A BrowseQueue válaszából a lista teljes hossza (TotalNumber; 0, ha nincs benne)."""
+    m = re.search(r"<TotalNumber>(\d+)</", valasz)
+    return int(m.group(1)) if m else 0
+
+
+def _cim(st: dict[str, Any]) -> str:
+    """A WiiM a címet hexában adja (getPlayerStatusEx Title); ha valamelyik firmware nem, a nyers szöveg."""
+    t = str(st.get("Title") or "")
+    try:
+        return bytes.fromhex(t).decode(errors="ignore")
+    except ValueError:
+        return t
+
+
 def sor_szamai(valasz: str) -> list[str]:
     """A BrowseQueue válaszából a sor számainak Deezer-azonosítói, sorrendben."""
     return re.findall(r"<Track\d+>\s*<Id>(\d+)</Id>", valasz)
@@ -175,7 +190,13 @@ async def lejatszik(hass: HomeAssistant, entity_id: str, fajta: str, did: str, s
         raise HomeAssistantError("no_wiim_deezer")
     # a kezdő szám helye a Deezer sorrendje szerint – ha nincs a listában, a WiiM meg sem szólal (a hívó másik utat választ)
     index = 1
-    sorrend = await deezer_sorrend(hass, fajta, did)
+    if szam or kovetkezok:
+        sorrend = await deezer_sorrend(hass, fajta, did)       # a kezdő szám helyéhez kell (ha nem érhető el: hiba)
+    else:
+        try:                                                    # csak az átvitelhez (most_szol) – nélküle is indul
+            sorrend = await deezer_sorrend(hass, fajta, did)
+        except Exception:  # noqa: BLE001 – a nyilvános Deezer API nem válaszol
+            sorrend = []
     osszes = len(sorrend) or None
     if szam:
         if str(szam) not in sorrend:
@@ -201,7 +222,9 @@ async def lejatszik(hass: HomeAssistant, entity_id: str, fajta: str, did: str, s
         kell = min(index + 1, osszes) if osszes else index + 1
         hatar = time.monotonic() + 25
         while time.monotonic() < hatar:
-            if sor_betoltve(await _pq(hass, host, "BrowseQueue", f"<QueueName>{SOR_NEV}</QueueName>")) >= kell:
+            v = await _pq(hass, host, "BrowseQueue", f"<QueueName>{SOR_NEV}</QueueName>")
+            hossz = sor_osszes(v)
+            if sor_betoltve(v) >= (min(kell, hossz) if hossz else kell):     # egyszámos listánál nem vár feleslegesen
                 break
             await asyncio.sleep(0.7)
         await _pq(hass, host, "PlayQueueWithIndex", f"<QueueName>{SOR_NEV}</QueueName><Index>{index}</Index>")
@@ -422,6 +445,7 @@ async def most_szol(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
         raise HomeAssistantError("not_wiim_deezer")
     st = await _allapot(hass, host)
     if st.get("vendor") != FORRAS or st.get("status") not in ("play", "pause", "load"):
+        (hass.data.get("cantabile_wiim_dz") or {}).pop(entity_id, None)     # már nem a mi listánk szól
         raise HomeAssistantError("not_wiim_deezer")
     sorrend: list[str] = tar["sorrend"]
     try:
@@ -430,7 +454,7 @@ async def most_szol(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
         cur = 0
     if not 1 <= cur <= len(sorrend):
         # a WiiM nem mondja meg, hányadik: a BrowseQueue-ban a szóló szám címe alapján
-        cim = bytes.fromhex(str(st.get("Title") or "")).decode(errors="ignore") if st.get("Title") else ""
+        cim = _cim(st)
         cur = tar.get("kezdo") or 1
         try:
             v = await _pq(hass, host, "BrowseQueue", f"<QueueName>{SOR_NEV}</QueueName>")
@@ -442,7 +466,7 @@ async def most_szol(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
             pass
     poz = int(st.get("curpos") or 0) / 1000
     return {"kind": tar["kind"], "id": tar["id"], "index": cur, "ids": sorrend[cur - 1:cur - 1 + 300], "position": poz,
-            "title": bytes.fromhex(str(st.get("Title") or "")).decode(errors="ignore") if st.get("Title") else ""}
+            "title": _cim(st)}
 
 
 async def deezer_felhasznalo(hass: HomeAssistant) -> str | None:
@@ -544,7 +568,10 @@ def regisztral(hass: HomeAssistant) -> None:
     @websocket_api.websocket_command({vol.Required("type"): "cantabile/sonos_favorite", vol.Required("title"): str})
     @websocket_api.async_response
     async def ws_sonos_favorite(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
-        conn.send_result(msg["id"], await kedvenc_leforditva(hass, msg["title"]) or {})
+        try:
+            conn.send_result(msg["id"], await kedvenc_leforditva(hass, msg["title"]) or {})
+        except Exception as err:  # noqa: BLE001 – a Deezer nem válaszol: a kártya a régi úton megy tovább
+            conn.send_error(msg["id"], "nem_sikerult", str(err) or type(err).__name__)
 
     for c in (ws_available, ws_play, ws_from_sonos, ws_now, ws_sonos_favorite):
         websocket_api.async_register_command(hass, c)

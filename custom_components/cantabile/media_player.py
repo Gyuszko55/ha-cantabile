@@ -60,6 +60,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(CantabileTv(hass, entry, cast) for cast in entry.options.get(CONF_TV_PLAYERS, []))
 
 
+def _formatum_hiba(hiba: str) -> bool:
+    """A TV-oldal hibája formátum-hiba-e (a fájlt nem tudja megnyitni / dekódolni) – csak ebből tanulunk „nem_flac”-ot;
+    hálózati hiba (NAS-kiesés, lejárt cím: `audio 2`) vagy megszakítás (`audio 1`) nem. Az oldal `audio <kód>` alakban
+    jelent (MediaError: 3 = dekódolás, 4 = nem támogatott forrás), a Cast-vevő néha a demuxer üzenetével."""
+    return bool(re.search(r"audio\s*[34]\b|DEMUXER|DECODE|NOT_SUPPORTED|NotSupported|format", hiba, re.I))
+
+
 class CantabileTv(CantabileEntity, MediaPlayerEntity):
     _attr_supported_features = TAMOGATOTT
     _attr_media_content_type = MediaType.MUSIC
@@ -82,6 +89,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         self._src: str | None = None
         self._fajl: str | None = None
         self._atkodolva = False
+        self._atk_kezdet = 0.0           # az átkódolt (MP3) hang ettől a ponttól indult: a TV-oldal 0-tól számol, ezt hozzáadjuk
         self._atkod_fut = False          # a FLAC-hiba utáni MP3-as újraindítás folyik: a régi cím jelentései nem számítanak
         self._inditas_adat: tuple[str, str, dict[str, Any]] | None = None
         self._poz: float | None = None
@@ -199,7 +207,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         if self._atkod_fut and msg.get("state") != "playing":
             return                              # a hibás (FLAC) cím „idle” jelentése: ne lépjen tovább a sorozat
         if (msg.get("error") and self._fajl and not self._atkodolva and self._inditas_adat
-                and self._fajl.lower().endswith(ATKODOLANDO)):
+                and self._fajl.lower().endswith(ATKODOLANDO) and _formatum_hiba(str(msg["error"]))):
             # a TV-oldal ezt a formátumot nem tudja megnyitni (pl. Android TV-s Cast-vevő és FLAC): megjegyezzük, és
             # ugyanez a szám ugyanonnan menet közben MP3-ra kódolva indul – a lejátszás közben nem áll le
             kozpont(self.hass).nem_flac.add(self.entity_id)
@@ -212,7 +220,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             kw = {**kw, "extra": {**kw.get("extra", {}), "start_position": float(msg.get("position") or 0)}}
             self._inditas_adat = None
             self._atkod_fut = True
-            self.hass.async_create_task(self._atkodva_ujra(mt, mid, kw), f"cantabile_tv_atkod_{self.entity_id}")
+            self.hass.async_create_task(self._atkodva_ujra(mt, mid, kw, self.inditas), f"cantabile_tv_atkod_{self.entity_id}")
             return
         if msg.get("meta") and not self._meta:
             # újracsatlakozás (pl. HA-újraindítás után): a TV-oldal még szól – visszavesszük, mi az
@@ -223,7 +231,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         if self._allapot == MediaPlayerState.PLAYING:
             self._szolt = time.monotonic()
         if msg.get("position") is not None:
-            self._poz, self._poz_ido = msg["position"], dt_util.utcnow()
+            self._poz, self._poz_ido = msg["position"] + (self._atk_kezdet if self._atkodolva else 0), dt_util.utcnow()
         if msg.get("duration"):
             self._hossz = msg["duration"]
         self.async_write_ha_state()
@@ -571,8 +579,10 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         return " · ".join(x for x in (hol, honnan) if x)
 
     # ---- vezérlés ----
-    async def _atkodva_ujra(self, mt: str, mid: str, kw: dict[str, Any]) -> None:
+    async def _atkodva_ujra(self, mt: str, mid: str, kw: dict[str, Any], inditas: int) -> None:
         try:
+            if self.inditas != inditas:
+                return                  # közben új szám indult (a felhasználó vagy a sorozat): a régit nem indítjuk újra
             await self.async_play_media(mt, mid, **kw)
         finally:
             self._atkod_fut = False
@@ -600,7 +610,7 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
         atkod = bool(fajl and self.entity_id in kp.nem_flac and fajl.lower().endswith(ATKODOLANDO))
         if atkod:
             src = kp.hang_cim(fajl, kezdet)
-        self._fajl, self._atkodolva = fajl, atkod
+        self._fajl, self._atkodolva, self._atk_kezdet = fajl, atkod, (kezdet if atkod else 0.0)
         self._inditas_adat = (media_type, media_id, {k: v for k, v in kwargs.items() if k != "extra"} | {"extra": {**extra}})
         await kp.oldalt_kuld(self)
         self._mcid, self._src, self._meta, self._cue_i = media_id, src, meta, (0 if meta.get("cue") else None)
@@ -719,6 +729,14 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
                 await self._cel_hiv("media_seek", seek_position=max(0.0, position - self._eltolas))
             except HomeAssistantError as err:
                 _LOGGER.debug("Cantabile TV: a DLNA-s TV nem tekert (%s): %s", self.cast, err)
+            return
+        if self._atkodolva and self._fajl:
+            # az átkódolt (MP3) folyamban a böngésző nem tud tekerni: onnan új folyam indul
+            kp = kozpont(self.hass)
+            self._src, self._atk_kezdet = kp.hang_cim(self._fajl, position), position
+            self._poz, self._poz_ido = position, dt_util.utcnow()
+            self.uzen({"cmd": "play", "src": self._src, "meta": self._meta, "t": time.time()})
+            self.async_write_ha_state()
             return
         self.uzen({"cmd": "seek", "position": position})
 

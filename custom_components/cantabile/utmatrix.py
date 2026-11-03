@@ -246,10 +246,16 @@ def osszegez(lista: list[dict[str, Any]]) -> dict[str, Any]:
 def hibat_ralo(m: dict[str, Any], hibak: dict[tuple[str, str, str], float], most: float) -> None:
     """A lejátszáskor nem szóló utak (forrás, hangszóró, út → mikor) a mátrixban „hianyzik”-ként, HIBA_IDO-ig."""
     for (f, e, ut), mikor in list(hibak.items()):
+        cella = (m.get("cellak") or {}).get(f, {}).get(e)
         if most - mikor > HIBA_IDO:
             del hibak[(f, e, ut)]
+            if cella:                    # lejárt: a jelölés is le (nem csak a következő frissítéskor)
+                for u in cella["utak"]:
+                    if u["ut"] == ut and any(x["k"] == "lejatszas" for x in u["feltetelek"]):
+                        u["feltetelek"] = [x for x in u["feltetelek"] if x["k"] != "lejatszas"]
+                        u["allapot"] = _ut_allapot([x["ok"] for x in u["feltetelek"]])
+                cella.update(osszegez(cella["utak"]))
             continue
-        cella = (m.get("cellak") or {}).get(f, {}).get(e)
         if not cella:
             continue
         for u in cella["utak"]:
@@ -488,10 +494,14 @@ class UtMatrix:
     async def betolt(self) -> None:
         """A tárolt mátrix (az előző futásból): induláskor azonnal megvan, a friss a HA elindulása után készül. Az előző
         futás „nem szólt” jelölései nem jönnek át (újraindítás után minden út újra próbálható)."""
-        self.adat = await self.store.async_load()
-        if self.adat:
-            jeloles_nelkul(self.adat)
-            self.tanult = {"nem_flac": {}, **(self.adat.get("tanult") or {})}
+        try:
+            self.adat = await self.store.async_load()
+            if self.adat:
+                jeloles_nelkul(self.adat)
+                self.tanult = {"nem_flac": {}, **(self.adat.get("tanult") or {})}
+        except Exception:  # noqa: BLE001 – sérült / régi formátumú tárolt mátrix: az integráció ettől még elindul
+            _LOGGER.warning("Cantabile útmátrix: a tárolt mátrix nem olvasható, újraépül", exc_info=True)
+            self.adat = None
         self._tanultat_atad()
 
     @callback
