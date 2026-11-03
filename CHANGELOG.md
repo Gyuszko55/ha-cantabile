@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.7.0b12 – 2026-11-03
+
+- **The card's decisions are logged in Home Assistant.** Speaker switches, the route taken, fallbacks (WiiM's own Deezer → Music Assistant, Spotify Connect → Deezer), every message the card shows and every time the selector falls back to the old speaker go to `cantabile/log`; the last 300 entries are kept (`cantabile/log/get`), warnings and errors also land in the HA log (`custom_components.cantabile.kartya`). A "it bounced back without a word" case can now be traced, even from a tablet or phone.
+- **Splitting a Sonos group no longer jumps to the start of the list.** When a speaker that wasn't the group's leader is left alone, Sonos gives it back its own queue from track 1. The card saves where the group was before splitting and puts the speaker back there (in its own queue if it is the same list, otherwise it loads the group's queue from the playing track) and seeks to the position.
+- When a Deezer substitution started but didn't play, the selector fell back to the old speaker silently; now it says so.
+- **Music Assistant fallback starts clean:** before a `replace` play the MA queue is cleared, so the old queue no longer plays for a few seconds on the new speaker.
+
 ## 2.7.0b11 – 2026-11-03
 
 - **3D route matrix, step A: every route now carries its recipe.** Besides which player and under which conditions, a cell's route now says how it starts: the command and its parameters (e.g. WiiM CreateQueue with the WiiM's Deezer account, the Sonos queue filled with Deezer links, `cantabile.play_tracks`), whether it can start at a position (seconds / track index / no), whether playback can be handed over to another player, and per content format (the third dimension) whether it plays directly or transcoded (FLAC → MP3 320k). For now the recipe is data only; the card still starts routes itself, so nothing changes in use.

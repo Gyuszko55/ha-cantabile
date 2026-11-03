@@ -2950,6 +2950,12 @@ class CantabileCard extends HTMLElement {
   }
 
   // kimenetváltás: ami szól, átkerül az új kimenetre (mint egy igazi hangszóróválasztón); atvisz=false: csak választ
+  // a választó visszaáll a régi hangszóróra (az új nem szólt): naplózva, hogy utólag kiderüljön, miért
+  _visszaRegire(regi, ok = "") {
+    this._naplo("visszaállt a régi hangszóróra", "warning", { regi: regi?.entity || null, cel: this._hangszoro()?.entity || null, ok });
+    this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso();
+  }
+
   async _atviszHaKell(regi, uj) {
     // a hangszóró saját bemenete (BT IN, LINE IN) nem vihető át: a régi szünetel (BT-n a telefon is megáll), az új hallgat;
     // ha visszaváltunk rá, onnan folytatja – hacsak nem visszük rá épp más zenét
@@ -2983,7 +2989,7 @@ class CantabileCard extends HTMLElement {
     if (this._spotifyConnectSzol(regi)) {
       // Spotify Connect: a Spotify maga adja át a lejátszást a másik eszköznek
       const eszk = this._spotifyEszkoz(uj);
-      if (!eszk) { this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); this._uzen(T("A Spotify Connect-lejátszás csak Spotify Connect-hangszóróra vihető át – a(z) {r} szól tovább.", { r: KN(regi) })); return this._frissit(); }
+      if (!eszk) { this._visszaRegire(regi); this._uzen(T("A Spotify Connect-lejátszás csak Spotify Connect-hangszóróra vihető át – a(z) {r} szól tovább.", { r: KN(regi) })); return this._frissit(); }
       return this._hiv("media_player", "select_source", { entity_id: this._stream.spotify_entity, source: eszk });
     }
     // PARTY: a régi hangszórón leáll, az újon ugyanazzal a válogatással indul
@@ -2991,7 +2997,7 @@ class CantabileCard extends HTMLElement {
     if (pk?.party && pk.entity === regi.entity && uj.entity !== HELYI) {
       const futo = await this._hass.callWS({ type: "cantabile/party/state" }).then((r) => r.parties.find((x) => x.entity_id === regi.entity), () => null);
       if (futo) {
-        const vissza = () => { this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); this._frissit(); };
+        const vissza = () => { this._visszaRegire(regi); this._frissit(); };
         if (this._hass?.states[uj.entity]?.state === "unavailable") { vissza(); return this._nemElerheto(uj.entity); }
         // ugyanaz a szám szól tovább, ugyanonnan (a kívánságok és a vendéglink is átjön)
         const poz = await this._helye(regi).catch(() => null);
@@ -3006,7 +3012,7 @@ class CantabileCard extends HTMLElement {
     }
     // saját lista: az új hangszórón indul (ott az szól belőle, amit az tud)
     if (pk?.lista && pk.entity === regi.entity && uj.entity !== HELYI && (SZOL(this._allapot(regi)) || SZUNETEL(this._allapot(regi)))) {
-      const vissza = () => { this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); this._frissit(); };
+      const vissza = () => { this._visszaRegire(regi); this._frissit(); };
       if (this._hass?.states[uj.entity]?.state === "unavailable") { vissza(); return this._nemElerheto(uj.entity); }
       // ahol tart: a régi hangszórón szóló szám helye a listában (ha megtalálható)
       let kezdo = 0;
@@ -3063,7 +3069,7 @@ class CantabileCard extends HTMLElement {
           return this._hiv("media_player", "media_stop", { entity_id: rma }, { csendes: true }).catch(() => {});
         }
       }
-      this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso();
+      this._visszaRegire(regi);
       this._uzen(T("Ezt a Music Assistant-számot ({p}) csak Music Assistant-lejátszó játszhatja – a(z) {r} szól tovább.", { p: most?.provider?.split("--")[0] || "MA", r: KN(regi) }));
       return this._frissit();
     }
@@ -3088,15 +3094,64 @@ class CantabileCard extends HTMLElement {
     return this._csoportAllit(uj);
   }
 
+  // a Sonos-csoport helye: a sor elemei, hányadik szám (0-tól), hol tart, és mikor olvastuk
+  async _sonosHely(vez) {
+    try {
+      const st = this._hass.states[vez];
+      const v = await this._hass.callWS({ type: "call_service", domain: "sonos", service: "get_queue", service_data: { entity_id: vez }, return_response: true });
+      const ids = (v?.response?.[vez] || []).map((x) => String(x.media_content_id || ""));
+      let track = Math.max(0, (Number(st?.attributes?.queue_position) || 1) - 1), poz = Number(st?.attributes?.media_position) || 0;
+      try { const ps = await this._hass.callWS({ type: "cantabile/sonos_position", entity_id: vez }); if (ps?.position >= 0) { poz = ps.position; if (ps.track >= 0) track = ps.track; } } catch (_) { /* régebbi integráció */ }
+      return ids.length && track < ids.length ? { ids, track, poz, t0: Date.now(), cim: st?.attributes?.media_title || "" } : null;
+    } catch (_) { return null; }
+  }
+
+  // csoportbontás után: ha a megmaradó Sonos nem ott tart, ahol a csoport, oda állítjuk (a saját sorában, ha az ugyanaz;
+  // különben a csoport sorát tölti be a szóló számtól)
+  async _sonosHelyVissza(uj, hely) {
+    const e = { entity_id: uj.entity };
+    await new Promise((x) => setTimeout(x, 2500));                  // a Sonos a bontás után magától is helyreállhat
+    const st = this._hass.states[uj.entity], a = st?.attributes || {};
+    const most = Math.max(0, (Number(a.queue_position) || 1) - 1);
+    if (SZOL(st) && most === hely.track && (!hely.cim || a.media_title === hely.cim)) return;
+    const poz = Math.round(hely.poz + (Date.now() - hely.t0) / 1000);
+    try {
+      const v = await this._hass.callWS({ type: "call_service", domain: "sonos", service: "get_queue", service_data: e, return_response: true });
+      const sajat = (v?.response?.[uj.entity] || []).map((x) => String(x.media_content_id || ""));
+      if (sajat[hely.track] && sajat[hely.track] === hely.ids[hely.track]) {
+        await this._hiv("sonos", "play_queue", { ...e, queue_position: hely.track });
+        this._naplo("Sonos-csoport bontása: a hely visszaállítva (saját sor)", "warning", { cel: uj.entity, szam: hely.track + 1, poz, volt: most + 1 });
+      } else {
+        const resz = hely.ids.slice(hely.track, hely.track + 100);
+        // az első szám rögtön szól, a többi utána kerül a sorba (így nincs hosszú csend)
+        await this._hiv("media_player", "clear_playlist", e);
+        await this._hiv("media_player", "play_media", { ...e, media_content_id: resz[0], media_content_type: "music", enqueue: "add" });
+        await this._hiv("sonos", "play_queue", { ...e, queue_position: 0 });
+        this._naplo("Sonos-csoport bontása: a csoport sora betöltve", "warning", { cel: uj.entity, szam: hely.track + 1, db: resz.length, poz });
+        (async () => { for (const id of resz.slice(1)) await this._hiv("media_player", "play_media", { ...e, media_content_id: id, media_content_type: "music", enqueue: "add" }, { csendes: true }).catch(() => {}); })();
+      }
+      if (poz > 3) {
+        await new Promise((x) => setTimeout(x, 1200));
+        await this._hiv("media_player", "media_seek", { ...e, seek_position: poz }, { csendes: true }).catch(() => {});
+      }
+    } catch (err) {
+      this._naplo("Sonos-csoport bontása: a hely nem állítható vissza", "error", { cel: uj.entity, hiba: String(err?.message || err) });
+    }
+  }
+
   async _atvisz(regi, uj, s, fb = null) {
     const szol = SZOL(s);
     const tagok = s?.attributes?.group_members?.length ? s.attributes.group_members : [regi.entity];
     if (regi.mod === "sonos" && uj.mod === "sonos" && szol) {
       // Sonos → Sonos: az új hangszóró belép a szóló csoportba, a többiek kilépnek – a zene megszakítás nélkül megy tovább
       if (uj.tagok) return this._csoportAllit(uj);
+      // a csoportból kiváló (nem vezető) Sonos a saját sorát kapja vissza, az 1. számtól: a hely a bontás előtt mentve,
+      // utána ellenőrizve (és ha kell, visszaállítva) – különben a lista elejéről szólna
+      const hely = tagok.includes(uj.entity) && tagok[0] !== uj.entity ? await this._sonosHely(tagok[0]) : null;
       if (!tagok.includes(uj.entity)) await this._hiv("media_player", "join", { entity_id: tagok[0], group_members: [uj.entity] });
       const tobbi = [...new Set([...tagok, ...(regi.tagok || [])])].filter((e) => e !== uj.entity);
       if (tobbi.length) await this._hiv("media_player", "unjoin", { entity_id: tobbi });
+      if (hely) await this._sonosHelyVissza(uj, hely);
       return;
     }
     // más rendszerek között (Sonos ↔ WiiM ↔ BT): a régi szünetel, az újon ugyanaz indul – rádión az adó, magnón a kazetta
@@ -3120,7 +3175,9 @@ class CantabileCard extends HTMLElement {
           return this._hiv("media_player", "media_pause", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
         }
         if (!(await this._helyettesitJatszik({ deezer: dzf.ids }, a.media_album_name || a.media_title || "Deezer", dzf.kezdo, uj, dzf.poz, t0))) {
-          this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); return this._frissit();
+          this._visszaRegire(regi, "deezer-helyettesítés: " + (this._helyettesitOk || "?"));
+          if (this._helyettesitOk === "lejatszas") this._uzen(T("A(z) {h} nem indult el – a(z) {r} szól tovább.", { h: KN(uj), r: KN(regi) }));
+          return this._frissit();
         }
         return this._hiv("media_player", "media_pause", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
       }
@@ -3130,13 +3187,13 @@ class CantabileCard extends HTMLElement {
       const spf = await this._sonosSpotifyForras(regi, s);
       if (spf) {
         await this._csoportAllit(uj);
-        if (!(await this._sonosSpotifyAtvisz(uj, spf))) { this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); return this._frissit(); }
+        if (!(await this._sonosSpotifyAtvisz(uj, spf))) { this._visszaRegire(regi); return this._frissit(); }
         return this._hiv("media_player", "media_pause", { entity_id: regi.entity }, { csendes: true }).catch(() => {});
       }
     }
     if (szol && ado === -1 && !forras) {
       // ismeretlen forrás (pl. a lejátszó saját appjából indított zene): nem visszük át, és nem is állítjuk le
-      this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso();
+      this._visszaRegire(regi);
       this._uzen(T("Ezt, ami most szól, nem tudom átvinni a(z) {h} hangszóróra – a(z) {r} szól tovább.", { h: KN(uj), r: KN(regi) }));
       return this._frissit();
     }
@@ -3164,7 +3221,7 @@ class CantabileCard extends HTMLElement {
     if (szol && !ok && this._hangszoro() === uj) {
       // az új nem indult el: a régi szól tovább, a választó visszaáll
       this._hiv("media_player", "media_stop", { entity_id: uj.entity }, { csendes: true }).catch(() => {});
-      this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso(); this._frissit();
+      this._visszaRegire(regi); this._frissit();
       return this._uzen(T("A(z) {h} nem indult el – a(z) {r} szól tovább.", { h: KN(uj), r: KN(regi) }));
     }
     if (szol) await regiLe();
@@ -3267,11 +3324,13 @@ class CantabileCard extends HTMLElement {
     const hiany = r.osszes - r.talalt;
     this._uzen(T("A(z) {h} hangszórón innen szól: {f}.", { h: KN(hsz), f: { sonos: "Deezer (Sonos)", ma: "Music Assistant", nas: T("zenemappa") }[r.mod] })
       + (hiany ? " " + T("{n} szám nincs meg, kimarad.", { n: hiany }) : ""), opt.gomb || null);
+    this._naplo("helyettesítés", "info", { cel: hsz.entity, mod: r.mod, talalt: r.talalt, osszes: r.osszes, kezdo: i });
     if (r.mod === "ma") {
       const e = opt.ma || this._maE(hsz);
       try { await this._hass.callWS({ type: "cantabile/ma/play", entity_id: e, uri: lista.slice(i), media_type: "track", enqueue: "replace", device: ESZKOZ() }); }
       catch (err) { this._maHiba(e, err); return false; }
       const ok = await this._szolMar({ entity: e }, () => true);
+      if (!ok) this._naplo("az MA-lejátszó nem szólalt meg", "warning", { cel: e });
       if (ok && pontrol) {
         await new Promise((x) => setTimeout(x, 1500));
         this._hiv("media_player", "media_seek", { entity_id: e, seek_position: Math.round(poz + (t0 ? (Date.now() - t0) / 1000 : 0)) }, { csendes: true }).catch(() => {});
@@ -3311,7 +3370,7 @@ class CantabileCard extends HTMLElement {
         const r = await this._hass.callWS({ type: "cantabile/spotify_connect", names: nevek, uris, offset: 0, position_ms: Math.round((Number(spf.poz) || 0) * 1000) });
         this._uzen(T("A(z) {h} hangszórón innen szól: {f}.", { h: KN(uj), f: `Spotify Connect – ${r.device}` }));
         return true;
-      } catch (e) { console.info("Cantabile: Spotify Connect nem ment, Deezer-tartalék:", e?.message || e); }
+      } catch (e) { console.info("Cantabile: Spotify Connect nem ment, Deezer-tartalék:", e?.message || e); this._naplo("Spotify Connect nem ment – Deezer-tartalék", "warning", { cel: uj.entity, hiba: String(e?.message || e) }); }
     }
     try {
       const r = await this._hass.callWS({ type: "cantabile/titles_to_deezer", items: spf.elemek.slice(0, 100) });
@@ -3320,7 +3379,7 @@ class CantabileCard extends HTMLElement {
         this._uzen(T("A Spotify itt nem szólhat – ugyanazok a számok a Deezerről ({t}/{o}).", { t: r.talalt, o: r.osszes }));
         return this._helyettesitJatszik({ deezer: linkek }, spf.cim, 0, uj, r.deezer[0] ? spf.poz : 0);
       }
-    } catch (e) { console.info("Cantabile: a Spotify-sor Deezer-tartaléka nem ment:", e?.message || e); }
+    } catch (e) { console.info("Cantabile: a Spotify-sor Deezer-tartaléka nem ment:", e?.message || e); this._naplo("Spotify-sor Deezer-tartaléka nem ment", "warning", { cel: uj.entity, hiba: String(e?.message || e) }); }
     this._uzen(T("A Spotify-sort a(z) {h} hangszórón nem tudom folytatni (nem Spotify Connect-eszköz, és a Deezeren sem találtam meg).", { h: KN(uj) }));
     return false;
   }
@@ -3335,6 +3394,7 @@ class CantabileCard extends HTMLElement {
       return true;
     } catch (e) {                            // nincs Deezer a WiiM-ben, nem kedvenc lista, vagy a szám nincs benne: tartalék út
       console.info("Cantabile: a WiiM saját Deezere nem indult, tartalék út:", e?.message || e);
+      this._naplo("WiiM saját Deezer nem indult – tartalék út", "warning", { cel: uj.entity, hiba: e?.code ? `${e.code}: ${e.message || ""}` : String(e?.message || e) });
       return false;
     }
   }
@@ -3513,6 +3573,9 @@ class CantabileCard extends HTMLElement {
     const n = this._kimenetek.length, regi = this._hangszoro(), regiAll = this._allapot(regi);
     const cel = this._kimenetek[((i % n) + n) % n], kiz = atvisz ? this._kizarolagos(regi, regiAll) : null;
     const celAll = cel && cel.entity !== HELYI ? this._hass?.states[cel.entity] : null;
+    this._naplo("hangszóróváltás", "info", { regi: regi?.entity || null, cel: cel?.entity || null, kizarolagos: kiz || null,
+      allapot: regiAll?.state || null, tartalom: String(regiAll?.attributes?.media_content_id || "").replace(/\?.*/, "").slice(0, 120),
+      sorszam: regiAll?.attributes?.queue_position ?? null });
     const fr = cel !== regi && this._foglalo(cel);
     if (fr) { this._foglaltUzen(fr); this._frissit(); return; }
     if (celAll && celAll.state !== "unavailable" && !(Number(celAll.attributes?.supported_features) & 512)) {
@@ -4316,7 +4379,16 @@ class CantabileCard extends HTMLElement {
   // üzenet a lejátszón: külön réteg a kártya fölött (az elrendezést nem érinti), a kártya látható részén; becsúszik, majd elhalványul.
   // Ha a kártya épp nem látszik (pl. a lapozó másik lapján), a HA saját értesítője jön.
   // `gomb`: {szoveg, fn} vagy ezek listája – műveletek az üzenetben (pl. „Átveszem”, „▶ Nappali”)
+  // a kártya döntései a HA-ba (cantabile/log): utólag visszakereshető, mi történt (tablet / telefon konzolja nem látszik)
+  _naplo(esemeny, szint = "info", adat = {}) {
+    if (!this._hass || this._nincsIntegracio) return;
+    const h = this._hangszoro?.();
+    this._hass.callWS({ type: "cantabile/log", event: String(esemeny).slice(0, 200), level: szint, device: ESZKOZ(),
+      data: { hangszoro: h?.entity || null, ...adat } }).catch(() => {});
+  }
+
   _uzen(szoveg, gomb = null) {
+    this._naplo("üzenet", "info", { szoveg: String(szoveg || "").slice(0, 300) });
     const kartya = this.shadowRoot?.querySelector("ha-card"), r = kartya?.getBoundingClientRect();
     const fent = r ? Math.max(0, -r.top) : 0, lent = r ? Math.min(r.height, innerHeight - r.top) : 0;
     if (!kartya || !r.width || lent - fent < 80) {

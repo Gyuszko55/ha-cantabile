@@ -309,6 +309,12 @@ def regisztral(hass: HomeAssistant) -> None:
             if not ma_lejatszo(hass, e):
                 raise HomeAssistantError("not_ma")
             _foglal(conn, [e], None)
+            if msg["enqueue"] == "replace":
+                # a régi sor ne szóljon bele (2.7.0b11: átvitelkor 10 mp-ig a régi sor egy száma szólt az új helyett)
+                try:
+                    await hass.services.async_call("media_player", "clear_playlist", {"entity_id": e}, blocking=True)
+                except Exception:  # noqa: BLE001 – a lejátszás enélkül is indul
+                    _LOGGER.debug("Cantabile: az MA-sor nem üríthető (%s)", e, exc_info=True)
             adat = {"entity_id": e, "media_id": msg["uri"], "enqueue": msg["enqueue"]}
             if msg.get("media_type"):
                 adat["media_type"] = msg["media_type"]
