@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0b19 – 2026-11-03
+
+- **A TV whose Music Assistant player can't play no longer swallows the music.** On a DLNA TV (e.g. Samsung) the MA player showed "playing" for a second, then stopped, and the card took it as done. Now the card checks that the TV's MA player keeps playing for a few seconds; if not, the MA queue goes back to the old speaker, the selector returns with a message, and the route is marked as not playing for an hour in the route matrix.
+
 ## 2.7.0b18 – 2026-11-03
 
 - **Long Deezer lists move to a TV in full.** Moving a Sonos Deezer list of 40+ tracks (e.g. Deezer favourites) to a Cantabile TV used to look every track up in the music folder: it took half a minute and found only a tenth of them, so the TV would stop after those. Now a long list goes to the TV's own Music Assistant player with every track, sound only; albums (shorter) still play from the music folder on the TV page with picture and lyrics.

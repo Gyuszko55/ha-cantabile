@@ -36,6 +36,7 @@
 
 // angol feliratok (kulcs: a magyar forrásszöveg)
 const EN = {
+  "A(z) {h} nem tudja lejátszani a Music Assistant zenéjét – a(z) {r} szól tovább.": "{h} can't play Music Assistant's music – {r} keeps playing.",
   "A(z) {h} nem indult el – a(z) {r} szól tovább.": "{h} didn't start – {r} keeps playing.",
   "A(z) {h} TV-n a Music Assistant szól tovább – csak a hang (a TV-oldal képe, dalszövege ehhez nem jár).": "Music Assistant keeps playing on the {h} TV – sound only (no TV page picture or lyrics with it).",
   "Véletlenszerű lejátszás": "Shuffle",
@@ -3088,8 +3089,20 @@ class CantabileCard extends HTMLElement {
         try {
           await this._hass.callWS({ type: "cantabile/ma/transfer", source: rma, target: tvMa, device: ESZKOZ() });
           this._naplo("MA-sor a TV MA-lejátszójára", "info", { cel: tvMa });
-          this._uzen(T("A(z) {h} TV-n a Music Assistant szól tovább – csak a hang (a TV-oldal képe, dalszövege ehhez nem jár).", { h: KN(uj) }));
-          return;
+          // valóban szól-e (pl. DLNA-s TV-n az MA egy pillanatra „playing”, aztán leáll): ha nem, vissza a régire
+          const szolt = await this._szolMar({ entity: tvMa }, () => true);
+          if (szolt) await new Promise((x) => setTimeout(x, 6000));
+          if (szolt && SZOL(this._hass.states[tvMa])) {
+            this._uzen(T("A(z) {h} TV-n a Music Assistant szól tovább – csak a hang (a TV-oldal képe, dalszövege ehhez nem jár).", { h: KN(uj) }));
+            return;
+          }
+          this._naplo("a TV MA-lejátszója nem szólt – vissza", "warning", { cel: tvMa });
+          this._matrixHiba("ma_konyvtar", uj, "ma_sajat");
+          this._matrixHiba("deezer", uj, "ma_deezer");
+          await this._hass.callWS({ type: "cantabile/ma/transfer", source: tvMa, target: rma, device: ESZKOZ() }).catch(() => {});
+          this._visszaRegire(regi, "a TV MA-lejátszója nem szólt");
+          this._uzen(T("A(z) {h} nem tudja lejátszani a Music Assistant zenéjét – a(z) {r} szól tovább.", { h: KN(uj), r: KN(regi) }));
+          return this._frissit();
         } catch (err) { this._maHiba(tvMa, err); }
       }
       this._visszaRegire(regi, "MA-szám, a célon nincs MA-lejátszó");
@@ -3382,7 +3395,13 @@ class CantabileCard extends HTMLElement {
       const e = opt.ma || this._maE(hsz);
       try { await this._hass.callWS({ type: "cantabile/ma/play", entity_id: e, uri: lista.slice(i), media_type: "track", enqueue: "replace", device: ESZKOZ() }); }
       catch (err) { this._maHiba(e, err); return false; }
-      const ok = await this._szolMar({ entity: e }, () => true);
+      let ok = await this._szolMar({ entity: e }, () => true);
+      if (ok && /^media_player\.cantabile_tv_/.test(hsz.entity)) {
+        // TV saját MA-lejátszója (pl. DLNA-n): egy pillanatra „playing”, aztán leállhat – csak a tartós szólás számít
+        await new Promise((x) => setTimeout(x, 6000));
+        ok = SZOL(this._hass.states[e]);
+        if (!ok) { this._matrixHiba("deezer", hsz, "ma_deezer"); this._matrixHiba("ma_konyvtar", hsz, "ma_sajat"); }
+      }
       if (!ok) this._naplo("az MA-lejátszó nem szólalt meg", "warning", { cel: e });
       if (ok && pontrol) {
         await new Promise((x) => setTimeout(x, 1500));
