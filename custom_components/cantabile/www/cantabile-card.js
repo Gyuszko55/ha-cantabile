@@ -5752,7 +5752,14 @@ class CantabileCard extends HTMLElement {
 
   // a szóló szám kiemelése; ha közben más lett a sor (új kazetta), újrarajzol
   _sorKiemel(gorget = false) {
-    const pl = this._polc; if (pl?.ful !== "sor" || !pl.sor) return;
+    const pl = this._polc;
+    // MA-sor: számváltáskor (az MA-lejátszó új címe) a lista újra, a szóló számmal kiemelve (2.7.1)
+    if (pl?.ful === "sor" && pl.maSor) {
+      const st = this._hass?.states[pl.maSor.e], cid = `${st?.attributes?.media_content_id || ""}|${st?.attributes?.media_title || ""}`;
+      if (cid !== pl.maSor.cid && !pl.maSor.tolt) { pl.maSor.tolt = true; this._maSorRajz(this.shadowRoot.querySelector(".plista"), pl.maSor.e, true); }
+      return;
+    }
+    if (pl?.ful !== "sor" || !pl.sor) return;
     const lista = this.shadowRoot.querySelector(".plista"), f = this._sorForras();
     if (f.kulcs !== pl.sor.kulcs) { pl.sor = null; this._sorRajz(lista); return; }
     let ujra = false;
@@ -7322,8 +7329,11 @@ class CantabileCard extends HTMLElement {
 
   // QUEUE fül MA-sornál: a sor a szóló szám körül (néhány előző és a következők; az MA sorát az MA szerkeszti – a HA ehhez
   // nem ad műveletet)
-  async _maSorRajz(lista, e) {
-    lista.innerHTML = `<div class="puzenet">${T("Betöltés…")}</div>`;
+  async _maSorRajz(lista, e, csendes = false) {
+    if (!lista) return;
+    const st0 = this._hass?.states[e];
+    if (this._polc) this._polc.maSor = { e, cid: `${st0?.attributes?.media_content_id || ""}|${st0?.attributes?.media_title || ""}` };
+    if (!csendes) lista.innerHTML = `<div class="puzenet">${T("Betöltés…")}</div>`;
     let q;
     try { q = await this._hass.callWS({ type: "cantabile/ma/queue_items", entity_id: e, before: 3, after: 40 }); }
     catch (_) {
@@ -7337,7 +7347,8 @@ class CantabileCard extends HTMLElement {
     lista.innerHTML = `<h5 class="kcsop">MUSIC ASSISTANT<span>${ESC(T("{n} szám", { n: q.total ?? "?" }))}</span></h5>
       <div class="masor">${q.items.map((x, k) => elem(x, q.offset + k + 1, q.offset + k === q.index)).join("")}</div>
       <div class="puzenet">${ESC(T("A sort a Music Assistant kezeli (keverés: {k}, ismétlés: {i}); átrendezni és törölni az MA saját felületén lehet.", { k: q.shuffle ? T("be") : T("ki"), i: ism }))}</div>`;
-    lista.querySelector(".masorelem.most")?.scrollIntoView({ block: "nearest" });
+    const most = lista.querySelector(".masorelem.most");
+    if (most) lista.scrollTop = Math.max(0, most.offsetTop - lista.offsetTop - lista.clientHeight / 3);
   }
 
   // ---- lenyíló előlap: bemenet és hangszín (hangszin.py) ----
