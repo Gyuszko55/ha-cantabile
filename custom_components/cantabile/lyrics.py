@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import logging
 import os
@@ -201,6 +202,7 @@ def _eredmeny(adat: dict[str, Any] | None) -> dict[str, Any]:
         "plain": adat.get("plainLyrics") or None,
         "artist": adat.get("artistName"),
         "title": adat.get("trackName"),
+        "lrclib_id": adat.get("id"),
     }
 
 
@@ -259,6 +261,55 @@ async def _ovh(sess: aiohttp.ClientSession, eloado: str, cim: str) -> str | None
     return "\n".join(sorok).strip() or None
 
 
+# ---- rossz szöveg (2.7.1): a felhasználó elutasította – törlés, és a keresés ezt többé nem adja ----
+ELUTASITOTT = "_elutasitott.json"
+
+
+def ujjlenyomat(e: dict[str, Any] | None) -> str | None:
+    """Egy dalszöveg azonosítója a tartalmából (időbélyegek és kisbetű-nagybetű nélkül) – a .lrc-ből és az LRCLIB-ből
+    egyformán számolható."""
+    if not e:
+        return None
+    if e.get("synced"):
+        szoveg = " ".join(str(sor) for _t, sor in e["synced"])
+    elif e.get("plain"):
+        szoveg = str(e["plain"])
+    elif e.get("syncedLyrics") or e.get("plainLyrics"):
+        szoveg = " ".join(sor for _t, sor in _lrc(e["syncedLyrics"])) if e.get("syncedLyrics") else str(e["plainLyrics"])
+    else:
+        return None
+    tiszta = re.sub(r"\W+", " ", szoveg.casefold()).strip()[:600]
+    return hashlib.sha1(tiszta.encode()).hexdigest()[:16] if tiszta else None
+
+
+def _elut_kulcs(eloado: str, cim: str) -> str:
+    return f"{eloado.casefold().strip()}|{(_TOLDALEK.sub('', cim).strip() or cim).casefold()}"
+
+
+def elut_olvas(hass: HomeAssistant) -> dict[str, dict[str, list[Any]]]:
+    try:
+        with open(os.path.join(hass.config.path(*TAROLO), ELUTASITOTT), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def elut_ir(hass: HomeAssistant, adat: dict[str, Any]) -> None:
+    ut = os.path.join(hass.config.path(*TAROLO), ELUTASITOTT)
+    os.makedirs(os.path.dirname(ut), exist_ok=True)
+    with open(ut + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(adat, f, ensure_ascii=False)
+    os.replace(ut + ".tmp", ut)
+
+
+def elutasitott(elut: dict[str, Any], eloado: str, cim: str, e: dict[str, Any] | None) -> bool:
+    """Ezt a szöveget a felhasználó már rossznak jelölte (LRCLIB-azonosító vagy tartalom szerint)."""
+    b = elut.get(_elut_kulcs(eloado, cim))
+    if not b or not e:
+        return False
+    return (e.get("id") or e.get("lrclib_id")) in (b.get("ids") or []) or ujjlenyomat(e) in (b.get("ujj") or [])
+
+
 def _legjobb(talalatok: list[dict[str, Any]], hossz: float | None) -> dict[str, Any] | None:
     def pont(t: dict[str, Any]) -> tuple[int, float]:
         elteres = abs((t.get("duration") or 0) - hossz) if hossz else 0
@@ -274,20 +325,22 @@ async def keres(hass: HomeAssistant, eloado: str, cim: str, album: str | None, h
     """Dalszöveg: előbb a zenefájl melletti .lrc, aztán az LRCLIB, végül a lyrics.ovh; a megtaláltat a fájl mellé menti.
     `csak_lrclib`: a begyűjtő csak az LRCLIB-et kérdezi, és annak hibájánál kivételt ad (nem a tartalékkal pótol)."""
     lrc = lrc_fajl or (await hass.async_add_executor_job(lrc_ut, hass, media_id) if media_id else None)
+    elut = await hass.async_add_executor_job(elut_olvas, hass)
     masik: str | None = None                 # streamingnél a zenemappa azonos száma (oda is ment)
     if lrc is None:
         # nem zenemappás szám (Deezer, Spotify, MA, rádió…): a zenemappa azonos száma, különben a streaming-tároló
         masik = await _zenemappaban(hass, eloado, cim)
         lrc = tarolo_ut(hass, eloado, cim)
-        if masik and (helyi := await hass.async_add_executor_job(lrc_olvas, masik)) and (helyi.get("synced") or not csak_lrclib):
+        if (masik and (helyi := await hass.async_add_executor_job(lrc_olvas, masik)) and (helyi.get("synced") or not csak_lrclib)
+                and not elutasitott(elut, eloado, cim, helyi)):
             return helyi
-    if lrc and (helyi := await hass.async_add_executor_job(lrc_olvas, lrc)):
+    if lrc and (helyi := await hass.async_add_executor_job(lrc_olvas, lrc)) and not elutasitott(elut, eloado, cim, helyi):
         if helyi.get("synced") or not csak_lrclib:
             if masik:
                 await hass.async_add_executor_job(lrc_ir, masik, helyi, eloado, cim, album, hossz)
             return helyi
     kulcs = f"{eloado.casefold()}|{cim.casefold()}|{round(hossz or 0)}"
-    if kulcs in _tar and not csak_lrclib:
+    if kulcs in _tar and not csak_lrclib and not elutasitott(elut, eloado, cim, _tar[kulcs]):
         _tar.move_to_end(kulcs)
         e = _tar[kulcs]
         for ut in (lrc, masik):
@@ -304,11 +357,13 @@ async def keres(hass: HomeAssistant, eloado: str, cim: str, album: str | None, h
             if album:
                 param["album_name"] = album
             adat = await _ker(sess, "get", param)
+            if adat and elutasitott(elut, eloado, cim, adat):
+                adat = None                  # rossznak jelölt: a keresőből egy másikat
         if not adat:
             talalatok = await _ker(sess, "search", {"artist_name": eloado, "track_name": tiszta}) or []
             if not talalatok and tiszta != cim:
                 talalatok = await _ker(sess, "search", {"artist_name": eloado, "track_name": cim}) or []
-            adat = _legjobb(talalatok, hossz)
+            adat = _legjobb([t for t in talalatok if not elutasitott(elut, eloado, cim, t)], hossz)
     except (aiohttp.ClientError, asyncio.TimeoutError) as err:
         if csak_lrclib:
             raise
@@ -326,7 +381,7 @@ async def keres(hass: HomeAssistant, eloado: str, cim: str, album: str | None, h
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
             _LOGGER.debug("lyrics.ovh nem elérhető: %s", err)
             sima = None
-        if sima:
+        if sima and not elutasitott(elut, eloado, cim, {"plain": sima}):
             eredmeny = {"found": True, "instrumental": False, "synced": None, "plain": sima, "artist": eloado, "title": cim, "source": "lyrics.ovh"}
         elif lrclib_hiba is not None:
             # egyik sem válaszolt rendesen: hiba (nem tároljuk – később újra próbálható)
@@ -338,6 +393,57 @@ async def keres(hass: HomeAssistant, eloado: str, cim: str, album: str | None, h
         if ut:
             await hass.async_add_executor_job(lrc_ir, ut, eredmeny, eloado, cim, album, hossz)
     return eredmeny
+
+
+def _elvet_fajlok(lrc_utak: list[str], ujj: str | None) -> list[str]:
+    """A rossz szöveg fájljai: a Cantabile által letöltött .lrc törlődik; a felhasználó saját .lrc-je (nincs benne a
+    Cantabile-jel) „.lrc.elutasitott” nevet kap – megmarad, de nem olvassuk."""
+    ki = []
+    for ut in lrc_utak:
+        try:
+            with open(ut, encoding="utf-8-sig", errors="replace") as f:
+                tartalom = f.read()
+        except OSError:
+            continue
+        if ujj and ujjlenyomat(lrc_olvas(ut)) != ujj:
+            continue                                    # más szöveg van benne (pl. közben a gyűjtő újat írt): marad
+        try:
+            if "[re:Cantabile" in tartalom:
+                os.remove(ut)
+            else:
+                os.replace(ut, ut + ".elutasitott")
+            ki.append(ut)
+        except OSError as err:
+            _LOGGER.debug("A rossz dalszöveg nem törölhető (%s): %s", ut, err)
+    return ki
+
+
+async def elvet(hass: HomeAssistant, eloado: str, cim: str, album: str | None, hossz: float | None,
+                media_id: str | None = None) -> dict[str, Any]:
+    """A felhasználó szerint rossz a szöveg: megjegyzi (azonosító + tartalom), törli a letöltöttet, és másikat keres."""
+    lrc = await hass.async_add_executor_job(lrc_ut, hass, media_id) if media_id else None
+    utak = [u for u in (lrc, await _zenemappaban(hass, eloado, cim) if lrc is None else None, tarolo_ut(hass, eloado, cim)) if u]
+    jelenlegi = None
+    for ut in utak:
+        if (jelenlegi := await hass.async_add_executor_job(lrc_olvas, ut)):
+            break
+    if jelenlegi is None:
+        kulcs0 = f"{eloado.casefold()}|{cim.casefold()}|"
+        jelenlegi = next((v for k, v in reversed(_tar.items()) if k.startswith(kulcs0)), None)
+    ujj = ujjlenyomat(jelenlegi)
+    elut = await hass.async_add_executor_job(elut_olvas, hass)
+    b = elut.setdefault(_elut_kulcs(eloado, cim), {"ids": [], "ujj": []})
+    if jelenlegi and jelenlegi.get("lrclib_id") and jelenlegi["lrclib_id"] not in b["ids"]:
+        b["ids"].append(jelenlegi["lrclib_id"])
+    if ujj and ujj not in b["ujj"]:
+        b["ujj"].append(ujj)
+    await hass.async_add_executor_job(elut_ir, hass, elut)
+    torolt = await hass.async_add_executor_job(_elvet_fajlok, utak, ujj)
+    for k in [k for k in _tar if k.startswith(f"{eloado.casefold()}|{cim.casefold()}|")]:
+        del _tar[k]
+    _LOGGER.info("Cantabile dalszöveg: %s – %s rossznak jelölve (%d fájl), újat keresek", eloado, cim, len(torolt))
+    uj = await keres(hass, eloado, cim, album, hossz, media_id)
+    return {**uj, "rejected": True}
 
 
 UJRA_NAP = 30            # a nem talált / csak sima szövegű számot ennyi nap múlva kérdezi újra
@@ -548,6 +654,33 @@ def regisztral(hass: HomeAssistant) -> None:
         connection.send_result(msg["id"], eredmeny)
 
     websocket_api.async_register_command(hass, ws_dalszoveg)
+
+    @websocket_api.websocket_command(
+        {
+            vol.Required("type"): "cantabile/lyrics/reject",
+            vol.Required("artist"): str,
+            vol.Required("title"): str,
+            vol.Optional("album"): vol.Any(str, None),
+            vol.Optional("duration"): vol.Any(vol.Coerce(float), None),
+            vol.Optional("media_id"): vol.Any(str, None),
+        }
+    )
+    @websocket_api.async_response
+    async def ws_elvet(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+        """Rossz dalszöveg: törlés, megjegyzés, és új keresés (a rosszat többé nem adja)."""
+        eloado, cim = msg["artist"].strip(), msg["title"].strip()
+        if not eloado or not cim:
+            connection.send_result(msg["id"], {"found": False})
+            return
+        try:
+            eredmeny = await elvet(hass, eloado, cim, msg.get("album"), msg.get("duration"), msg.get("media_id"))
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.debug("LRCLIB: %s", err)
+            connection.send_error(msg["id"], "nem_elerheto", szoveg(hass, "lyrics_down"))
+            return
+        connection.send_result(msg["id"], eredmeny)
+
+    websocket_api.async_register_command(hass, ws_elvet)
 
     # a zenetár időzített dalszövegeinek begyűjtése a háttérben (egyszer indul)
     if "cantabile_dalszoveg_gyujto" not in hass.data:

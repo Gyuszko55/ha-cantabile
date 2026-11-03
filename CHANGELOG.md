@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.1b1 – 2026-11-03
+
+- **WRONG LYRICS:** the lyrics panel has a button for lyrics that don't belong to the song (or are out of sync). Cantabile deletes the downloaded lyrics (the `.lrc` it saved next to the file or in its store; your own `.lrc` is kept as `.lrc.elutasitott`), remembers them as wrong (by LRCLIB id and by content) and looks for others at once – the wrong ones won't come back, not from the background collector either. New websocket: `cantabile/lyrics/reject`.
+- **Moving a Music Assistant queue no longer skips to the next track before the end.** MA counts the pauses of repeated switches as played time and, near the end, starts the next track on the new speaker; the card now notices this and goes back to the playing track and its position.
+
 ## 2.7.0 – 2026-11-03
 
 **The route matrix: everything plays everywhere it can.** Cantabile now builds a matrix of *source × speaker* from your setup (wizard, entity and area registry, the card) and keeps it in HA's storage: every cell lists the routes that can play that source on that speaker, in order, with their conditions and a recipe (command, parameters, whether it can start mid-track, whether it can be handed over, and per format – the third dimension – direct or transcoded). The first live route plays; if it doesn't, the next one does, and the failed route is skipped for an hour. Highlights since 2.6.3:

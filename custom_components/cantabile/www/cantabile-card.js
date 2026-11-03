@@ -36,6 +36,9 @@
 
 // angol feliratok (kulcs: a magyar forrásszöveg)
 const EN = {
+  "Rossz dalszöveg: törlöm, és másikat keresek (ezt többé nem hozza)": "Wrong lyrics: delete them and look for others (these won't come back)",
+  "A rossz szöveget törlöm, másikat keresek…": "Deleting the wrong lyrics, looking for others…",
+  "Nincs másik dalszöveg ehhez a dalhoz – a rosszat töröltem, többé nem jön elő.": "No other lyrics for this song – the wrong ones are deleted and won't come back.",
   "ez a TV (DLNA) nem tud tükrözni": "this TV (DLNA) can't mirror",
   "ezt a lejátszót nem lehet tükrözni": "this player can't be mirrored",
   "a(z) {h} nem tudja lejátszani a Music Assistant zenéjét": "{h} can't play Music Assistant's music",
@@ -2986,6 +2989,26 @@ class CantabileCard extends HTMLElement {
     this._hsz = this._kimenetek.indexOf(regi); this._hangUtolso();
   }
 
+  // MA-sor átvitele (cantabile/ma/transfer): az MA a váltás szünetét is lejátszott időnek számolja, és ha a szám vége
+  // közelinek tűnik, a következővel indul – ilyenkor vissza a szóló számra, ugyanoda (2.7.1)
+  async _maAtvisz(forras, cel) {
+    let elotte = null;
+    try { elotte = await this._hass.callWS({ type: "cantabile/ma/now", entity_id: forras }); } catch (_) { /* nincs adat */ }
+    await this._hass.callWS({ type: "cantabile/ma/transfer", source: forras, target: cel, device: ESZKOZ() });
+    const c = elotte?.current, poz = Number(elotte?.elapsed) || 0, hossz = Number(c?.duration) || 0;
+    if (!c?.name || (hossz && poz > hossz - 4)) return;           // a szám tényleg véget ért: a következő a jó
+    if (!(await this._szolMar({ entity: cel }, () => true))) return;
+    await new Promise((x) => setTimeout(x, 1500));
+    const cim = this._hass.states[cel]?.attributes?.media_title || "";
+    if (!cim || cim === c.name) return;
+    this._naplo("MA-átvitel: az MA a következő számmal indult – vissza a szóló számra", "warning", { cel, volt: c.name, lett: cim, poz: Math.round(poz) });
+    await this._hiv("media_player", "media_previous_track", { entity_id: cel }, { csendes: true }).catch(() => {});
+    if (poz > 3 && await this._szolMar({ entity: cel, }, (st) => st?.attributes?.media_title === c.name)) {
+      await new Promise((x) => setTimeout(x, 1200));
+      await this._hiv("media_player", "media_seek", { entity_id: cel, seek_position: Math.round(poz) }, { csendes: true }).catch(() => {});
+    }
+  }
+
   async _atviszHaKell(regi, uj) {
     this._atvitelCel = uj;                 // ha közben máshova váltottak, az elkésett eredmény nem indít, nem állít vissza
     // a hangszóró saját bemenete (BT IN, LINE IN) nem vihető át: a régi szünetel (BT-n a telefon is megáll), az új hallgat;
@@ -3073,7 +3096,7 @@ class CantabileCard extends HTMLElement {
       const cel = this._maE(uj);
       if (!cel) await mostLeker();
       if (cel && cel !== rma) {
-        try { await this._hass.callWS({ type: "cantabile/ma/transfer", source: rma, target: cel, device: ESZKOZ() }); }
+        try { await this._maAtvisz(rma, cel); }
         catch (err) { this._maHiba(cel, err); this._visszaRegire(regi, "MA-átvitel hiba"); return this._frissit(); }
         // a TV saját MA-lejátszójáról ment el a zene (2.7.0b21): a TV-re a tükör kerül az MA helyére – hang nélkül az új
         // hangszórót mutatja
@@ -3113,7 +3136,7 @@ class CantabileCard extends HTMLElement {
       const tvMa = this._tvMa(uj);
       if (tvMa && tvMa !== rma) {
         try {
-          await this._hass.callWS({ type: "cantabile/ma/transfer", source: rma, target: tvMa, device: ESZKOZ() });
+          await this._maAtvisz(rma, tvMa);
           this._naplo("MA-sor a TV MA-lejátszójára", "info", { cel: tvMa });
           // valóban szól-e (pl. DLNA-s TV-n az MA egy pillanatra „playing”, aztán leáll): ha nem, vissza a régire
           const szolt = await this._szolMar({ entity: tvMa }, () => true);
@@ -4626,6 +4649,25 @@ class CantabileCard extends HTMLElement {
     this._dalRajz(!v.found ? T("Nincs dalszöveg ehhez a dalhoz.") : v.instrumental && !v.synced && !v.plain ? T("Instrumentális szám – nincs szövege.") : null);
   }
 
+  // rossz dalszöveg (2.7.1): a szerver törli a letöltöttet, megjegyzi, és másikat keres – a rosszat többé nem hozza
+  async _dalElvet() {
+    const dl = this._dal;
+    if (!dl) return;
+    const d = dl.d, kulcs = dl.kulcs;
+    this._dalRajz(T("A rossz szöveget törlöm, másikat keresek…"));
+    let v;
+    try {
+      v = await this._hass.callWS({ type: "cantabile/lyrics/reject", artist: d.artist, title: d.title, album: d.album || null, duration: d.duration || null, ...(d.media_id ? { media_id: d.media_id } : {}) });
+    } catch (e) {
+      if (this._dal?.kulcs === kulcs) this._dalRajz(T("A dalszöveg-szolgáltatás nem érhető el."));
+      return;
+    }
+    this._naplo("rossz dalszöveg elvetve", "info", { eloado: d.artist, cim: d.title, uj: !!v?.found });
+    if (this._dal?.kulcs !== kulcs) return;
+    this._dal.v = v; this._dal.most = -1;
+    this._dalRajz(!v.found ? T("Nincs másik dalszöveg ehhez a dalhoz – a rosszat töröltem, többé nem jön elő.") : null);
+  }
+
   _dalRajz(uzenet) {
     const dl = this._dal, sr = this.shadowRoot;
     if (!dl) return;
@@ -4638,10 +4680,11 @@ class CantabileCard extends HTMLElement {
       test = `<div class="dlista${szinkron ? " szinkron" : ""}">${sorok.map(([t, x]) => `<p${t != null ? ` data-t="${t}"` : ""}${x.trim() ? "" : ' class="szunet"'}>${x.trim() ? ESC(x) : "♪ ♪ ♪"}</p>`).join("")}</div>`;
     }
     p.innerHTML = `
-      <div class="pfej"><span class="pful akt">LYRICS</span><div class="put">${ESC(dl.d.artist)} – ${ESC(dl.d.title)}</div><button class="pzar" title="${T("Bezár")}">×</button></div>
+      <div class="pfej"><span class="pful akt">LYRICS</span><div class="put">${ESC(dl.d.artist)} – ${ESC(dl.d.title)}</div>${v?.found && !this._nincsIntegracio ? `<span class="pful drossz" role="button" tabindex="0" title="${ESC(T("Rossz dalszöveg: törlöm, és másikat keresek (ezt többé nem hozza)"))}">WRONG LYRICS</span>` : ""}<button class="pzar" title="${T("Bezár")}">×</button></div>
       ${test}
       <div class="dlab"><span>${dl.hol === "r" && v?.found ? ESC(T("Rádióadásnál a pontos hely nem ismert, a szöveg kiemelés nélkül látszik.")) : ""}</span><span>lrclib.net</span></div>`;
     p.querySelector(".pzar").addEventListener("click", () => this._dalZar());
+    p.querySelector(".drossz")?.addEventListener("click", () => this._dalElvet());
     const l = p.querySelector(".dlista");
     if (l) ["wheel", "touchstart", "mousedown"].forEach((e) => l.addEventListener(e, () => { dl.kezi = Date.now(); }, { passive: true }));
     // időzített szövegnél fent-lent fél doboznyi hely, hogy az első és az utolsó sor is középre görgethető legyen
