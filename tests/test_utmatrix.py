@@ -155,3 +155,38 @@ def test_tv_kep_a_helyisegben():
     assert u["kep"] == ["Mi Box"]                                  # a DLNA-s TV tükröt nem tud
     assert m["cellak"]["deezer"]["media_player.cast_tv"]["utak"][0]["kep"] == ["saját képernyő"]
     assert m["cellak"]["deezer"]["media_player.cast_tv"]["utak"][1]["kep"] == []      # MA csak hang
+
+
+def test_recept_minden_uton():
+    m = U.epit(_be())
+    for sor in m["cellak"].values():
+        for cella in sor.values():
+            for u in cella["utak"]:
+                r = u["recept"]
+                assert r["parancs"] and r["pozicio"] in ("seek", "sorindex", "nem") and r["formatumok"]
+                assert r["cel"] == u["kimenet"]
+
+
+def test_recept_wiim_deezer_es_sonos_sor():
+    m = U.epit(_be())
+    w = m["cellak"]["deezer"]["media_player.wiim"]["utak"][0]["recept"]
+    assert w["parancs"] == "cantabile/wiim_deezer/play" and w["pozicio"] == "sorindex" and "deezer" in w["formatumok"]
+    s = m["cellak"]["nas"]["media_player.sonos"]["utak"][0]["recept"]
+    assert "sonos.play_queue" in s["parancs"]
+    n = m["cellak"]["nas"]["media_player.wiim"]["utak"][0]["recept"]
+    assert n["parancs"] == "cantabile.play_tracks" and n["pozicio"] == "seek"
+    assert n["formatumok"]["flac"]["mod"] == "kozvetlen"
+
+
+def test_recept_tanult_flac_atkodolas():
+    be = _be()
+    be["hangszorok"][2]["tv"] = "media_player.cantabile_tv"
+    be["nem_flac"] = {"media_player.cantabile_tv": "2026-11-03T10:00:00+00:00"}
+    m = U.epit(be)
+    u = m["cellak"]["nas"]["media_player.tv"]["utak"][0]
+    assert u["kimenet"] == "media_player.cantabile_tv"
+    f = u["recept"]["formatumok"]["flac"]
+    assert f == {"mod": "atkodol", "cel": "mp3_320", "tanulva": "2026-11-03T10:00:00+00:00"}
+    assert u["recept"]["formatumok"]["mp3"]["mod"] == "kozvetlen"
+    r = m["cellak"]["radio"]["media_player.tv"]["utak"][0]["recept"]
+    assert r["formatumok"] == {"stream": {"mod": "kozvetlen"}}

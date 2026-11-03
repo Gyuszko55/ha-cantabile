@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.0b11 – 2026-11-03
+
+- **3D route matrix, step A: every route now carries its recipe.** Besides which player and under which conditions, a cell's route now says how it starts: the command and its parameters (e.g. WiiM CreateQueue with the WiiM's Deezer account, the Sonos queue filled with Deezer links, `cantabile.play_tracks`), whether it can start at a position (seconds / track index / no), whether playback can be handed over to another player, and per content format (the third dimension) whether it plays directly or transcoded (FLAC → MP3 320k). For now the recipe is data only; the card still starts routes itself, so nothing changes in use.
+- **Learned player traits are kept.** When a TV page can't open FLAC, the TV is remembered in the matrix store: after a restart the TV gets MP3 from the first track instead of failing once again. `cantabile/matrix/reset` with `learned: true` forgets them.
+
 ## 2.7.0b10 – 2026-11-03
 
 - The STREAMING tab no longer says Sonos favourites only play on Sonos: off a Sonos it says the favourite's content plays there (Deezer, Spotify, radio), as it does since 2.7.0b8.

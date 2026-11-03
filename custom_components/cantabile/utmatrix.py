@@ -12,6 +12,10 @@ megvan), és frissül: indításkor, ha a lejátszók vagy a vezérlőpultok (a 
 
 2.7.0b1: a mátrix megfigyel; `cantabile/matrix` (lekérdezés), `cantabile/matrix/fail` (egy út nem szólt), `cantabile/matrix/reset` (a jelölések törlése).
 2.7.0b3: a kártya a Deezert és a Spotifyt a mátrixból indítja (a cella első élő útja, vagy a hangszórón választott út).
+2.7.0b11 (3D-s mátrix, A lépés): minden út kap egy receptet – mivel és milyen paraméterekkel indul, tud-e adott helyről
+indulni, átadható-e, és formátumonként (a harmadik dimenzió) közvetlenül szól-e vagy átkódolva. A recept egyelőre adat
+(a kártya még maga hajtja végre); a lejátszók tanult tulajdonságai (pl. a TV-oldal nem nyitja meg a FLAC-ot) a tárolóban
+megmaradnak, újraindítás után sem kell újratanulni.
 """
 from __future__ import annotations
 
@@ -50,6 +54,66 @@ BT = "helyi:bt"                          # a böngésző (a kártyát mutató te
 BT_UTAK = {"sajat", "ideiglenes", "preset_forditva", "kedvenc_forditva", "nas_helyett", "deezer_tartalek"}
 # TV-n (Cantabile TV-oldallal) a zenemappás helyettesítés áll elöl (kép, borító, dalszöveg); az MA csak hangként, utána
 TV_ELORE = {"nas_helyett"}
+
+# ---- recept (2.7.0b11): hogyan indul az út ----
+# parancs: amivel indul; parameterek: mit kap (leírás); pozicio: "seek" (másodpercre), "sorindex" (számra), "nem";
+# atadhato: a szóló zene átvehető-e róla másik lejátszóra (cím, előadó, pozíció ismert)
+_SOR_SONOS = {"parancs": "media_player.clear_playlist + media_player.play_media (enqueue: add) + sonos.play_queue",
+              "pozicio": "sorindex", "atadhato": True}
+RECEPTEK: dict[str, dict[str, Any]] = {
+    "sajat": {"parancs": "cantabile.play_tracks", "parameterek": {"tracks": "a számok címei", "start": "sorindex",
+              "position": "másodperc"}, "pozicio": "seek", "atadhato": True},
+    "sonos_deezer": {**_SOR_SONOS, "parameterek": {"media_content_id": "Deezer-linkek (album / lista / szám)", "fiok": "a Sonos Deezer-fiókja"}},
+    "wiim_deezer": {"parancs": "cantabile/wiim_deezer/play", "parameterek": {"kind": "album | playlist", "item": "Deezer-azonosító",
+                    "track": "kezdő szám", "fiok": "a WiiM Deezer-fiókja (CreateQueue)"}, "pozicio": "sorindex", "atadhato": True},
+    "ma_deezer": {"parancs": "cantabile/ma/play", "parameterek": {"uri": "MA-címek", "media_type": "track", "enqueue": "replace",
+                  "fiok": "a Music Assistant Deezere"}, "pozicio": "sorindex", "atadhato": True},
+    "nas_helyett": {"parancs": "cantabile/substitute", "parameterek": {"ma_entity": None, "cel": "ugyanazok a számok a zenemappából"},
+                    "pozicio": "sorindex", "atadhato": True},
+    "sonos_spotify": {"parancs": "media_player.play_media", "parameterek": {"media_content_id": "spotify:// cím", "fiok": "a Sonos Spotify-ja"},
+                      "pozicio": "nem", "atadhato": True},
+    "spotify_connect": {"parancs": "cantabile/spotify_connect", "parameterek": {"names": "a Connect-eszköz nevei", "uris": "Spotify-címek",
+                        "position_ms": "ezredmásodperc"}, "pozicio": "seek", "atadhato": True},
+    "deezer_tartalek": {"parancs": "cantabile/spotify_to_deezer → a Deezer-cella útja", "parameterek": {}, "pozicio": "sorindex", "atadhato": True},
+    "sonos_tidal": {"parancs": "media_player.play_media", "parameterek": {"media_content_id": "Tidal-cím"}, "pozicio": "nem", "atadhato": False},
+    "wiim_preset": {"parancs": "WiiM-preset (a WiiM saját gombja)", "parameterek": {"preset": "sorszám"}, "pozicio": "nem", "atadhato": False},
+    "preset_forditva": {"parancs": "cantabile/wiim_presets → a Deezer- / rádió-cella útja", "parameterek": {}, "pozicio": "nem", "atadhato": False},
+    "sonos_kedvenc": {"parancs": "media_player.play_media", "parameterek": {"media_content_type": "favorite_item_id"}, "pozicio": "nem", "atadhato": False},
+    "kedvenc_forditva": {"parancs": "cantabile/sonos_favorite → a Deezer- / Spotify- / rádió-cella útja", "parameterek": {"title": "a kedvenc címe"},
+                         "pozicio": "nem", "atadhato": False},
+    "ma_sajat": {"parancs": "cantabile/ma/play", "parameterek": {"uri": "MA-cím", "enqueue": "replace"}, "pozicio": "sorindex", "atadhato": True},
+    "sonos_helyett": {**_SOR_SONOS, "parancs": "cantabile/substitute (Sonos Deezer)", "parameterek": {"cel": "egyes szám a Sonos Deezeréről"}},
+    "ideiglenes": {"parancs": "ideiglenes feltöltés + cantabile.play_tracks", "parameterek": {"tracks": "ideiglenes címek"}, "pozicio": "seek", "atadhato": False},
+    "airplay": {"parancs": "a telefon küldi (AirPlay)", "parameterek": {}, "pozicio": "nem", "atadhato": False},
+    "party": {"parancs": "cantabile/party/start", "parameterek": {"mod": "sonos | url", "tagok": "a csoport lejátszói"}, "pozicio": "nem", "atadhato": False},
+    "sajat_lista": {"parancs": "cantabile/list/play", "parameterek": {"lista": "a lista azonosítója", "mod": "sonos | url"}, "pozicio": "sorindex", "atadhato": True},
+}
+# formátumok (a 3. dimenzió) forrásonként: a fájlos utak FLAC / MP3, a többi a saját tartalomtípusa
+FAJLOS = {"sajat", "nas_helyett", "party", "sajat_lista", "ideiglenes"}
+TARTALOM = {"radio": "stream", "deezer": "deezer", "deezer_szamok": "deezer", "spotify": "spotify", "tidal": "tidal",
+            "wiim_preset": "preset", "sonos_kedvenc": "kedvenc", "ma_konyvtar": "ma", "airplay": "airplay"}
+ATKODOLAS = "mp3_320"          # a /api/cantabile/tv/audio/<kulcs>.mp3 (ffmpeg, libmp3lame 320k)
+
+
+def recept(forras: str, kulcs: str, h: dict[str, Any], ki: str | None, be: dict[str, Any]) -> dict[str, Any]:
+    """Az út receptje a hangszórón: a sablon (RECEPTEK) + a cél és a formátumtábla."""
+    r: dict[str, Any] = {**RECEPTEK.get(kulcs, {"parancs": None, "parameterek": {}, "pozicio": "nem", "atadhato": False})}
+    r["parameterek"] = dict(r.get("parameterek") or {})
+    if kulcs == "sajat" and h.get("platform") in SONOS:
+        r.update({**_SOR_SONOS, "parameterek": {"media_content_id": "a számok címei"}})
+    if h.get("platform") == "bongeszo" and kulcs in FAJLOS:
+        r["parancs"] = "a kártya saját lejátszója (böngésző)"
+    r["cel"] = ki
+    tanult = (be.get("nem_flac") or {})
+    if kulcs in FAJLOS and forras != "radio":
+        if ki and ki in tanult:
+            r["formatumok"] = {"flac": {"mod": "atkodol", "cel": ATKODOLAS, "tanulva": tanult[ki]}, "mp3": {"mod": "kozvetlen"}}
+        else:
+            r["formatumok"] = {"flac": {"mod": "kozvetlen"}, "mp3": {"mod": "kozvetlen"}}
+    else:
+        r["formatumok"] = {TARTALOM.get(forras, forras): {"mod": "kozvetlen"}}
+    return r
+
 
 # a feltételek (bemenetek) nevei
 FELTETELEK: dict[str, str] = {
@@ -241,7 +305,7 @@ def epit(be: dict[str, Any]) -> dict[str, Any]:
                 else:
                     kep = []
                 lista.append({
-                    "ut": kulcs, "nev": nev, "mod": mod, "kimenet": ki, "kep": kep,
+                    "ut": kulcs, "nev": nev, "mod": mod, "kimenet": ki, "kep": kep, "recept": recept(fk, kulcs, h, ki, be),
                     "feltetelek": [{"k": k, "nev": FELTETELEK[k], "ok": v} for k, v in ertek.items()],
                     "allapot": _ut_allapot(list(ertek.values())),
                 })
@@ -400,6 +464,7 @@ async def bemenetek(hass: HomeAssistant) -> dict[str, Any]:
         "spotify_eszkozok": await _spotify_eszkozok(hass, hangszorok) if stream.get("spotify_entity") else {},
         "tidal": bool(stream.get("tidal")),
         "figyelmeztetes": figyelmeztetes,
+        "nem_flac": dict((matrix(hass).tanult.get("nem_flac") or {}) if "matrix" in hass.data.get(DOMAIN, {}) else {}),
     }
 
 
@@ -414,6 +479,8 @@ class UtMatrix:
         self._kesleltetett: Any = None
         self._leiratkozas: list[Any] = []
         self.hibak: dict[tuple[str, str, str], float] = {}
+        # a lejátszók tanult tulajdonságai (megmaradnak): {"nem_flac": {TV-lejátszó: mikor}}
+        self.tanult: dict[str, dict[str, str]] = {"nem_flac": {}}
 
     async def betolt(self) -> None:
         """A tárolt mátrix (az előző futásból): induláskor azonnal megvan, a friss a HA elindulása után készül. Az előző
@@ -421,6 +488,34 @@ class UtMatrix:
         self.adat = await self.store.async_load()
         if self.adat:
             jeloles_nelkul(self.adat)
+            self.tanult = {"nem_flac": {}, **(self.adat.get("tanult") or {})}
+        self._tanultat_atad()
+
+    @callback
+    def _tanultat_atad(self) -> None:
+        """A tanult FLAC-képtelenség vissza a TV-központba (az átkódolás az első számtól, újratanulás nélkül)."""
+        if "tv" in self.hass.data.get(DOMAIN, {}):
+            from . import tv  # noqa: PLC0415
+
+            tv.kozpont(self.hass).nem_flac.update(self.tanult.get("nem_flac") or {})
+
+    async def tanul(self, mit: str, entity_id: str) -> None:
+        """Egy lejátszó új tulajdonsága (pl. „nem_flac”): a tárolóba, és a cellák receptjébe a következő frissítéskor."""
+        if entity_id in self.tanult.setdefault(mit, {}):
+            return
+        self.tanult[mit][entity_id] = dt_util.utcnow().isoformat(timespec="seconds")
+        _LOGGER.info("Cantabile útmátrix: %s → %s (megjegyezve)", entity_id, mit)
+        if self.adat is not None:
+            self.adat["tanult"] = self.tanult
+            await self.store.async_save(self.adat)
+        self.kesobb("tanult tulajdonság")
+
+    async def tanult_torles(self) -> None:
+        self.tanult = {"nem_flac": {}}
+        if "tv" in self.hass.data.get(DOMAIN, {}):
+            from . import tv  # noqa: PLC0415
+
+            tv.kozpont(self.hass).nem_flac.clear()
 
     async def frissit(self, ok: str = "kérés") -> dict[str, Any]:
         async with self._zar:
@@ -432,6 +527,7 @@ class UtMatrix:
                 "verzio": VERSION, "ido": dt_util.utcnow().isoformat(), "ok": ok, "tartam": round(time.monotonic() - t0, 1),
                 "feltetelek": FELTETELEK,
                 "bemenet": {k: v for k, v in be.items() if k != "hangszorok"},
+                "tanult": self.tanult,
             })
             self.adat = m
             await self.store.async_save(m)
@@ -524,12 +620,14 @@ async def regisztral(hass: HomeAssistant) -> None:
 
     websocket_api.async_register_command(hass, ws_fail)
 
-    @websocket_api.websocket_command({vol.Required("type"): "cantabile/matrix/reset"})
+    @websocket_api.websocket_command({vol.Required("type"): "cantabile/matrix/reset", vol.Optional("learned", default=False): bool})
     @websocket_api.async_response
     async def ws_reset(hass: HomeAssistant, conn: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
         """A „nem szólt” jelölések törlése (pl. a hiba elhárítása után): a mátrix újra a bemenetekből."""
         mx = matrix(hass)
         mx.hibak.clear()
+        if msg["learned"]:
+            await mx.tanult_torles()
         conn.send_result(msg["id"], await mx.frissit("jelölések törölve"))
 
     websocket_api.async_register_command(hass, ws_reset)

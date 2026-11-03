@@ -33,7 +33,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event, async_track_time_interval
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_TV_PLAYERS, SIGNAL_UPNP
+from .const import CONF_TV_PLAYERS, DOMAIN, SIGNAL_UPNP
 from .entity import CantabileEntity
 from .tv import ATKODOLANDO, TV_DASHBOARD, TV_VIEW, kozpont
 
@@ -200,6 +200,10 @@ class CantabileTv(CantabileEntity, MediaPlayerEntity):
             # a TV-oldal ezt a formátumot nem tudja megnyitni (pl. Android TV-s Cast-vevő és FLAC): megjegyezzük, és
             # ugyanez a szám ugyanonnan menet közben MP3-ra kódolva indul – a lejátszás közben nem áll le
             kozpont(self.hass).nem_flac.add(self.entity_id)
+            if "matrix" in self.hass.data.get(DOMAIN, {}):        # tartósan: újraindítás után sem kell újratanulni
+                from . import utmatrix  # noqa: PLC0415
+
+                self.hass.async_create_task(utmatrix.matrix(self.hass).tanul("nem_flac", self.entity_id), "cantabile_tanul")
             _LOGGER.info("Cantabile TV: a(z) %s TV-oldala nem nyitja meg a FLAC-ot (%s) – MP3-ra kódolva szól", self.entity_id, msg["error"])
             mt, mid, kw = self._inditas_adat
             kw = {**kw, "extra": {**kw.get("extra", {}), "start_position": float(msg.get("position") or 0)}}
