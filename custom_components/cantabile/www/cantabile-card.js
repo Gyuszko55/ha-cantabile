@@ -7806,14 +7806,18 @@ class CantabileCard extends HTMLElement {
 
     // magnó
     const kaz = this._kazetta();
-    const szalagSzol = SZOL(s) && i === -1, szunet = SZUNETEL(s) && i === -1;
-    this._magnoAllapot = { szol: szalagSzol, szunet, s, kaz };
+    // a gomb mögött a Music Assistant sora szól (pl. Technics): az idővonal, a cím és a dalszöveg az MA-lejátszóé – a
+    // készülék saját lejátszója ilyenkor elavult helyet / címet mutathat (pl. fél órája nem frissült) (2.7.0b22)
+    const maE = this._maSorGomb(hsz) ? this._maE(hsz) : null;
+    const sm = maE && maE !== hsz.entity && h.states[maE] ? h.states[maE] : s;
+    const szalagSzol = SZOL(sm) && i === -1, szunet = SZUNETEL(sm) && i === -1;
+    this._magnoAllapot = { szol: szalagSzol, szunet, s: sm, kaz };
     magno.classList.toggle("fut", szalagSzol);
     magno.classList.toggle("szun", szunet);
     this._funkRajz();
     if (this._polc?.ful === "sor") this._sorKiemel();
     sr.querySelectorAll(".mg").forEach((b) => b.classList.toggle("akt", (b.dataset.k === "play" && szalagSzol) || (b.dataset.k === "pause" && szunet)));
-    this._infoRajz(a, kaz, szalagSzol || szunet);
+    this._infoRajz(sm?.attributes || {}, kaz, szalagSzol || szunet);
     sr.getElementById("mallapot").textContent = szalagSzol ? "PLAY" : szunet ? "PAUSE" : radioSzol ? "RADIO ON" : "STOP";
     sr.getElementById("vufajta").textContent = !szalagSzol ? "TAPE · NORMAL" : this._vuFelirat();
     this._szalagRajz();
