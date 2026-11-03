@@ -141,7 +141,7 @@ Music Assistant sornál a szóló és a következő szám.
 - **ⓘ Jelút**: a ⚙ előtti gomb élőben mutatja, honnan jön a hang, mi történik vele, és hol szól (forrás → feldolgozás →
   kimenet, az EQ-val / hangszínnel, és hogy a VU-mérő valódi-e).
 - **Üzenetek a lejátszón**: a súgók és hibák füstüveg ablakban jelennek meg a kártyán, aztán elhalványulnak.
-- **Verziószám**: a kártya verziója (pl. `2.7.0b22`) kicsi, halvány betűvel a rádió és a magnó jobb alsó sarkában
+- **Verziószám**: a kártya verziója (pl. `2.7.0`) kicsi, halvány betűvel a rádió és a magnó jobb alsó sarkában
   látszik – hibabejelentésnél érdemes megadni.
 - **Döntésnapló**: a hangszóróváltások, a választott út, a tartalékra lépés, minden üzenet és minden visszaugrás a régi
   hangszóróra a Home Assistantba kerül – az utolsó 300 bejegyzés a `cantabile/log/get` websocket-paranccsal olvasható, a
@@ -169,7 +169,7 @@ Assistantból épül, tárolva van, és frissül induláskor, ha a lejátszók v
   helyettesítés, sárgás nem ellenőrizhető, szürke nem szól, a cellában az első élő út rövid nevével. Cellára koppintva
   látszanak az utak a feltételekkel (✓ / ✗ / ?), és hogy TV-n hol lesz a kép. Az **ALL DEVICES** a kártyán nem szereplő
   hangszórókat is hozzáveszi, a **REFRESH** újraépíti a mátrixot, a **CLEAR MARKS** törli a „nem szólt” jelöléseket.
-- **Útreceptek** (2.7.0b11): minden út a receptjét is hordozza – a parancsot és a paramétereit, a cél lejátszót, hogy
+- **Útreceptek** (2.7.0): minden út a receptjét is hordozza – a parancsot és a paramétereit, a cél lejátszót, hogy
   indulhat-e egy adott pontról (másodperc / sorindex / nem), átadható-e másik lejátszóra, és tartalomformátumonként, hogy
   közvetlenül vagy átkódolva szól (FLAC → MP3 320k). Egyelőre ez csak adat: a kártya ugyanúgy indít, mint eddig.
 - **A tanult tulajdonságok megmaradnak**: pl. az a TV, amelyiknek az oldala nem nyitja meg a FLAC-ot (lásd *TV*), a

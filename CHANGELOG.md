@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.7.0 – 2026-11-03
+
+**The route matrix: everything plays everywhere it can.** Cantabile now builds a matrix of *source × speaker* from your setup (wizard, entity and area registry, the card) and keeps it in HA's storage: every cell lists the routes that can play that source on that speaker, in order, with their conditions and a recipe (command, parameters, whether it can start mid-track, whether it can be handed over, and per format – the third dimension – direct or transcoded). The first live route plays; if it doesn't, the next one does, and the failed route is skipped for an hour. Highlights since 2.6.3:
+
+- **ROUTE MATRIX view** on the card (ⓘ → ROUTE MATRIX): the whole matrix, tap a cell for its routes.
+- **Everything everywhere:** Deezer albums / playlists on a WiiM through the WiiM's own Deezer (lossless) or Music Assistant's Deezer, elsewhere from the music folder; Sonos favourites play their content on other speakers (Deezer, Spotify, radio); the phone's BT output gets the music folder routes too; MÁSIK ÚT picks another route.
+- **Moving music between speakers** keeps track and position across Sonos, WiiM (own Deezer – also back from it), Music Assistant and TVs; Sonos Deezer favourites come newest-first, so when the WiiM would continue in a different order Music Assistant carries the list on in the Sonos order; splitting a Sonos group keeps the position; long Deezer lists go to a TV's own Music Assistant player (sound only), and a DLNA TV that can't play MA falls back with a message.
+- **TV:** a FLAC the TV page can't open plays transcoded to MP3 (learned per TV and remembered across restarts; seeking and position work); the TV mirror is sent by hand from the card's TV window (**SEND TO TV / MIRROR OFF**), follows the music, and appears by itself on a TV the music was just taken from; a mirror shows Music Assistant's data when MA plays on the speaker.
+- **Music Assistant:** transport buttons, timeline and synced lyrics follow MA when its queue plays behind a button; MA fallbacks start with a clean queue.
+- **Card decision log** (`cantabile/log`, `cantabile/log/get`): switches, routes, fallbacks and messages, with warnings in the HA log; the card shows its version in the bottom-right corner.
+- **Setup wizard in an unfamiliar home:** only available players are pre-selected; players without a device (e.g. YAML) are offered under "Other".
+- Many fixes from a full review; see the 2.7.0b1–b22 notes below.
+
 ## 2.7.0b22 – 2026-11-03
 
 Fixes from a full review of 2.7.0b1–b21:

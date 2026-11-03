@@ -142,7 +142,7 @@ BT; for a Music Assistant queue the current and next track.
 - **ⓘ Signal path**: the button before ⚙ shows, live, where the sound comes from, what happens to it and where it plays
   (source → processing → output, with the EQ / tone and whether the VU meter is real).
 - **Messages on the player**: hints and errors appear in a smoked-glass window on the card, then fade out.
-- **Version label**: the card's version (e.g. `2.7.0b22`) shows in small, faint type in the bottom-right corner of the
+- **Version label**: the card's version (e.g. `2.7.0`) shows in small, faint type in the bottom-right corner of the
   radio and the deck – handy for bug reports.
 - **Decision log**: speaker switches, the route taken, fallbacks, every message and every bounce back to the old speaker
   are logged in Home Assistant – the last 300 entries via websocket `cantabile/log/get`; warnings and errors also go to
@@ -169,7 +169,7 @@ storage and refreshed at start-up, when players or dashboards change, hourly and
   substitution, amber can't be checked, grey doesn't play, with the first live route's short name in each cell. Tap a cell
   for its routes with their conditions (✓ / ✗ / ?) and where the picture appears on a TV. **ALL DEVICES** adds the
   speakers that aren't on the card, **REFRESH** rebuilds the matrix, **CLEAR MARKS** forgets the “didn't play” marks.
-- **Route recipes** (2.7.0b11): every route also carries its recipe – the command and its parameters, the target player,
+- **Route recipes** (2.7.0): every route also carries its recipe – the command and its parameters, the target player,
   whether it can start at a position (seconds / track index / no), whether it can be handed over to another player, and
   per content format whether it plays directly or transcoded (FLAC → MP3 320k). For now this is data only: the card
   starts routes as before.
