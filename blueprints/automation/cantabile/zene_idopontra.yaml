@@ -83,7 +83,9 @@ blueprint:
       input:
         hangszoro:
           name: Hangszóró neve
-          description: Ahogy a Cantabile kártya választóján látszik (pl. „Sonos 1”, „Technics”). Üresen az első hangszóró.
+          description: >-
+            A kártya beállításában megadott név (pl. „Háló”), vagy a választón látható rövid név (pl. „Sonos 2” –
+            Cantabile 2.7.1-től). Üresen az első hangszóró.
           default: ""
           selector: { text: {} }
         lejatszo:
@@ -131,6 +133,8 @@ variables:
   kikapcsolas: !input kikapcsolas
   ertesito: !input ertesito
   zene_nev: !input zene
+  # a hangerő a zene előtt áll be: ha nem indul el, ez kerül vissza
+  elozo_hangero: "{{ state_attr(lejatszo, 'volume_level') if lejatszo != '' else none }}"
 
 triggers:
   - trigger: time
@@ -161,6 +165,11 @@ actions:
     response_variable: zene
   - if: "{{ not zene.success }}"
     then:
+      - if: "{{ lejatszo != '' and elozo_hangero is number }}"
+        then:
+          - action: media_player.volume_set
+            target: { entity_id: "{{ lejatszo }}" }
+            data: { volume_level: "{{ elozo_hangero }}" }
       - if: "{{ ertesito != '' }}"
         then:
           - action: "{{ ertesito }}"
