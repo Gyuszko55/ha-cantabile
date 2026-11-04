@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.1b7 – 2026-11-04
+
+- **`cantabile.play` finds a speaker by its short name too** – the one on the card's selector (e.g. "Sonos 2"), besides the name in the card settings ("Háló"), the entity id and the player's name. Before, an automation with the selector's name failed with "no such speaker". The error message now lists both names.
+- Blueprint "Cantabile: zene időpontra": if the music doesn't start, the volume set before it goes back to what it was.
+
 ## 2.7.1b6 – 2026-11-03
 
 - **Cover art in the TV mirror and the card's TV window when Music Assistant plays**, also on the phone: the player's picture is a plain-http address on the local network (MA's image proxy, a Sonos speaker), which an https page (the HA app through Nabu Casa) doesn't load. MA covers now go through Cantabile's signed image proxy, others through HA's own media player image proxy.

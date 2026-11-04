@@ -410,9 +410,20 @@ class Zene:
                 raise HibaUzenet("one_sonos")
             return (" + ".join(h.get("nev", h["entity"]) for h in sonosok), [h["entity"] for h in sonosok], "sonos")
         if q:
-            jo = max(hl, key=lambda h: pont(q, h.get("nev", "")) or pont(q, h["entity"].split(".")[1].replace("_", " ")))
-            if not (pont(q, jo.get("nev", "")) or pont(q, jo["entity"].split(".")[1].replace("_", " "))):
-                raise HibaUzenet("no_such_speaker", hol=hol, nevek=", ".join(h.get("nev", h["entity"]) for h in hl))
+            # a kártya beállításának neve, a választón látható rövid neve (pl. „Sonos 2”), az entitás azonosítója és
+            # a lejátszó neve – bármelyikkel megtalálható (2.7.1; korábban csak a hosszú név és az azonosító)
+            def nevei(h: dict[str, Any]) -> list[str]:
+                st = self.hass.states.get(h["entity"])
+                return [x for x in (h.get("nev"), h.get("rovid"), h["entity"].split(".")[1].replace("_", " "),
+                                    st.attributes.get("friendly_name") if st else None) if x]
+
+            def pontja(h: dict[str, Any]) -> float:
+                return max((pont(q, n) for n in nevei(h)), default=0)
+
+            jo = max(hl, key=pontja)
+            if not pontja(jo):
+                raise HibaUzenet("no_such_speaker", hol=hol, nevek=", ".join(
+                    f"{h['rovid']} ({h.get('nev')})" if h.get("rovid") and h.get("rovid") != h.get("nev") else h.get("nev", h["entity"]) for h in hl))
         else:
             # ami most szól, különben az első
             jo = next((h for h in hl if (s := self.hass.states.get(h["entity"])) and s.state in ("playing", "buffering")), hl[0])
