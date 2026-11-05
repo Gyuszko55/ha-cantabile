@@ -1,12 +1,10 @@
-# Cantabile – a power button you can put in a conditional card / power gomb feltételes kártyában
+# Cantabile – a power button you can put in a conditional card
 #
 # The POWER button of the Cantabile card is part of the card's front panel: it can't be moved
 # into a conditional card on its own, and there's no option to hide it. What it does:
 #   - something plays  → stops it (media_player.media_stop, and Cantabile's track-by-track player)
 #   - nothing plays    → starts the last radio station
 # The examples below do the same with your own button, so you can show it only when you want.
-# A Cantabile kártya POWER gombja az előlap része, külön nem tehető feltételes kártyába.
-# Az alábbi gombok ugyanazt csinálják, és már feltételessé tehetők.
 #
 # Replace media_player.living_room and "Living room" with your speaker's entity and the
 # name shown on the card.
