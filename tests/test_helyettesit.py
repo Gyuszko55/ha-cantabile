@@ -126,7 +126,7 @@ def test_spotify_eszkoz_valasztas_es_megjegyzett_nev(monkeypatch):
         return N(async_delay_save=lambda f, d: tarolt.update(f())), tarolt
 
     valaszok = iter([
-        {"devices": [{"id": "1b2a", "name": "WiiM Mini-A16A", "is_active": True}]},     # aktív: névvel
+        {"devices": [{"id": "1b2a", "name": "WiiM Mini-X1", "is_active": True}]},     # aktív: névvel
         {"devices": [{"id": "1b2a", "name": "1b2a", "is_active": False}]},               # tétlen: csak azonosító
     ])
 
@@ -135,10 +135,10 @@ def test_spotify_eszkoz_valasztas_es_megjegyzett_nev(monkeypatch):
 
     monkeypatch.setattr(St, "_eszk_tar", tar)
     monkeypatch.setattr(St, "_spotify_hiv", hiv)
-    assert asyncio.run(St.spotify_eszkozok(None))[0]["name"] == "WiiM Mini-A16A" and tarolt == {"1b2a": "WiiM Mini-A16A"}
+    assert asyncio.run(St.spotify_eszkozok(None))[0]["name"] == "WiiM Mini-X1" and tarolt == {"1b2a": "WiiM Mini-X1"}
     e = asyncio.run(St.spotify_eszkozok(None))
-    assert e[0]["name"] == "WiiM Mini-A16A"                                 # a tétlen is felismerhető
-    assert St.eszkoz_valaszt(e, ["Technics", "WiiM Mini-A16A"])["id"] == "1b2a"
+    assert e[0]["name"] == "WiiM Mini-X1"                                 # a tétlen is felismerhető
+    assert St.eszkoz_valaszt(e, ["Technics", "WiiM Mini-X1"])["id"] == "1b2a"
     assert St.eszkoz_valaszt(e, ["Nest Hub"]) is None
 
 
