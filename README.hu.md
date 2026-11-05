@@ -80,7 +80,8 @@ azonnali kereséssel) és PHONE (zene a telefonról / számítógépről: BT-n k
 vagy feltöltve a zenemappába). A sor a legutóbb használt forrást nyitja.
 
 **QUEUE** – a szóló sor: ugrás, törlés, következőnek, a sor végére, és átrendezés húzással (⋮⋮) Sonoson, WiiM-en és BT-n;
-Music Assistant sornál a szóló és a következő szám.
+Music Assistant sornál a szóló szám körüli számok (borítóval, a számváltást követve), a kazetta számlálóján pedig, hogy
+a lista hányadik száma szól (pl. 012/300).
 
 <p align="center"><img src="docs/images/phone.png" alt="Cantabile rádió telefonon" width="300">&nbsp;&nbsp;<img src="docs/images/phone-genres.png" alt="A MŰFAJOK fül telefonon" width="300"></p>
 
@@ -104,7 +105,9 @@ Music Assistant sornál a szóló és a következő szám.
 - REW / PLAY / FF / STOP / PAUSE / EJECT, SHUFFLE, REPEAT (1–5 kör vagy végtelen), FADE (Sonos-áttűnés), SLEEP.
 - **Hézagmentes**: Sonoson (saját sor) és WiiM-en (a következő szám előre átadva, DLNA); BT-n közel hézagmentes.
 - **DALSZÖVEG**: a kazettán a szám címére koppintva (vagy a rádió műsorsorára) – a szöveg az
-  [LRCLIB](https://lrclib.net)-ről jön; a magnón az épp szóló sor kiemelve követi a zenét.
+  [LRCLIB](https://lrclib.net)-ről jön; a magnón az épp szóló sor kiemelve követi a zenét (az időzítés nélküli szöveg
+  a számmal együtt görgetve fut). A **WRONG LYRICS** gomb elveti a számhoz nem illő szöveget, és rögtön mást keres; az
+  elvetett nem tér vissza.
 - **Bemondások**: az Assist (pl. Voice PE) vagy egy TTS-üzenet alatt a zene lehalkul (Cantabile beállítások).
 - **Home Assistant-újraindítás után** a Sonoson szóló zenemappás sor a szám végén magától folytatódik.
 
@@ -564,6 +567,8 @@ A korábbi magyar kulcsok (`hangszorok`, `adok`, `magno`, `nas` …) is működn
 Minden zenei művelet Home Assistant-műveletként is elérhető, így automatizálás, szkript vagy külső rendszer is
 indíthat zenét név alapján, ugyanúgy, mint a kártya vagy a hangvezérlés: `cantabile.play` a `query`, `kind`,
 `artist`, `speaker`, `shuffle` és `source` mezőkkel, válaszként megmondja, mi szól és hol (`success` / `error`).
+A `speaker` lehet a kártya beállításaiban adott név, a kártya választóján látható rövid név (pl. „Sonos 2”), az
+entitás-azonosító vagy a lejátszó neve.
 Bemásolható példák – reggeli rádió, hangosodó ébresztő, időzített kikapcsolás, hibakezelés, gombnyomás, mezős
 szkript, webhook, MQTT, REST és Python – az [examples](examples/) mappában vannak.
 

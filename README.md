@@ -79,7 +79,8 @@ artist → album, with instant search) and PHONE (music from the phone or comput
 through a temporary upload; or uploaded to the music folder). The row reopens the source used last.
 
 **QUEUE** – the current queue: jump, remove, play next, add to the end, and reorder by dragging (⋮⋮) on Sonos, WiiM and
-BT; for a Music Assistant queue the current and next track.
+BT; for a Music Assistant queue the tracks around the playing one (with covers, following track changes), and the
+cassette counter shows which track of the list plays (e.g. 012/300).
 
 <p align="center"><img src="docs/images/phone.png" alt="Cantabile radio on a phone" width="300">&nbsp;&nbsp;<img src="docs/images/phone-genres.png" alt="The GENRES tab on a phone" width="300"></p>
 
@@ -104,7 +105,9 @@ BT; for a Music Assistant queue the current and next track.
 - REW / PLAY / FF / STOP / PAUSE / EJECT, SHUFFLE, REPEAT (1–5 rounds or endless), FADE (Sonos crossfade), SLEEP.
 - **Gapless**: Sonos (its own queue) and WiiM (the next track is handed over in advance via DLNA); near-gapless on BT.
 - **LYRICS**: tap the song title on the cassette (or the radio's now-playing line) – the lyrics come from
-  [LRCLIB](https://lrclib.net); on the tape the current line is highlighted and follows the music.
+  [LRCLIB](https://lrclib.net); on the tape the current line is highlighted and follows the music (plain lyrics scroll
+  along with the song). **WRONG LYRICS** discards lyrics that don't belong to the song and looks for others at once; the
+  rejected ones don't come back.
 - **Announcements**: music is turned down while Assist (e.g. Voice PE) or a TTS message speaks (Cantabile options).
 - **After a Home Assistant restart** a playing music-folder queue on Sonos continues by itself after the current track.
 
@@ -568,7 +571,8 @@ The earlier Hungarian keys (`hangszorok`, `adok`, `magno`, `nas` …) are accept
 
 Every music action is also a Home Assistant action, so automations, scripts and other systems can start music by
 name, the same way as the card or voice: `cantabile.play` with `query`, `kind`, `artist`, `speaker`, `shuffle` and
-`source`, answering what plays and where (`success` / `error`). Ready-to-paste examples – morning radio, wake-up
+`source`, answering what plays and where (`success` / `error`). `speaker` may be the name in the card settings, the
+short name on the card's selector (e.g. "Sonos 2"), the entity id or the player's name. Ready-to-paste examples – morning radio, wake-up
 getting louder, sleep timer, error handling, a button, a script with fields, webhook, MQTT, REST and Python – are in
 the [examples](examples/) folder.
 
