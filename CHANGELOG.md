@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.7.1 – 2026-11-05
+
+Fixes and smaller additions since 2.7.0 (details in 2.7.1b1–b7 below):
+
+- **`cantabile.play` finds a speaker by the short name on the card's selector** (e.g. "Sonos 2") too, so automations written with that name work; the error message lists the usable names.
+- **New [examples](examples/) folder** (English and Hungarian): automations, a script with fields, webhook, MQTT, REST and Python calls, and the **blueprint "Cantabile: zene időpontra"** (music at a set time) with a one-click import button. If the music doesn't start, the blueprint puts the volume back.
+- **WRONG LYRICS** button: rejects lyrics that don't belong to the song and looks for others; the rejected ones don't come back.
+- **Music Assistant queue** shown on the cassette counter and in QUEUE (around the playing track, with covers, following track changes); long lists start sooner on MA; moving an MA queue no longer skips to the next track.
+- **Sonos → TV** waits for the TV's Music Assistant player instead of refusing on the first try.
+- **Cover art in the TV mirror and the card's TV window** when Music Assistant plays, also through Nabu Casa (https).
+- **Plain lyrics scroll along** with the song when no synced lyrics exist.
+
 ## 2.7.1b7 – 2026-11-04
 
 - **`cantabile.play` finds a speaker by its short name too** – the one on the card's selector (e.g. "Sonos 2"), besides the name in the card settings ("Háló"), the entity id and the player's name. Before, an automation with the selector's name failed with "no such speaker". The error message now lists both names.

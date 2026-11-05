@@ -6,9 +6,9 @@ import pytest
 from custom_components.cantabile import music as M
 
 C = {"hangszorok": [
-    {"nev": "Nappali", "rovid": "Sonos 1", "entity": "media_player.szonosz", "mod": "sonos"},
+    {"nev": "Nappali", "rovid": "Sonos 1", "entity": "media_player.sonos_living", "mod": "sonos"},
     {"nev": "Háló", "rovid": "Sonos 2", "entity": "media_player.haloszoba_tv", "mod": "sonos"},
-    {"nev": "WiiM", "rovid": "Technics", "entity": "media_player.wiim_mini_a16a_4", "mod": "url"},
+    {"nev": "WiiM", "rovid": "Technics", "entity": "media_player.wiim_mini_4", "mod": "url"},
 ]}
 
 
@@ -19,7 +19,7 @@ def _z():
 
 
 @pytest.mark.parametrize("hol,ent", [("Sonos 2", "media_player.haloszoba_tv"), ("Háló", "media_player.haloszoba_tv"),
-                                     ("Technics", "media_player.wiim_mini_a16a_4"), ("sonos 1", "media_player.szonosz")])
+                                     ("Technics", "media_player.wiim_mini_4"), ("sonos 1", "media_player.sonos_living")])
 def test_nev_es_rovid_nev(hol, ent):
     assert _z().hangszorok(C, hol)[1] == [ent]
 
