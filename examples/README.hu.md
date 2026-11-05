@@ -12,6 +12,7 @@ cseréld.
 | [automations.yaml](automations.yaml) | Reggeli rádió, fokozatosan hangosodó ébresztő, esti album időzített kikapcsolással, zene hazaérkezéskor, hibakezelés telefonos értesítéssel, rádió be/ki gombnyomásra |
 | [script_play_music.yaml](script_play_music.yaml) | Újrahasználható szkript mezőkkel (mit, hol, hangerő, időzítő), amely visszaadja, mi szól |
 | [blueprint_example.yaml](blueprint_example.yaml) | A *Cantabile: zene időpontra* blueprintből készült automatizálás |
+| [power_button.yaml](power_button.yaml) | Power gomb feltételes kártyában: az egész Cantabile kártya csak bekapcsolt hangszórónál, „ki” gomb csak lejátszás közben, és egy gomb, ami úgy működik, mint a kártya POWER-je (a szkriptekkel) |
 | [webhook_mqtt.yaml](webhook_mqtt.yaml) | Zene webhookról (telefonos gyorsparancs, NFC-matrica) vagy MQTT-üzenetre; Node-RED és websocket |
 | [rest_example.sh](rest_example.sh), [rest_example.py](rest_example.py) | Hívás kívülről a REST API-n át, válasszal |
 

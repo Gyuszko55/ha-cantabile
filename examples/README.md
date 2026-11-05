@@ -12,6 +12,7 @@ your own.
 | [automations.yaml](automations.yaml) | Morning radio, wake-up getting louder, evening album with sleep timer, welcome-home music, error handling with a phone message, radio on/off from a button |
 | [script_play_music.yaml](script_play_music.yaml) | A reusable script with fields (what, where, volume, sleep timer) that returns what plays |
 | [blueprint_example.yaml](blueprint_example.yaml) | An automation made from the blueprint *Cantabile: zene időpontra* |
+| [power_button.yaml](power_button.yaml) | A power button in a conditional card: the whole Cantabile card shown only while the speaker is on, an "off" button only while music plays, and one button that works like the card's POWER (with the scripts) |
 | [webhook_mqtt.yaml](webhook_mqtt.yaml) | Start music from a webhook (phone shortcut, NFC tag) or an MQTT message; Node-RED and websocket notes |
 | [rest_example.sh](rest_example.sh), [rest_example.py](rest_example.py) | Calling it from outside through the REST API, with the answer |
 

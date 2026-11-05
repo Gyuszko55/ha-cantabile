@@ -1,0 +1,89 @@
+# Cantabile – a power button you can put in a conditional card / power gomb feltételes kártyában
+#
+# The POWER button of the Cantabile card is part of the card's front panel: it can't be moved
+# into a conditional card on its own, and there's no option to hide it. What it does:
+#   - something plays  → stops it (media_player.media_stop, and Cantabile's track-by-track player)
+#   - nothing plays    → starts the last radio station
+# The examples below do the same with your own button, so you can show it only when you want.
+# A Cantabile kártya POWER gombja az előlap része, külön nem tehető feltételes kártyába.
+# Az alábbi gombok ugyanazt csinálják, és már feltételessé tehetők.
+#
+# Replace media_player.living_room and "Living room" with your speaker's entity and the
+# name shown on the card.
+
+# ---------------------------------------------------------------------------------------
+# 1. Dashboard cards (Edit dashboard → Add card → Manual): paste what is under one of the names
+# ---------------------------------------------------------------------------------------
+
+# 1a. The whole Cantabile card, only while the speaker is on.
+#     Put your existing card YAML under "card:", indented by two more spaces.
+whole_card:
+  type: conditional
+  conditions:
+    - condition: state
+      entity: media_player.living_room
+      state_not: "off"
+  card:
+    type: custom:cantabile-card
+    # … your existing card settings, unchanged
+
+# 1b. An "off" button, only while music plays.
+off_button:
+  type: conditional
+  conditions:
+    - condition: state
+      entity: media_player.living_room
+      state: "playing"
+  card:
+    type: button
+    name: Off
+    icon: mdi:power
+    entity: media_player.living_room
+    tap_action:
+      action: perform-action
+      perform_action: script.music_off
+
+# 1c. One button that works like POWER: stops when something plays, otherwise starts the radio.
+power_button:
+  type: button
+  name: Power
+  icon: mdi:power
+  entity: media_player.living_room
+  tap_action:
+    action: perform-action
+    perform_action: script.music_power
+
+# ---------------------------------------------------------------------------------------
+# 2. Scripts: paste what is under "scripts:" into scripts.yaml (without the "scripts:" line)
+# ---------------------------------------------------------------------------------------
+scripts:
+
+  music_off:
+    alias: "Music off"
+    icon: mdi:power
+    sequence:
+      - action: media_player.media_stop
+        target:
+          entity_id: media_player.living_room
+      # needed on a non-Sonos speaker: otherwise the music folder series goes on
+      # with the next track after the stop
+      - action: cantabile.stop_tracks
+        data:
+          entity_id: media_player.living_room
+
+  music_power:
+    alias: "Music power"
+    icon: mdi:power
+    sequence:
+      - if:
+          - condition: state
+            entity_id: media_player.living_room
+            state: "playing"
+        then:
+          - action: script.music_off
+        else:
+          - action: cantabile.play
+            data:
+              query: "Jazz FM"
+              kind: radio
+              speaker: "Living room"

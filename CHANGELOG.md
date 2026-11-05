@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Example [power_button.yaml](examples/power_button.yaml): a power button in a conditional card (the card's own POWER can't be moved out of the card).
+
 ## 2.7.1 – 2026-11-05
 
 Fixes and smaller additions since 2.7.0 (details in 2.7.1b1–b7 below):
