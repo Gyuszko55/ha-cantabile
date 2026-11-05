@@ -564,6 +564,19 @@ The earlier Hungarian keys (`hangszorok`, `adok`, `magno`, `nas` …) are accept
 | `cantabile.play_tracks` / `cantabile.stop_tracks` | Track-by-track playback on players without a queue |
 | `cantabile.sleep_timer` | Stop a player after N minutes (fade-out in the last 30 s; Sonos uses its own timer) |
 
+## Automations and examples
+
+Every music action is also a Home Assistant action, so automations, scripts and other systems can start music by
+name, the same way as the card or voice: `cantabile.play` with `query`, `kind`, `artist`, `speaker`, `shuffle` and
+`source`, answering what plays and where (`success` / `error`). Ready-to-paste examples – morning radio, wake-up
+getting louder, sleep timer, error handling, a button, a script with fields, webhook, MQTT, REST and Python – are in
+the [examples](examples/) folder.
+
+**Blueprint – music at a set time** (*Cantabile: zene időpontra*): time, days, only if someone is home, what to
+play, speaker, volume, gradually louder, sleep timer and a message if it didn't start.
+
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FGyuszko55%2Fha-cantabile%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fcantabile%2Fzene_idopontra.yaml)
+
 ## Notes
 
 - **Real VU signal** uses `ffmpeg` on the Home Assistant host (included in Home Assistant OS). Encrypted streams

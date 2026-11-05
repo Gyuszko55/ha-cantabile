@@ -559,6 +559,19 @@ A korábbi magyar kulcsok (`hangszorok`, `adok`, `magno`, `nas` …) is működn
 | `cantabile.play_tracks` / `cantabile.stop_tracks` | Számonkénti lejátszás sor nélküli lejátszón |
 | `cantabile.sleep_timer` | Lejátszó leállítása N perc múlva (az utolsó 30 mp-ben lehalkít; Sonoson a saját időzítője) |
 
+## Automatizálás és példák
+
+Minden zenei művelet Home Assistant-műveletként is elérhető, így automatizálás, szkript vagy külső rendszer is
+indíthat zenét név alapján, ugyanúgy, mint a kártya vagy a hangvezérlés: `cantabile.play` a `query`, `kind`,
+`artist`, `speaker`, `shuffle` és `source` mezőkkel, válaszként megmondja, mi szól és hol (`success` / `error`).
+Bemásolható példák – reggeli rádió, hangosodó ébresztő, időzített kikapcsolás, hibakezelés, gombnyomás, mezős
+szkript, webhook, MQTT, REST és Python – az [examples](examples/) mappában vannak.
+
+**Blueprint – zene időpontra** (*Cantabile: zene időpontra*): időpont, napok, csak ha valaki otthon van, mit
+szóljon, hangszóró, hangerő, fokozatos hangosodás, időzített kikapcsolás és értesítés, ha nem indult el.
+
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FGyuszko55%2Fha-cantabile%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fcantabile%2Fzene_idopontra.yaml)
+
 ## Tudnivalók
 
 - A **valódi VU-jelhez** `ffmpeg` kell a Home Assistant gépén (a Home Assistant OS tartalmazza). A titkosított

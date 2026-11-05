@@ -1,0 +1,58 @@
+# Cantabile – a reusable music script with fields / újrahasználható zenei szkript mezőkkel
+#
+# Put it into scripts.yaml. Call it from a button, an automation, a dashboard or from outside
+# (REST: see rest_example.sh). It returns what plays and where.
+# A scripts.yaml-ba tedd. A hívó megkapja, mi szól és hol.
+
+play_music:
+  alias: "Play music"
+  icon: mdi:music
+  fields:
+    what:
+      description: "Artist, album, track, station or playlist"
+      example: "A Kind of Magic"
+      required: true
+      selector: { text: {} }
+    where:
+      description: "Speaker name from the card (empty: where something plays, otherwise the first)"
+      example: "Living room"
+      selector: { text: {} }
+    player:
+      description: "The speaker's entity, for the volume and the sleep timer (same device as 'where')"
+      example: "media_player.living_room"
+      selector: { entity: { domain: media_player } }
+    volume:
+      description: "Volume 0–100 (empty: unchanged)"
+      selector: { number: { min: 0, max: 100, unit_of_measurement: "%" } }
+    minutes:
+      description: "Sleep timer in minutes (0 = none)"
+      default: 0
+      selector: { number: { min: 0, max: 240 } }
+  sequence:
+    - if: "{{ player is defined and volume is defined }}"
+      then:
+        - action: media_player.volume_set
+          target: { entity_id: "{{ player }}" }
+          data: { volume_level: "{{ (volume | float) / 100 }}" }
+    - action: cantabile.play
+      data:
+        query: "{{ what }}"
+        speaker: "{{ where | default('') }}"
+      response_variable: music
+    - if: "{{ music.success and player is defined and (minutes | int(0)) > 0 }}"
+      then:
+        - action: cantabile.sleep_timer
+          data: { entity_id: "{{ player }}", minutes: "{{ minutes | int }}" }
+    - stop: "done"
+      response_variable: music
+
+# Calling it from an automation, with the answer / Hívása automatizálásból, a válasszal:
+#
+#    - action: script.play_music
+#      data:
+#        what: "Queen"
+#        where: "Kitchen"
+#        player: media_player.kitchen
+#        volume: 25
+#        minutes: 30
+#      response_variable: result

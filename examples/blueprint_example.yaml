@@ -1,0 +1,24 @@
+# Cantabile – an automation made from the blueprint "Cantabile: zene időpontra"
+# (blueprints/automation/cantabile/zene_idopontra.yaml). The automation editor writes this
+# for you when you fill in the form; here it is in YAML.
+# Weekday wake-up in the bedroom: 06:45 Mon–Fri, only if Anna is home, a Deezer playlist
+# shuffled, 20 % reached gradually in 5 minutes, off after 60 minutes, a message if it fails.
+
+- alias: "Wake-up with music"
+  use_blueprint:
+    path: cantabile/zene_idopontra.yaml
+    input:
+      idopont: "06:45:00"            # time
+      napok: [mon, tue, wed, thu, fri]
+      otthon: [person.anna]          # only if someone of these is home (optional)
+      zene: "Morning coffee"         # what to play, by name
+      fajta: playlist                # auto | artist | album | track | radio | playlist
+      forras: deezer                 # auto | local | deezer | spotify | tidal
+      keverve: true                  # shuffle
+      hangszoro: "Bedroom"           # speaker name (card settings or selector)
+      lejatszo: media_player.bedroom # its entity, for volume and sleep timer (optional)
+      hangero: 20                    # volume %, set before the music starts
+      fokozatos: true                # gradually louder: from 3 % in 10 steps
+      fokozat_perc: 5                # minutes to reach the volume (1–30)
+      kikapcsolas: 60                # sleep timer, minutes (0 = none)
+      ertesito: notify.mobile_app_my_phone   # tells why, if the music didn't start (optional)

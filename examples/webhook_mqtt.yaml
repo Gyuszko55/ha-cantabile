@@ -1,0 +1,43 @@
+# Cantabile – start music from outside / zene indítása kívülről (automations.yaml)
+
+# Webhook: no token needed, the secret is the hard-to-guess id. Good for phone shortcuts
+# (iOS Shortcuts, Tasker, HTTP Shortcuts), NFC tags, other systems. The caller only gets "OK";
+# if it needs the result, use the REST API (rest_example.sh).
+#
+#   curl -X POST "http://homeassistant.local:8123/api/webhook/cantabile-music-CHANGE-ME" \
+#     -H "Content-Type: application/json" \
+#     -d '{"what": "Favourite songs", "kind": "playlist", "where": "Kitchen", "shuffle": true}'
+- alias: "Music from a webhook"
+  triggers:
+    - trigger: webhook
+      webhook_id: "cantabile-music-CHANGE-ME"   # make it long and random
+      allowed_methods: [POST]
+      local_only: true                          # false: callable from outside too (Nabu Casa)
+  actions:
+    - action: cantabile.play
+      data:
+        query: "{{ trigger.json.what }}"
+        kind: "{{ trigger.json.kind | default('auto') }}"
+        speaker: "{{ trigger.json.where | default('') }}"
+        shuffle: "{{ trigger.json.shuffle | default(false) }}"
+
+# MQTT: another system sends a message.
+#
+#   mosquitto_pub -t home/music/play -m '{"what": "Jazz FM", "where": "Kitchen"}'
+- alias: "Music from MQTT"
+  triggers:
+    - trigger: mqtt
+      topic: "home/music/play"
+  actions:
+    - action: cantabile.play
+      data:
+        query: "{{ trigger.payload_json.what }}"
+        speaker: "{{ trigger.payload_json.where | default('') }}"
+
+# Node-RED: in an "action" (call service) node set Action = cantabile.play and Data (JSON):
+#   {"query": "{{payload.what}}", "kind": "auto", "speaker": "Living room"}
+# Turn on "Return response" in the node if you need the answer.
+#
+# Websocket (HA's own API), after authenticating with a token:
+#   {"id": 2, "type": "call_service", "domain": "cantabile", "service": "play",
+#    "service_data": {"query": "Queen", "speaker": "Living room"}, "return_response": true}

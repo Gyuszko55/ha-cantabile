@@ -4,6 +4,7 @@
 
 - **`cantabile.play` finds a speaker by its short name too** – the one on the card's selector (e.g. "Sonos 2"), besides the name in the card settings ("Háló"), the entity id and the player's name. Before, an automation with the selector's name failed with "no such speaker". The error message now lists both names.
 - Blueprint "Cantabile: zene időpontra": if the music doesn't start, the volume set before it goes back to what it was.
+- New [examples](examples/) folder (English and Hungarian): automations, a script with fields, the blueprint, webhook, MQTT, REST and Python calls. The READMEs got an "Automations and examples" section with a one-click blueprint import button.
 
 ## 2.7.1b6 – 2026-11-03
 

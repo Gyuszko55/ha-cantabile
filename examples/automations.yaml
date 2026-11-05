@@ -1,0 +1,147 @@
+# Cantabile – automation examples / automatizálás-példák
+#
+# Paste into automations.yaml, or into the automation editor in "Edit in YAML" mode.
+# Replace the speaker names and entity ids with your own.
+# Illeszd az automations.yaml-ba, vagy a szerkesztőben „Szerkesztés YAML-ban” módban.
+# A hangszóró- és entitásneveket a saját rendszeredre cseréld.
+#
+# "speaker" is the name given in the card settings, or (from 2.7.1) the short name on the
+# card's speaker selector. Empty: where something is playing, otherwise the first speaker.
+
+# 1. Morning radio at a pleasant volume, weekdays only / Reggeli rádió, csak hétköznap
+- alias: "Morning radio"
+  triggers:
+    - trigger: time
+      at: "06:45:00"
+  conditions:
+    - condition: time
+      weekday: [mon, tue, wed, thu, fri]
+  actions:
+    - action: media_player.volume_set      # set the volume first, so it doesn't start loud
+      target:
+        entity_id: media_player.living_room
+      data:
+        volume_level: 0.12
+    - action: cantabile.play
+      data:
+        query: "Jazz FM"
+        kind: radio
+        speaker: "Living room"
+
+# 2. Wake-up: starts quietly and gets louder / Ébresztő: halkan indul, fokozatosan hangosodik
+#    (the blueprint "Cantabile: zene időpontra" does this without YAML – see blueprint_example.yaml)
+- alias: "Wake-up music"
+  triggers:
+    - trigger: time
+      at: "07:00:00"
+  actions:
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.bedroom
+      data:
+        volume_level: 0.04
+    - action: cantabile.play
+      data:
+        query: "Morning coffee"
+        kind: playlist
+        source: deezer
+        speaker: "Bedroom"
+    - repeat:
+        count: 8
+        sequence:
+          - delay: "00:00:30"
+          - action: media_player.volume_up
+            target:
+              entity_id: media_player.bedroom
+
+# 3. An album in the bedroom, fades out after 45 minutes / Esti album, 45 perc után elhalkul
+- alias: "Evening album"
+  triggers:
+    - trigger: time
+      at: "22:30:00"
+  actions:
+    - action: cantabile.play
+      data:
+        query: "A Kind of Magic"
+        kind: album
+        artist: "Queen"
+        source: local                      # music folder only: fast, works without internet
+        speaker: "Bedroom"
+    - action: cantabile.sleep_timer
+      data:
+        entity_id: media_player.bedroom
+        minutes: 45
+
+# 4. Coming home: music if it's still quiet / Hazaérkezés: zene, ha még csend van
+- alias: "Welcome home music"
+  triggers:
+    - trigger: state
+      entity_id: person.anna
+      to: "home"
+  conditions:
+    - condition: state
+      entity_id: media_player.living_room
+      state: ["idle", "paused", "off"]
+    - condition: time
+      after: "08:00:00"
+      before: "21:00:00"
+  actions:
+    - action: cantabile.play
+      data:
+        query: "Favourite songs"
+        kind: playlist
+        source: deezer
+        shuffle: true
+        speaker: "Living room"
+
+# 5. Error handling: tell the phone if it didn't start / Hibakezelés: értesítés, ha nem indult
+#    cantabile.play answers with success / error, it never stops the automation.
+- alias: "Music with a check"
+  triggers:
+    - trigger: time
+      at: "18:00:00"
+  actions:
+    - action: cantabile.play
+      data:
+        query: "Favourite songs"
+        kind: playlist
+        speaker: "Kitchen"
+      response_variable: music
+    - if:
+        - condition: template
+          value_template: "{{ not music.success }}"
+      then:
+        - action: notify.mobile_app_my_phone
+          data:
+            title: "Cantabile"
+            message: "Didn't start: {{ music.error }}"
+      else:
+        - action: notify.mobile_app_my_phone
+          data:
+            message: "Playing: {{ music.playing }} – {{ music.speaker }} ({{ music.source }})"
+
+# 6. A button (Zigbee, Shelly…): radio on / off / Gombnyomásra rádió be / ki
+#    On a non-Sonos speaker also call cantabile.stop_tracks, otherwise Cantabile's
+#    track-by-track player starts the next track after the stop.
+- alias: "Kitchen button: radio"
+  triggers:
+    - trigger: state
+      entity_id: event.kitchen_button
+  actions:
+    - if:
+        - condition: state
+          entity_id: media_player.kitchen
+          state: "playing"
+      then:
+        - action: media_player.media_stop
+          target:
+            entity_id: media_player.kitchen
+        - action: cantabile.stop_tracks
+          data:
+            entity_id: media_player.kitchen
+      else:
+        - action: cantabile.play
+          data:
+            query: "Jazz FM"
+            kind: radio
+            speaker: "Kitchen"
