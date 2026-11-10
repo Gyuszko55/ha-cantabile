@@ -1,4 +1,4 @@
-# Cantabile
+# <img src="docs/images/icon.png" alt="Cantabile icon" width="44" align="absmiddle"> Cantabile
 
 **An old hi-fi radio and cassette deck for your Home Assistant dashboard** – an FM dial with preset buttons, internet
 radio, a cassette deck with turning reels and real VU meters, and a music library that brings your own music folder,

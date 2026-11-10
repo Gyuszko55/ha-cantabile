@@ -1,4 +1,4 @@
-# Cantabile
+# <img src="docs/images/icon.png" alt="Cantabile ikon" width="44" align="absmiddle"> Cantabile
 
 **Régi hi-fi rádió és tape deck a Home Assistant vezérlőpultjára** – FM-skála adógombokkal, internetes rádió, tape deck
 forgó orsókkal és valódi VU-mérőkkel, és egy zenetár, amely egybehozza a saját zenemappádat, a Music Assistantot, a
