@@ -430,7 +430,8 @@ under *Control Home Assistant* – the wizard's *Voice* step lists your agents a
    before the clock; without it `weather.home` or the first weather entity is used, `weather: false` hides it.
    `visual:` sets the look – `cover` (default: the cover, the details beside it, the lyrics across the bottom), `vinyl`
    (a spinning record with the cover as its label and a circular spectrum), `bars`, `wave` or `both` (the equaliser);
-   `lyrics: false` hides the lyrics. The same can be set in ⚙ → *TV look* or with the entities below.
+   `lyrics: false` hides the lyrics. These two keys are only a fallback: the look is normally set in ⚙ → *TV look* or
+   with the `select` / `switch` entities below, stored by the integration, and every TV page follows it live.
    The TV loads this page through Home Assistant's Cast receiver, so Home Assistant must be reachable from the TV over
    https (Home Assistant Cloud or your own external URL).
 3. On the card: **⚙ → Speakers → + New speaker** → choose the **“Cantabile TV · …”** player (not the TV's own Cast /

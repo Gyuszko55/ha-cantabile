@@ -425,7 +425,8 @@ résznél az *Assist* mellett kapcsold be a **Cantabile**-t is – a varázsló 
    nélküle a `weather.home`, vagy az első időjárás-entitás látszik, `weather: false` elrejti.
    `visual:` a kinézet – `cover` (alapértelmezés: borító, mellette az adatok, alul a dalszöveg teljes szélességben),
    `vinyl` (forgó lemez, a borító a címkéje, körspektrummal), `bars`, `wave` vagy `both` (equalizer); `lyrics: false`
-   elrejti a dalszöveget. Ugyanez a ⚙ → *TV-kinézet* résznél vagy a lenti entitásokkal is beállítható.
+   elrejti a dalszöveget. Ez a két kulcs csak tartalék: a kinézetet rendesen a ⚙ → *TV-kinézet* résznél vagy a lenti
+   `select` / `switch` entitással állítod, az integráció tárolja, és minden TV-oldal élőben követi.
    A TV ezt az oldalt a Home Assistant Cast-vevőjén át tölti be, ezért a Home Assistantnak a TV felől https-en
    elérhetőnek kell lennie (Home Assistant Cloud vagy saját külső cím).
 3. A kártyán: **⚙ → Hangszórók → + Új hangszóró** → a **„Cantabile TV · …”** lejátszót válaszd (ne a TV saját Cast- /

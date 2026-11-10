@@ -3941,25 +3941,16 @@ class CantabileCard extends HTMLElement {
     this._tvBeallBetolt();
   }
 
-  // a TV-oldal kinézete (custom:cantabile-tv kártyák, bármelyik vezérlőpulton): a ⚙ panel „TV-kinézet” része
-  async _tvBeallBetolt() {
-    const sz = this._szerk;
-    try {
-      const lista = await this._hass.callWS({ type: "lovelace/dashboards/list" });
-      const pultok = [];
-      for (const d of lista.filter((x) => x.mode === "storage")) {
-        let cfg; try { cfg = await this._hass.callWS({ type: "lovelace/config", url_path: d.url_path }); } catch (_) { continue; }
-        const kartyak = [], bejar = (x) => { if (Array.isArray(x)) x.forEach(bejar); else if (x && typeof x === "object") { if (x.type === "custom:cantabile-tv") kartyak.push(x); else Object.values(x).forEach(bejar); } };
-        bejar(cfg);
-        if (kartyak.length) pultok.push({ pult: d.url_path, cim: d.title || d.url_path, cfg, kartyak });
-      }
-      if (this._szerk !== sz || !pultok.length) return;
-      const k = pultok[0].kartyak[0], visual = ["vinyl", "cover", "bars", "wave", "both"].includes(k.visual) ? k.visual : "cover";
-      const lyrics = ["vinyl", "cover"].includes(visual) ? k.lyrics !== false : k.lyrics === true;
-      this._tvPultok = pultok;
-      sz.tv = { visual, lyrics, eredeti: `${visual}|${lyrics}` };
-      this._beallRajz();
-    } catch (_) { /* nincs jogosultság vagy TV-oldal: a rész nem jelenik meg */ }
+  // a TV-oldal kinézete (a Cantabile „TV-kinézet” select és „Futó dalszöveg” switch entitása, tv_kinezet.py): a ⚙ panel
+  // „TV-kinézet” része – csak ha van TV-lejátszó; mentéskor a két entitás szolgáltatását hívja (vezérlőpultot nem ír)
+  _tvBeallBetolt() {
+    const sz = this._szerk, st = this._hass?.states || {}, id = TV_KIN_ID(st);
+    if (!id.v || !id.d || !(id.v in st) || !(id.d in st)) return;
+    if (!Object.keys(this._tvMap || {}).length && !Object.values(st).some((x) => x.attributes?.cast_entity)) return;
+    const visual = TV_KINEZETEK.includes(st[id.v].state) ? st[id.v].state : "cover", lyrics = st[id.d].state === "on";
+    this._tvEnt = id;
+    sz.tv = { visual, lyrics, eredeti: `${visual}|${lyrics}` };
+    this._beallRajz();
   }
 
   _beallZar() {
@@ -4161,17 +4152,12 @@ class CantabileCard extends HTMLElement {
         try { await this._hass.callWS({ type: "lovelace/config/save", url_path: pult || null, config: cfg }); mentve.push(pult); }
         catch (e) { if (pult === itt) throw e; hibas.push(pult); }
       }
-      // TV-kinézet: a custom:cantabile-tv kártyák (a TV-oldal a vezérlőpult frissülésekor magától átveszi)
-      if (sz.tv && `${sz.tv.visual}|${sz.tv.lyrics}` !== sz.tv.eredeti) {
-        for (const p of this._tvPultok || []) {
-          p.kartyak.forEach((k) => {
-            k.visual = sz.tv.visual;
-            if (["vinyl", "cover"].includes(sz.tv.visual)) { if (sz.tv.lyrics) delete k.lyrics; else k.lyrics = false; }
-            else if (sz.tv.lyrics) k.lyrics = true; else delete k.lyrics;
-          });
-          try { await this._hass.callWS({ type: "lovelace/config/save", url_path: p.pult, config: p.cfg }); if (!mentve.includes(p.pult)) mentve.push(p.pult); }
-          catch (e) { hibas.push(p.pult); }
-        }
+      // TV-kinézet: a két Cantabile-entitás (a TV-oldal az állapotukat élőben követi)
+      if (sz.tv && this._tvEnt && `${sz.tv.visual}|${sz.tv.lyrics}` !== sz.tv.eredeti) {
+        try {
+          await this._hass.callService("select", "select_option", { entity_id: this._tvEnt.v, option: sz.tv.visual });
+          await this._hass.callService("switch", sz.tv.lyrics ? "turn_on" : "turn_off", { entity_id: this._tvEnt.d });
+        } catch (e) { hibas.push(T("TV-kinézet")); }
       }
       this._beallZar();
       const nevek = mentve.map((u) => lista.find((d) => d.url_path === u)?.title || u || T("Áttekintés")).join(", ");
@@ -8425,15 +8411,25 @@ const ORA_OPC = (h) => {
   return h12 !== undefined ? { hourCycle: h12 ? "h12" : "h23" } : {};
 };
 
+// a TV-kinézet entitásai (select + switch, tv_kinezet.py) a `cantabile_tv` attribútumukról: { v: select, d: switch }
+const TV_KINEZETEK = ["vinyl", "cover", "bars", "wave", "both"];
+const TV_KIN_ID = (st) => {
+  const id = {};
+  for (const [e, s] of Object.entries(st || {})) { const a = s?.attributes?.cantabile_tv; if (a === "visual") id.v = e; else if (a === "lyrics") id.d = e; }
+  return id;
+};
+
 class CantabileTv extends HTMLElement {
   // visual: cover (borító, alapértelmezés) | vinyl (forgó bakelit körspektrummal) | bars | wave | both;
   // lyrics: futó dalszöveg (borítónál és bakelitnél alapból be);
   // elonezet: <hangszóró> – a kártya TV-ablaka: nem TV-ként jelentkezik be, hanem ennek a hangszórónak az adatait mutatja
-  setConfig(c) { this._c = { visual: "cover", ...(c || {}) }; }
+  // (a kinézetet és a dalszöveget a Cantabile két entitása adja, ha megvannak – a kártya beállítása csak tartalék)
+  setConfig(c) { this._c0 = { visual: "cover", ...(c || {}) }; this._c = { ...this._c0 }; }
   get _dszBe() { return this._c.lyrics === true || (this._c.lyrics !== false && ["vinyl", "cover"].includes(this._c.visual)); }
 
   set hass(h) {
     this._h = h;
+    if (!this._c.elonezet) this._kinKovet(h);
     if (this._kesz) return;
     this._kesz = true;
     // hibakeresés a Cast-vevőn (oda nem látunk be): a hibák és az állapot `cantabile_tv_diag` eseményként jönnek vissza
@@ -8447,6 +8443,38 @@ class CantabileTv extends HTMLElement {
   }
 
   getCardSize() { return 12; }
+
+  // TV-kinézet: a „TV-kinézet” select és a „Futó dalszöveg” switch állapota (élőben); ha nincsenek, a kártya beállítása
+  _kinKovet(h) {
+    const st = h?.states || {};
+    if ((!this._kinId || !(this._kinId.v in st || this._kinId.d in st)) && Date.now() - (this._kinKeresve || 0) > 30000) {
+      this._kinKeresve = Date.now();
+      this._kinId = TV_KIN_ID(st);
+    }
+    const id = this._kinId || {}, v = st[id.v]?.state, d = st[id.d]?.state;
+    const visual = TV_KINEZETEK.includes(v) ? v : this._c0.visual;
+    const lyrics = d === "on" ? true : d === "off" ? false : this._c0.lyrics;
+    if (visual === this._c.visual && lyrics === this._c.lyrics) return;
+    const regiDsz = this._dszBe;
+    this._c = { ...this._c, visual, lyrics };
+    if (this._v) this._kinAlkalmaz(regiDsz);
+  }
+
+  _kinAlkalmaz(regiDsz) {
+    this._v.classList.toggle("bak", this._c.visual === "vinyl");
+    this._v.classList.toggle("bmod", this._c.visual === "cover");
+    for (const c of [this._cv, this._bk]) c?.getContext("2d")?.clearRect(0, 0, c.width, c.height);
+    if (this._dszBe === regiDsz) return;
+    if (!this._dszBe) {
+      clearTimeout(this._dszUjra);
+      this._dsz = null;
+      this.shadowRoot?.querySelector(".dsz")?.classList.remove("van", "uz");
+      this.shadowRoot?.querySelector(".csipek .kar")?.remove();
+    } else if (this._dszUtolso) {
+      this._dszKulcs = null;
+      this._dszKer(...this._dszUtolso);
+    }
+  }
 
   // a Cast-vevő a kártyát kétszer is létrehozhatja: csak a lejátszóhoz kapcsolódott példány látszik (felül), a többi
   // elrejti magát és nem kapcsolódik újra; a lekerült példány elengedi a kapcsolatot
@@ -8975,6 +9003,7 @@ class CantabileTv extends HTMLElement {
   }
 
   async _dszKer(m, radio) {
+    this._dszUtolso = [m, radio];
     const sr = this.shadowRoot, d = sr.querySelector(".dsz"), kulcs = `${m.artist}|${m.title}`;
     if (this._dszKulcs === kulcs) return this._karJel();       // ugyanaz a szám (az adatok újrarajzolva): a jelzés maradjon
     this._dszKulcs = kulcs; this._dsz = null; this._dszI = -2;

@@ -1,7 +1,14 @@
 # Changelog
 
-## Unreleased
+## 2.7.2 – 2026-11-10
 
+- **The TV look no longer writes into dashboards.** The look of the TV page (`select` "TV look") and the running lyrics
+  (`switch` "Running lyrics") are kept in the integration's own storage; the `cantabile-tv` card reads them from the two
+  entities and follows changes live. Before, changing either rewrote every `custom:cantabile-tv` card in every dashboard
+  – which any user, automation or script could trigger, although only admins may save dashboards – and failed on YAML
+  dashboards. On the first start the current look is taken over (read only) from the existing TV card; the card's own
+  `visual` / `lyrics` keys stay as a fallback when the entities are missing. The ⚙ panel's *TV look* part now calls the
+  two entities (shown only when a TV player is set up).
 - Example [power_button.yaml](examples/power_button.yaml): a power button in a conditional card (the card's own POWER can't be moved out of the card).
 
 ## 2.7.1 – 2026-11-05

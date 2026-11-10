@@ -123,6 +123,7 @@ class Cantabile:
         self.rounds = 1
         self.sleep: dict[str, str] = {}             # lejátszó → leállás ideje (ISO)
         self.net: dict[str, Any] | None = None      # hanggal indított NET-adó
+        self.tv_kinezet: Any = None                 # tv_kinezet.TvKinezet (az __init__ tölti be)
         self._sorozat: dict[str, asyncio.Task] = {}
         self._sorrend: dict[str, Sorrend] = {}
         self._alvas: dict[str, Callable[[], None]] = {}

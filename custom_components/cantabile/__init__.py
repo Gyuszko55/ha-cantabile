@@ -36,7 +36,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
-from . import atmeneti, foglalas, halkitas, hangszin, helyettesit, library, listak, ma, llm, lyrics, music, naplo, party, sonossor, streaming, tovabbito, tv, utmatrix, varazslo, vu, wiim_deezer
+from . import atmeneti, foglalas, halkitas, hangszin, helyettesit, library, listak, ma, llm, lyrics, music, naplo, party, sonossor, streaming, tovabbito, tv, tv_kinezet, utmatrix, varazslo, vu, wiim_deezer
 from .const import (
     CARD_URL, CONF_DUCK_LEVEL, CONF_DUCK_SOURCES, CONF_LLM_API, DOMAIN, DUCK_LEVEL_DEFAULT, STATIC_URL, UID_NET, UID_ROUNDS,
     UID_SLEEP, VERSION,
@@ -161,6 +161,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: CantabileConfigEntry) ->
     await _kartya_bejegyzes(hass)
     rt = Cantabile(hass)
     entry.runtime_data = rt
+    # a TV-oldal kinézete (select + switch) saját tárolóban; a kártya az entitásokból olvassa
+    rt.tv_kinezet = tv_kinezet.TvKinezet(hass)
+    await rt.tv_kinezet.betolt()
     rt.start()
     zene = music.regisztral(hass, rt)
     entry.async_on_unload(zene.stop)
