@@ -482,7 +482,9 @@ class CantabileConfigFlow(_Varazslo, config_entry_oauth2_flow.AbstractOAuth2Flow
     async def async_oauth_create_entry(self, data: dict[str, Any]) -> ConfigFlowResult:
         """Store the Spotify token on the (single) Cantabile entry; the options stay as they are."""
         bej = self._get_reconfigure_entry()
-        return self.async_update_reload_and_abort(bej, data={**bej.data, **data}, reason="spotify_linked")
+        # no reload: streaming reads the token from entry.data on every call, and the entry's own update listener
+        # reloads only on an options change (HA 2026.12: a flow must not reload an entry that has an update listener)
+        return self.async_update_and_abort(bej, data={**bej.data, **data}, reason="spotify_linked")
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """1. Üdvözlés: mi kerül beállításra, mi választható."""
