@@ -267,7 +267,7 @@ Assistant language: **Hungarian** or **English**.
 - Deezer plays on Sonos through the Deezer service in your Sonos app, on a WiiM through the Deezer account in the WiiM Home
   app (lossless), elsewhere through Music Assistant's Deezer or from the music folder. Searching Deezer needs no account.
 - Spotify plays on Sonos through the Spotify service in your Sonos app, on Spotify Connect devices (send music to the
-  speaker once from the Spotify app so the account knows it) through the Home Assistant Spotify integration (Premium);
+  speaker once from the Spotify app so the account knows it) with Cantabile's own Spotify login (Premium);
   elsewhere albums and tracks come from Deezer. Spotify doesn't release playlist tracks to apps, so a Spotify playlist
   plays only on Sonos or a Spotify Connect speaker.
 - Browsers: a current Chrome / Edge, Safari or Firefox – at least Chrome 105, Safari / iOS 16 or Firefox 110 (older
@@ -309,7 +309,7 @@ Assistant language: **Hungarian** or **English**.
 |---|---|---|---|
 | **Sonos favourites** | Favourites saved in the Sonos app | Your saved playlists, albums and stations on the STREAMING tab, by voice too | Sonos; elsewhere the favourite's content (Deezer, Spotify, radio) |
 | **Deezer** | A Deezer subscription linked in the **Sonos app** (*Settings → Services & voice → Add a service*). Searching needs no account. | Charts, search, artist pages, albums, tracks; voice (*“… from Deezer”*); anything not in your music folder is looked up here | Sonos, WiiM (own Deezer), Music Assistant players; elsewhere from the music folder |
-| **Spotify** *(experimental)* | 1. The Home Assistant **Spotify** integration – with your own Spotify developer app; redirect URI `https://my.home-assistant.io/redirect/oauth`; **Premium** for playback. 2. Optional: a Spotify developer key (client ID / secret) in the **Cantabile options** for catalogue search (without it the Spotify integration's session is used). 3. For Sonos: Spotify linked in the Sonos app. | Search, artist pages, albums, your playlists and library; voice (*“… from Spotify”*) | Sonos (link), any **Spotify Connect** speaker (e.g. WiiM) |
+| **Spotify** *(experimental)* | 1. **Cantabile's own Spotify login** (since 2.8.0): your own Spotify developer app (redirect URI `https://my.home-assistant.io/redirect/oauth`), its client ID / secret added under *Settings → Devices & services → ⋮ → Application credentials* (integration: Cantabile), then *Cantabile → ⋮ → Reconfigure* to sign in; **Premium** for playback. Cantabile does not use the Home Assistant Spotify integration's login. 2. Optional: a Spotify developer key (client ID / secret) in the **Cantabile options** for catalogue search only (no login needed). 3. For Sonos: Spotify linked in the Sonos app. 4. For Spotify Connect speakers: the Home Assistant **Spotify** integration's player (Cantabile selects the speaker on it). | Search, artist pages, albums, your playlists and library; voice (*“… from Spotify”*) | Sonos (link), any **Spotify Connect** speaker (e.g. WiiM) |
 | **Tidal** *(experimental)* | A Tidal developer key (developer.tidal.com, client ID / secret) in the Cantabile options; Tidal linked in the Sonos app | Search, artists, albums, playlists; voice (*“… from Tidal”*) | Sonos |
 
 **Watch out**
@@ -482,9 +482,10 @@ under *Control Home Assistant* – the wizard's *Voice* step lists your agents a
   artist / album / tracks. A Jellyfin or DLNA-server library works too: use its media-source path.
 - **Streaming**: on Sonos, your Sonos favourites (playlists, albums) and the whole Deezer catalogue (with the Deezer
   account linked in the Sonos app). Hide the DEEZER tab in ⚙ if you don't use it.
-- **Spotify (experimental)**: set up the Home Assistant **Spotify** integration (your own playlists and library, plus
-  playback on Spotify Connect speakers – Premium), and/or enter a Spotify developer key (client ID / secret from
-  developer.spotify.com) in the Cantabile integration options for catalogue search. On Sonos it plays with Spotify linked
+- **Spotify (experimental)**: sign Cantabile in to Spotify (your own playlists and library, plus playback on Spotify
+  Connect speakers – Premium): add your Spotify developer app's client ID / secret as *Application credentials*
+  (integration: Cantabile), then *Cantabile → ⋮ → Reconfigure*. For catalogue search alone a Spotify developer key
+  (client ID / secret from developer.spotify.com) in the Cantabile options is enough. On Sonos it plays with Spotify linked
   in the Sonos app. If a speaker isn't found among the Spotify Connect devices, set `spotify_device: <name>` on it.
 - **Tidal (experimental)**: enter a Tidal developer key (developer.tidal.com) in the Cantabile options; playback on Sonos
   with Tidal linked in the Sonos app.

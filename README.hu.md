@@ -266,7 +266,7 @@ nyelvét követik: **magyar** vagy **angol**.
 - A Deezer Sonoson a Sonos appban bekötött Deezerrel, WiiM-en a WiiM Home appban bekötött Deezer-fiókkal (lossless), máshol
   a Music Assistant Deezerével vagy a zenemappából szól. A Deezer-kereséshez nem kell fiók.
 - A Spotify Sonoson a Sonos appban bekötött Spotifyjal, Spotify Connect-eszközön (a Spotify appból egyszer küldj rá zenét,
-  hogy a fiók ismerje) a Home Assistant Spotify-integrációján át szól (Premium); máshol az album és a szám a Deezerről jön.
+  hogy a fiók ismerje) a Cantabile saját Spotify-bejelentkezésével szól (Premium); máshol az album és a szám a Deezerről jön.
   A Spotify a listák számait nem adja ki az alkalmazásoknak, ezért a Spotify-lista csak Sonoson vagy Spotify
   Connect-hangszórón szól.
 - Böngésző: friss Chrome / Edge, Safari vagy Firefox – legalább Chrome 105, Safari / iOS 16 vagy Firefox 110 (a régebbiek,
@@ -308,7 +308,7 @@ nyelvét követik: **magyar** vagy **angol**.
 |---|---|---|---|
 | **Sonos-kedvencek** | A Sonos appban elmentett kedvencek | A mentett listák, albumok, adók a STREAMING fülön, hanggal is | Sonos; máshol a kedvenc tartalma (Deezer, Spotify, rádió) |
 | **Deezer** | A **Sonos appban** bekötött Deezer-előfizetés (*Beállítások → Szolgáltatások és hang → Szolgáltatás hozzáadása*). A kereséshez nem kell fiók. | Toplisták, keresés, előadó-oldalak, albumok, számok; hanggal (*„… a Deezerről”*); ami a zenemappában nincs meg, azt itt keresi | Sonos, WiiM (saját Deezer), Music Assistant-lejátszó; máshol a zenemappából |
-| **Spotify** *(kísérleti)* | 1. A Home Assistant **Spotify** integrációja – saját Spotify fejlesztői appal; átirányítási cím `https://my.home-assistant.io/redirect/oauth`; a lejátszáshoz **Premium**. 2. Elhagyható: Spotify fejlesztői kulcs (client ID / secret) a **Cantabile beállításaiban** a katalógus-kereséshez (nélküle a Spotify-integráció munkamenetét használja). 3. Sonoshoz: a Sonos appban bekötött Spotify. | Keresés, előadó-oldalak, albumok, a saját listáid és könyvtárad; hanggal (*„… a Spotifyról”*) | Sonos (linkkel), bármely **Spotify Connect** hangszóró (pl. WiiM) |
+| **Spotify** *(kísérleti)* | 1. **A Cantabile saját Spotify-bejelentkezése** (2.8.0 óta): saját Spotify fejlesztői app (átirányítási cím `https://my.home-assistant.io/redirect/oauth`), a client ID / secret felvéve itt: *Beállítások → Eszközök és szolgáltatások → ⋮ → Alkalmazás-hitelesítő adatok* (integráció: Cantabile), majd *Cantabile → ⋮ → Újrakonfigurálás* a bejelentkezéshez; a lejátszáshoz **Premium**. A Cantabile a Home Assistant Spotify-integrációjának bejelentkezését nem használja. 2. Elhagyható: Spotify fejlesztői kulcs (client ID / secret) a **Cantabile beállításaiban**, csak a katalógus-kereséshez (bejelentkezés nélkül). 3. Sonoshoz: a Sonos appban bekötött Spotify. 4. Spotify Connect-hangszóróhoz: a Home Assistant **Spotify**-integrációjának lejátszója (a Cantabile ezen választja ki a hangszórót). | Keresés, előadó-oldalak, albumok, a saját listáid és könyvtárad; hanggal (*„… a Spotifyról”*) | Sonos (linkkel), bármely **Spotify Connect** hangszóró (pl. WiiM) |
 | **Tidal** *(kísérleti)* | Tidal fejlesztői kulcs (developer.tidal.com, client ID / secret) a Cantabile beállításaiban; a Sonos appban bekötött Tidal | Keresés, előadók, albumok, listák; hanggal (*„… a Tidalról”*) | Sonos |
 
 **Mire figyelj**
@@ -477,9 +477,10 @@ résznél az *Assist* mellett kapcsold be a **Cantabile**-t is – a varázsló 
   számok. Jellyfin vagy DLNA-szerver zenetára is jó: a médiaforrás-útvonalát add meg.
 - **Streaming**: Sonoson a Sonos-kedvencek (listák, albumok) és a teljes Deezer-kínálat (a Sonos appban bekötött
   Deezer-fiókkal). Ha nem használod, a ⚙-ben rejtsd el a DEEZER fület.
-- **Spotify (kísérleti)**: kösd be a Home Assistant **Spotify**-integrációját (saját listák és könyvtár, valamint lejátszás
-  Spotify Connect-hangszórón – Premium), és/vagy add meg a Cantabile integráció beállításaiban a Spotify-fejlesztői kulcsot
-  (client ID / secret a developer.spotify.com-ról) a katalógus kereséséhez. Sonoson a Sonos appba bekötött Spotify-jal
+- **Spotify (kísérleti)**: jelentkeztesd be a Cantabile-t a Spotify-ba (saját listák és könyvtár, valamint lejátszás
+  Spotify Connect-hangszórón – Premium): a Spotify-fejlesztői appod client ID-ját / secretjét add meg *Alkalmazás-hitelesítő
+  adatként* (integráció: Cantabile), majd *Cantabile → ⋮ → Újrakonfigurálás*. Csak a katalógus kereséséhez elég a
+  Cantabile beállításaiban megadott Spotify-fejlesztői kulcs (client ID / secret a developer.spotify.com-ról). Sonoson a Sonos appba bekötött Spotify-jal
   szól. Ha egy hangszóró nincs a Spotify Connect-eszközök között, add meg rajta: `spotify_device: <név>`.
 - **Tidal (kísérleti)**: Tidal-fejlesztői kulcs (developer.tidal.com) a Cantabile beállításaiban; lejátszás Sonoson, a
   Sonos appba bekötött Tidallal.

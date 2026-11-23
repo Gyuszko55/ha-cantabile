@@ -222,13 +222,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: CantabileConfigEntry) ->
     entry.async_on_unload(halkito.stop)
     if entry.options.get(CONF_LLM_API, True):
         entry.async_on_unload(llm.regisztral(hass, zene))
+    hass.data[DOMAIN]["opciok"] = dict(entry.options)
     entry.async_on_unload(entry.add_update_listener(_ujratolt))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
 async def _ujratolt(hass: HomeAssistant, entry: CantabileConfigEntry) -> None:
-    await hass.config_entries.async_reload(entry.entry_id)
+    # 2.8.0: only an options change reloads; the Spotify OAuth2 session writes its refreshed token into entry.data
+    if dict(entry.options) != hass.data.get(DOMAIN, {}).get("opciok"):
+        await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: CantabileConfigEntry) -> bool:

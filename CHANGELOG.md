@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.8.0 – 2026-11-23
+
+- **Cantabile has its own Spotify login.** It no longer uses the Home Assistant Spotify integration's OAuth session.
+  Add your Spotify developer app's client ID / secret as *Application credentials* (integration: Cantabile), then sign
+  in with *Settings → Devices & services → Cantabile → ⋮ → Reconfigure* (OAuth2; scopes: your playlists, saved albums
+  and tracks, followed artists, the Spotify Connect device list and playback). Your playlists / library (MY LIBRARY)
+  and Spotify Connect playback use this login; without it only the public catalogue is available, with the
+  client-credentials developer key in the options. **After updating, sign in once** – until then MY LIBRARY falls back
+  to the Spotify player's media browser and Connect playback asks you to sign in.
+- The refreshed Spotify token is saved without reloading the integration (only an options change reloads it).
+- The setup wizard's music-folder check resolves the folder path (`os.path.realpath`, network I/O on a NAS mount) in
+  the executor instead of the event loop.
+
 ## 2.7.2 – 2026-11-10
 
 - **The TV look no longer writes into dashboards.** The look of the TV page (`select` "TV look") and the running lyrics

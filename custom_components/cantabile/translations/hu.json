@@ -1,7 +1,8 @@
 {
   "config": {
     "abort": {
-      "single_instance_allowed": "A Cantabile már be van állítva."
+      "single_instance_allowed": "A Cantabile már be van állítva.",
+      "spotify_linked": "A Cantabile bejelentkezett a Spotify-ba."
     },
     "error": {
       "too_many_stations": "Legfeljebb 12 adó fér az adógombokra – vegyél ki néhányat.",
@@ -114,6 +115,13 @@
       "summary": {
         "title": "Összefoglaló",
         "description": "- **Hangszórók** (★ alapértelmezett): {speakers}\n- **Zenemappa** (· 48 kHz-es másolatok · ⬆ feltöltések): {library}\n- **Rádióadók:** {radio}\n- **TV-lejátszók:** {tv}\n- **Assist-eszköz** (hang): {voice}\n- **Vezérlőpult:** {dashboard}\n- **Meglévő Cantabile kártyák:** {cards}\n\n✅ beállítva · ⏭️ kihagyva (később is beállítható) · – nem változott · ⚠️ figyelmet kér. Az új TV-lejátszók maguktól felkerülnek a kártyára „TV · …” hangszóróként.\n\n**Később így módosíthatod:** a hangszórókat, az adókat, a zenemappát és a kinézetet a kártya ⚙ gombjával (a *Mentés* minden Cantabile kártyába beírja); a TV-lejátszókat, a bemondáskori halkítást, a Spotify / Tidal kulcsokat és az Assist-eszközt a [Beállítások → Eszközök és szolgáltatások]({integrations_url}) → Cantabile → **Konfigurálás** alatt – itt a varázsló is újra futtatható, lépésenként is."
+      },
+      "reconfigure": {
+        "title": "Spotify-bejelentkezés a Cantabile-nek",
+        "description": "A Cantabile saját bejelentkezéssel csatlakozik a Spotify-hoz – a Home Assistant Spotify-integrációjának munkamenetét nem használja. Ez kell a listáidhoz és a mentett zenéidhez (SAJÁT TÁR), valamint a Spotify Connect-hangszórókon való lejátszáshoz; a nyilvános katalógusban keresni a beállításokban megadott fejlesztői kulccsal is lehet.\n\nMielőtt továbblépsz, add meg a Spotify-fejlesztői alkalmazásod client ID-ját és secretjét itt: **Beállítások → Eszközök és szolgáltatások → ⋮ → Alkalmazás-hitelesítő adatok** (integráció: Cantabile). Az alkalmazás átirányítási címe (redirect URI): `{redirect_url}`.\n\nJelenlegi bejelentkezés: {state}"
+      },
+      "pick_implementation": {
+        "title": "Válaszd ki a Spotify-hitelesítő adatot"
       }
     }
   },
@@ -439,5 +447,8 @@
         }
       }
     }
+  },
+  "application_credentials": {
+    "description": "A Cantabile a saját Spotify-fejlesztői alkalmazásoddal jelentkezik be ({developer_url} → Dashboard → Create app). Az átirányítási cím (redirect URI) legyen `{redirect_url}`, majd add meg itt az alkalmazás client ID-ját és secretjét."
   }
 }

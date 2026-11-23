@@ -23,6 +23,7 @@ import voluptuous as vol
 
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -65,6 +66,12 @@ def _opciok(hass: HomeAssistant) -> dict[str, Any]:
     return dict(bej[0].options) if bej else {}
 
 
+def spotify_bejelentkezve(hass: HomeAssistant) -> bool:
+    """2.8.0: Cantabile's own Spotify login (Reconfigure → OAuth2) is present."""
+    bej = hass.config_entries.async_loaded_entries(DOMAIN)
+    return bool(bej and bej[0].data.get("token") and bej[0].data.get("auth_implementation"))
+
+
 def spotify_entitas(hass: HomeAssistant) -> str | None:
     """A HA Spotify-integrációjának lejátszója (Spotify Connect-vezérlés és a saját könyvtár böngészése)."""
     for e in er.async_get(hass).entities.values():
@@ -77,8 +84,10 @@ def allapot(hass: HomeAssistant) -> dict[str, Any]:
     """A kártyának: melyik szolgáltatás használható."""
     o = _opciok(hass)
     ent = spotify_entitas(hass)
+    login = spotify_bejelentkezve(hass)
     return {
-        "spotify": bool((o.get(CONF_SPOTIFY_ID) and o.get(CONF_SPOTIFY_SECRET)) or ent),
+        "spotify": bool((o.get(CONF_SPOTIFY_ID) and o.get(CONF_SPOTIFY_SECRET)) or login),
+        "spotify_login": login,
         "spotify_entity": ent,
         "tidal": bool(o.get(CONF_TIDAL_ID) and o.get(CONF_TIDAL_SECRET)),
     }
@@ -100,20 +109,34 @@ async def _ugyfel_token(hass: HomeAssistant, nev: str, cim: str, azon: str, tito
     return j["access_token"]
 
 
+async def _sajat_token(hass: HomeAssistant) -> str:
+    """2.8.0: the access token of Cantabile's own Spotify login (OAuth2 session on Cantabile's config entry).
+
+    Cantabile never uses another integration's session: without this login only the public catalogue (client
+    credentials from the options) is available."""
+    bej = hass.config_entries.async_loaded_entries(DOMAIN)
+    if not bej or not bej[0].data.get("token"):
+        raise StreamHiba("spotify_login_needed")
+    try:
+        impl = await config_entry_oauth2_flow.async_get_config_entry_implementation(hass, bej[0])
+        sess = config_entry_oauth2_flow.OAuth2Session(hass, bej[0], impl)
+        await sess.async_ensure_token_valid()
+        return sess.token["access_token"]
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug("Cantabile: the Spotify login could not be refreshed", exc_info=True)
+        raise StreamHiba("spotify_login_down") from err
+
+
 async def _spotify_token(hass: HomeAssistant, sajat: bool = False) -> str:
+    """sajat=True: the account's own data and playback (Cantabile's Spotify login only).
+    Otherwise (public catalogue): the client-credentials key from the options, else Cantabile's own login."""
+    if sajat:
+        return await _sajat_token(hass)
     o = _opciok(hass)
-    if not sajat and o.get(CONF_SPOTIFY_ID) and o.get(CONF_SPOTIFY_SECRET):
+    if o.get(CONF_SPOTIFY_ID) and o.get(CONF_SPOTIFY_SECRET):
         return await _ugyfel_token(hass, "spotify", SPOTIFY_TOKEN, o[CONF_SPOTIFY_ID], o[CONF_SPOTIFY_SECRET])
-    # a HA Spotify-integrációjának bejelentkezett munkamenete (a saját könyvtárhoz mindig ez)
-    for bej in hass.config_entries.async_loaded_entries("spotify"):
-        sess = getattr(getattr(bej, "runtime_data", None), "session", None)
-        if sess is not None:
-            try:
-                await sess.async_ensure_token_valid()
-                return sess.token["access_token"]
-            except Exception as err:  # noqa: BLE001
-                _LOGGER.debug("Cantabile: a Spotify-integráció tokenje nem érhető el", exc_info=True)
-                raise StreamHiba("spotify_login_down") from err
+    if spotify_bejelentkezve(hass):
+        return await _sajat_token(hass)
     raise StreamHiba("spotify_no_key")
 
 

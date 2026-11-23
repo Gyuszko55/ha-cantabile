@@ -14,6 +14,7 @@
   ],
   "config_flow": true,
   "dependencies": [
+    "application_credentials",
     "frontend",
     "http",
     "media_source",
@@ -28,5 +29,5 @@
     "segno==1.6.6"
   ],
   "single_config_entry": true,
-  "version": "2.7.2"
+  "version": "2.8.0"
 }

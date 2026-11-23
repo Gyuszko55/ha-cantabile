@@ -1,7 +1,8 @@
 {
   "config": {
     "abort": {
-      "single_instance_allowed": "Cantabile is already set up."
+      "single_instance_allowed": "Cantabile is already set up.",
+      "spotify_linked": "Cantabile is now signed in to Spotify."
     },
     "error": {
       "too_many_stations": "At most 12 stations fit on the preset buttons – untick some.",
@@ -114,6 +115,13 @@
       "summary": {
         "title": "Summary",
         "description": "- **Speakers** (★ default): {speakers}\n- **Music folder** (· 48 kHz copies · ⬆ uploads): {library}\n- **Radio stations:** {radio}\n- **TV players:** {tv}\n- **Assist tool** (voice): {voice}\n- **Dashboard:** {dashboard}\n- **Existing Cantabile cards:** {cards}\n\n✅ set up · ⏭️ skipped (can be set later) · – not changed · ⚠️ needs attention. New TV players appear on the card as “TV · …” speakers by themselves.\n\n**Changing things later:** speakers, stations, music folder and the look on the card's ⚙ button (*Save* writes into every Cantabile card); TV players, announcements, Spotify / Tidal keys and the Assist tool under [Settings → Devices & services]({integrations_url}) → Cantabile → **Configure** – where this wizard can be run again, also step by step."
+      },
+      "reconfigure": {
+        "title": "Spotify login for Cantabile",
+        "description": "Cantabile signs in to Spotify with its own login – it does not use the Home Assistant Spotify integration's session. This is needed for your playlists and saved music (MY LIBRARY) and for playing on Spotify Connect speakers; search in the public catalogue also works with a developer key in the options.\n\nBefore you continue, add your Spotify developer app's client ID and secret under **Settings → Devices & services → ⋮ → Application credentials** (integration: Cantabile). The app's redirect URI must be `{redirect_url}`.\n\nCurrent login: {state}"
+      },
+      "pick_implementation": {
+        "title": "Pick the Spotify credentials"
       }
     }
   },
@@ -439,5 +447,8 @@
         }
       }
     }
+  },
+  "application_credentials": {
+    "description": "Cantabile signs in to Spotify with your own Spotify developer app ({developer_url} → Dashboard → Create app). Set the redirect URI to `{redirect_url}`, then enter the app's client ID and secret here."
   }
 }

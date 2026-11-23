@@ -18,6 +18,7 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.core import callback
+from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 
@@ -153,7 +154,9 @@ class _Varazslo:
             fel = str(user_input.get("upload_folder") or "").strip().strip("/")
             if nas and not nas.startswith("media-source://"):
                 errors["media_folder"] = "folder_invalid"
-            elif nas and hires and (ut := varazslo.helyi_ut(dirs, nas)) and not await hass.async_add_executor_job(os.path.isdir, os.path.join(ut, hires)):
+            # 2.8.0: helyi_ut calls os.path.realpath – on a NAS mount that is network I/O, so it runs in the executor
+            elif nas and hires and (ut := await hass.async_add_executor_job(varazslo.helyi_ut, dirs, nas)) \
+                    and not await hass.async_add_executor_job(os.path.isdir, os.path.join(ut, hires)):
                 errors["hires_folder"] = "hires_not_found"
             if not errors:
                 self._b["magno"] = {"nas": nas, "hires": hires if nas else "", "feltoltes": fel if nas else ""}
@@ -440,8 +443,46 @@ class _Varazslo:
         raise NotImplementedError
 
 
-class CantabileConfigFlow(_Varazslo, ConfigFlow, domain=DOMAIN):
+# 2.8.0: Cantabile's own Spotify login. The scopes cover what Cantabile itself calls: the account's playlists, saved
+# albums / tracks and followed artists (MY LIBRARY), the Spotify Connect device list and starting playback on one.
+REDIRECT_URL = "https://my.home-assistant.io/redirect/oauth"
+SPOTIFY_SCOPES = (
+    "user-read-private",
+    "playlist-read-private",
+    "playlist-read-collaborative",
+    "user-library-read",
+    "user-follow-read",
+    "user-read-playback-state",
+    "user-modify-playback-state",
+)
+
+
+class CantabileConfigFlow(_Varazslo, config_entry_oauth2_flow.AbstractOAuth2FlowHandler, domain=DOMAIN):
+    """Setup wizard; Reconfigure = Cantabile's own Spotify login (OAuth2, application credentials)."""
+
+    DOMAIN = DOMAIN
     VERSION = 1
+
+    @property
+    def logger(self) -> logging.Logger:
+        return _LOGGER
+
+    @property
+    def extra_authorize_data(self) -> dict[str, Any]:
+        return {"scope": " ".join(SPOTIFY_SCOPES), "show_dialog": "true"}
+
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Spotify login for Cantabile itself (playlists, library, Spotify Connect); the setup wizard is in Options."""
+        if user_input is not None:
+            return await self.async_step_pick_implementation()
+        bej = self._get_reconfigure_entry()
+        return self.async_show_form(step_id="reconfigure", data_schema=vol.Schema({}),
+                                    description_placeholders={"state": "✓" if bej.data.get("token") else "–", "redirect_url": REDIRECT_URL})
+
+    async def async_oauth_create_entry(self, data: dict[str, Any]) -> ConfigFlowResult:
+        """Store the Spotify token on the (single) Cantabile entry; the options stay as they are."""
+        bej = self._get_reconfigure_entry()
+        return self.async_update_reload_and_abort(bej, data={**bej.data, **data}, reason="spotify_linked")
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """1. Üdvözlés: mi kerül beállításra, mi választható."""

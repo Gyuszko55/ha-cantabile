@@ -5303,8 +5303,9 @@ class CantabileCard extends HTMLElement {
     const kaz = (cim, alcim, tip, id, kep, extra = {}) => ({ cim, alcim, forras: "stream", tipus: szolg, id: link(tip, id), uri: szolg === "spotify" ? `spotify:${tip}:${id}` : undefined, mtype: tip, kep: kep || null, ...extra });
     lista.innerHTML = `<div class="puzenet">${T("Betöltés…")}</div>`;
     try {
-      // MY LIBRARY: a Spotify-fiók listái, mentett albumai és követett előadói (a HA Spotify-integrációjának
-      // bejelentkezett fiókjával, a Spotify API-ból – akkor is, ha épp nem szól semmi); alatta a keresés
+      // MY LIBRARY: a Spotify-fiók listái, mentett albumai és követett előadói (2.8.0: a Cantabile SAJÁT Spotify-
+      // bejelentkezésével – Újrakonfigurálás –, a Spotify API-ból, akkor is, ha épp nem szól semmi); alatta a keresés.
+      // Bejelentkezés nélkül az API-hívások hibát adnak (null), és a HA Spotify-lejátszójának médiaböngészője a tartalék.
       if (szolg === "spotify" && !hely && KERES_NORM(kerdes).length < 2 && connect) {
         // a fiók Spotify-eszközei (a szerver megjegyzi a nevüket, amikor névvel látja – a tétlenül csak azonosítóval
         // listázott hangszóró így később is felismerhető)
