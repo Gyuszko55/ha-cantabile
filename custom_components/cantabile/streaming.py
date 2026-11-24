@@ -1,12 +1,15 @@
 """Spotify és Tidal a kazettapolcon (kísérleti): katalógus-keresés a szerveren át, lejátszás Sonoson linkkel.
 
 A Deezerrel ellentétben mindkét szolgáltatás katalógusa csak engedéllyel kérdezhető le:
-  - Spotify: a Cantabile beállításaiban megadott fejlesztői kulcs (client credentials), vagy ha nincs, a Home
-    Assistant Spotify-integrációjának bejelentkezett munkamenete;
+  - Spotify: a Cantabile saját Spotify-bejelentkezése (2.8.0 óta: Alkalmazás-hitelesítő adatok + Újrakonfigurálás,
+    OAuth2), vagy csak a nyilvános katalógushoz a Cantabile beállításaiban megadott fejlesztői kulcs (client
+    credentials); a Home Assistant Spotify-integrációjának munkamenetét a Cantabile nem használja;
   - Tidal: a Cantabile beállításaiban megadott fejlesztői kulcs (client credentials, openapi.tidal.com v2).
 A kulcsok és a tokenek a szerveren maradnak: a kártya a `cantabile/spotify` és a `cantabile/tidal` paranccsal kér,
 csak az engedélyezett (olvasó) útvonalakon. A lejátszás Sonoson a szolgáltatás linkjével megy (a Sonos appban
-bekötött fiókkal); Spotify Connect-eszközön a kártya a HA Spotify-integrációján át indít.
+bekötött fiókkal). Spotify Connect-eszközön egy albumot vagy listát a kártya a HA Spotify-lejátszójának nyilvános
+szolgáltatásaival indít (select_source, play_media); számokat adott számtól és ponttól, valamint az eszközlistát a
+Cantabile saját bejelentkezésével, a Spotify Web API-n át kéri.
 """
 
 from __future__ import annotations
@@ -36,8 +39,8 @@ SPOTIFY_TOKEN = "https://accounts.spotify.com/api/token"
 TIDAL_API = "https://openapi.tidal.com/v2"
 TIDAL_TOKEN = "https://auth.tidal.com/v1/oauth2/token"
 _AZON = r"[A-Za-z0-9_-]+"
-# a saját könyvtár (listák, mentett albumok, követett előadók, kedvelt dalok): csak a HA Spotify-integrációjának
-# bejelentkezett fiókjával (a fejlesztői kulcs nem fér hozzá egy felhasználó könyvtárához)
+# a saját könyvtár (listák, mentett albumok, követett előadók, kedvelt dalok): csak a Cantabile saját Spotify-
+# bejelentkezésével (a fejlesztői kulcs nem fér hozzá egy felhasználó könyvtárához)
 SPOTIFY_SAJAT = re.compile(r"^/me/(playlists|albums|tracks|following)(\?[^#]*)?$")
 SPOTIFY_UT = re.compile(rf"^/(search|artists/{_AZON}(/(albums|top-tracks))?|albums/{_AZON}(/tracks)?|playlists/{_AZON}(/tracks)?)(\?[^#]*)?$")
 TIDAL_UT = re.compile(
@@ -73,7 +76,9 @@ def spotify_bejelentkezve(hass: HomeAssistant) -> bool:
 
 
 def spotify_entitas(hass: HomeAssistant) -> str | None:
-    """A HA Spotify-integrációjának lejátszója (Spotify Connect-vezérlés és a saját könyvtár böngészése)."""
+    """A HA Spotify-integrációjának lejátszója, ha van. A kártya a nyilvános szolgáltatásait hívja (Connect-eszköz
+    kiválasztása, lejátszás), és amíg a Cantabile saját Spotify-bejelentkezése hiányzik, a médiaböngészőjét használja a
+    saját könyvtárhoz. Az integráció munkamenetét (tokenjét) a Cantabile nem használja."""
     for e in er.async_get(hass).entities.values():
         if e.platform == "spotify" and e.domain == "media_player" and not e.disabled:
             return e.entity_id
@@ -277,7 +282,7 @@ async def spotify_deezerre(hass: HomeAssistant, cim: str) -> dict[str, Any]:
     return {"deezer": linkek, "talalt": sum(1 for x in linkek if x), "osszes": len(linkek)}
 
 
-# ---- Spotify Connect: lejátszás egy Spotify-eszközön (a HA Spotify-integrációjának fiókjával) ----
+# ---- Spotify Connect: lejátszás egy Spotify-eszközön (a Cantabile saját Spotify-bejelentkezésével) ----
 # A Spotify a tétlen eszközök nevét gyakran nem adja meg (csak az azonosítót, pl. a WiiM „AVR”-ként): amikor névvel látjuk,
 # megjegyezzük (azonosító → név), és később ebből ismerjük fel.
 _ESZK_KULCS = "cantabile.spotify_eszkozok"

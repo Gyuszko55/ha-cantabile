@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.8.1 – 2026-11-24
+
+- Documentation only (HACS review note): the module docstring and comments of `streaming.py` now describe the 2.8.0
+  setup – Cantabile's own Spotify login for the library, the Connect device list and track playback; the Home
+  Assistant Spotify player only through its public services (selecting the Connect device, playing an album or
+  playlist) and its media browser as a fallback; never the Spotify integration's session. No change in behaviour.
+
 ## 2.8.0 – 2026-11-23
 
 - **Cantabile has its own Spotify login.** It no longer uses the Home Assistant Spotify integration's OAuth session.
